@@ -1,16 +1,16 @@
-import { neon, Pool } from "@neondatabase/serverless";
+import { Pool, types } from "pg";
 
 /**
- * Two backends behind one interface:
+ * One query interface over two backends:
  *
- *  - Production / real Postgres: the Neon serverless driver (Vercel Postgres
- *    injects DATABASE_URL automatically).
+ *  - Production / any real Postgres (Supabase, Vercel Postgres, Neon, …):
+ *    node-postgres, driven by DATABASE_URL.
  *  - Local dev with zero setup: set USE_PGLITE=1 and an in-process WASM
  *    Postgres (PGlite) is used instead, persisted to ./.pglite-data.
  *
- * `sql` is a tagged-template query function (always parameterized).
- * `pgPool` is a node-postgres-shaped { query } — the Auth.js adapter needs it.
- * `execScript` runs a multi-statement SQL string (schema / seed).
+ * `sql`        — tagged-template query (always parameterized) → returns rows
+ * `pgPool`     — node-postgres-shaped { query }; the Auth.js adapter needs it
+ * `execScript` — runs a multi-statement SQL string (schema / seed)
  */
 
 const USE_PGLITE = process.env.USE_PGLITE === "1";
@@ -20,6 +20,9 @@ const connectionString =
   process.env.POSTGRES_URL ||
   process.env.POSTGRES_PRISMA_URL ||
   "";
+
+// Return DATE columns as plain 'YYYY-MM-DD' strings (no timezone shifting).
+types.setTypeParser(1082, (v) => v);
 
 export function assertDbConfigured() {
   if (!USE_PGLITE && !connectionString) {
@@ -41,7 +44,7 @@ export interface PgPool {
   ) => Promise<{ rows: Record<string, unknown>[]; rowCount: number }>;
 }
 
-/* ---------------- PGlite backend ---------------- */
+/* ---------------- PGlite backend (local dev) ---------------- */
 
 type PGliteModule = typeof import("@electric-sql/pglite");
 let pglitePromise: Promise<InstanceType<PGliteModule["PGlite"]>> | null = null;
@@ -53,16 +56,6 @@ function getPglite() {
   }
   return pglitePromise;
 }
-
-const pgliteSql: SqlTag = async (strings, ...values) => {
-  const text = strings.reduce(
-    (acc, s, i) => acc + s + (i < values.length ? `$${i + 1}` : ""),
-    "",
-  );
-  const db = await getPglite();
-  const res = await db.query(text, values as unknown[]);
-  return res.rows as never;
-};
 
 const pglitePool: PgPool = {
   async query(text, params) {
@@ -78,23 +71,34 @@ const pglitePool: PgPool = {
   },
 };
 
-/* ---------------- Neon backend ---------------- */
+/* ---------------- node-postgres backend (production) ---------------- */
 
-const neonSql = neon(
-  connectionString || "postgresql://invalid:invalid@localhost:5432/invalid",
-);
-const neonPoolInstance = new Pool({ connectionString });
-const neonPool: PgPool = {
+const isLocal = /localhost|127\.0\.0\.1|::1/.test(connectionString);
+const nodePool = new Pool({
+  connectionString: connectionString || undefined,
+  ssl: isLocal || !connectionString ? undefined : { rejectUnauthorized: false },
+  max: 3,
+  idleTimeoutMillis: 20_000,
+});
+const nodePgPool: PgPool = {
   async query(text, params) {
-    const r = await neonPoolInstance.query(text, params);
+    const r = await nodePool.query(text, params);
     return { rows: r.rows as Record<string, unknown>[], rowCount: r.rowCount ?? 0 };
   },
 };
 
 /* ---------------- exports ---------------- */
 
-export const sql: SqlTag = USE_PGLITE ? pgliteSql : (neonSql as unknown as SqlTag);
-export const pgPool: PgPool = USE_PGLITE ? pglitePool : neonPool;
+export const pgPool: PgPool = USE_PGLITE ? pglitePool : nodePgPool;
+
+export const sql: SqlTag = async (strings, ...values) => {
+  const text = strings.reduce(
+    (acc, s, i) => acc + s + (i < values.length ? `$${i + 1}` : ""),
+    "",
+  );
+  const res = await pgPool.query(text, values as unknown[]);
+  return res.rows as never;
+};
 
 export async function execScript(script: string): Promise<void> {
   if (USE_PGLITE) {
@@ -102,8 +106,8 @@ export async function execScript(script: string): Promise<void> {
     await db.exec(script);
     return;
   }
-  // Neon: run statements one at a time (the driver won't batch multiple in
-  // one query). The schema has no ';' inside any statement.
+  // Run statements one at a time (safe with connection poolers). The schema
+  // has no ';' inside any statement; strip comment lines from each chunk.
   const statements = script
     .split(";")
     .map((chunk) =>
@@ -115,6 +119,6 @@ export async function execScript(script: string): Promise<void> {
     )
     .filter(Boolean);
   for (const stmt of statements) {
-    await neonPoolInstance.query(stmt);
+    await nodePool.query(stmt);
   }
 }
