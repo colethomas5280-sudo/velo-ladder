@@ -100,7 +100,21 @@ export async function execScript(script: string): Promise<void> {
   if (USE_PGLITE) {
     const db = await getPglite();
     await db.exec(script);
-  } else {
-    await neonPoolInstance.query(script);
+    return;
+  }
+  // Neon: run statements one at a time (the driver won't batch multiple in
+  // one query). The schema has no ';' inside any statement.
+  const statements = script
+    .split(";")
+    .map((chunk) =>
+      chunk
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("--"))
+        .join("\n")
+        .trim(),
+    )
+    .filter(Boolean);
+  for (const stmt of statements) {
+    await neonPoolInstance.query(stmt);
   }
 }
