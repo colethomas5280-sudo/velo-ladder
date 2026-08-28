@@ -11,7 +11,7 @@ and sees only their own tracker, and can log their own sessions.
 
 - **Framework:** Next.js 16 (App Router)
 - **Auth:** email magic-link (Auth.js) over your Gmail
-- **Database:** Postgres (Vercel Postgres in production)
+- **Database:** any Postgres via `DATABASE_URL` (Supabase, Vercel Postgres, Neon, …)
 
 ---
 
@@ -28,10 +28,14 @@ new repo called `velo-ladder` (I can do this for you).
 2. **Add New → Project**, import `velo-ladder`, click **Deploy**. The first build
    will succeed but the app won't work yet — finish the steps below.
 
-### 3. Database
+### 3. Database (Supabase)
 
-In your Vercel project: **Storage → Create Database → Postgres**. Accept the
-defaults. Vercel adds the `DATABASE_URL` (and friends) to the project for you.
+1. Sign up at [supabase.com](https://supabase.com) → **New project**.
+2. Set a **database password** (save it somewhere) → **Create new project**, wait ~2 min.
+3. Click **Connect** (top of the project) → **Transaction pooler** tab → copy the URI.
+   It looks like `postgresql://postgres.abc:[YOUR-PASSWORD]@aws-...pooler.supabase.com:6543/postgres`.
+4. Replace `[YOUR-PASSWORD]` with the password from step 2. That full string is your
+   `DATABASE_URL` (you'll paste it into Vercel in step 5).
 
 ### 4. Gmail app password
 
@@ -44,6 +48,7 @@ Vercel project → **Settings → Environment Variables**. Add these (Production
 
 | Name | Value |
 |---|---|
+| `DATABASE_URL` | the Supabase Transaction-pooler URI from step 3 (with the real password) |
 | `AUTH_SECRET` | run `npx auth secret` in a terminal and paste the value (or any 40+ random characters) |
 | `AUTH_URL` | your deployed URL, e.g. `https://velo-ladder.vercel.app` |
 | `EMAIL_HOST` | `smtp.gmail.com` |
