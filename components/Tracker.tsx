@@ -24,6 +24,7 @@ import RosterManager from "./RosterManager";
 import EntryForm from "./EntryForm";
 import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
+import GroupEntryModal from "./GroupEntryModal";
 
 const TRACKER_KEY = "veloladder:tracker";
 
@@ -112,6 +113,7 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
     });
   };
   const [groupSaved, setGroupSaved] = useState<Set<string>>(new Set());
+  const [groupModalOpen, setGroupModalOpen] = useState(false);
   const group = useMemo(
     () => groupIds.filter((id) => athletes.some((a) => a.id === id)),
     [groupIds, athletes],
@@ -453,40 +455,69 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
 
       <Masthead athlete={athlete} sessions={allSessions} />
 
-      {groupMode && (
-        <div className="tabstrip">
-          {group.map((id) => {
-            const a = athletes.find((x) => x.id === id);
-            if (!a) return null;
-            const st = memberStatus(id);
-            return (
-              <button
-                key={id}
-                className={`atab ${st}${id === selectedId ? " on" : ""}`}
-                onClick={() => setSelectedId(id)}
-              >
-                {a.name.split(" ")[0]}
-                {st === "saved" ? " ✓" : st === "data" ? " ●" : ""}
-              </button>
-            );
-          })}
+      {groupMode ? (
+        <div className="group-bar card pad">
+          <span>
+            <b>{group.length}</b> athletes in this session
+            {groupSaved.size > 0 && ` · ${groupSaved.size} saved`}
+          </span>
+          <button
+            className="btn primary"
+            onClick={() => setGroupModalOpen(true)}
+          >
+            Enter data →
+          </button>
         </div>
+      ) : (
+        <EntryForm
+          cfg={cfg}
+          trackerId={tracker}
+          sessions={allSessions}
+          draft={draft}
+          setDraft={setDraft}
+          onSave={saveSession}
+          onClear={clearOrCancel}
+          saving={saving}
+          readOnly={readOnly}
+        />
       )}
 
-      <EntryForm
-        cfg={cfg}
-        trackerId={tracker}
-        sessions={allSessions}
-        draft={draft}
-        setDraft={setDraft}
-        onSave={saveSession}
-        onClear={clearOrCancel}
-        saving={saving}
-        readOnly={readOnly}
-        groupSize={groupMode ? group.length : 0}
-        onSaveAll={saveAll}
-        activeName={athlete.name.split(" ")[0]}
-      />
+      {groupMode && groupModalOpen && (
+        <GroupEntryModal
+          tracker={tracker}
+          setTracker={setTracker}
+          activeId={selectedId}
+          onPick={setSelectedId}
+          onClose={() => setGroupModalOpen(false)}
+          tabs={group
+            .map((id) => {
+              const a = athletes.find((x) => x.id === id);
+              return a
+                ? {
+                    id,
+                    name: a.name.split(" ")[0],
+                    status: memberStatus(id),
+                  }
+                : null;
+            })
+            .filter((x): x is NonNullable<typeof x> => x !== null)}
+        >
+          <EntryForm
+            cfg={cfg}
+            trackerId={tracker}
+            sessions={allSessions}
+            draft={draft}
+            setDraft={setDraft}
+            onSave={saveSession}
+            onClear={clearOrCancel}
+            saving={saving}
+            readOnly={readOnly}
+            groupSize={group.length}
+            onSaveAll={saveAll}
+            activeName={athlete.name.split(" ")[0]}
+          />
+        </GroupEntryModal>
+      )}
 
       <ProgressChart
         cfg={cfg}

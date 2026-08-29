@@ -1,8 +1,8 @@
 "use client";
 
 import useSWR from "swr";
-import { signOut } from "next-auth/react";
 import { fetcher } from "@/lib/fetcher";
+import AppHeader from "./AppHeader";
 import Tracker from "./Tracker";
 
 type Me = { role: "coach" | "athlete" | "none"; email: string };
@@ -13,23 +13,7 @@ export default function AppShell({ email }: { email: string }) {
 
   return (
     <div className="wrap">
-      <div className="appbar">
-        <span className="mark">
-          <span className="dot" />
-          Velo Ladder
-        </span>
-        <span className="spacer" />
-        <span className="who">
-          {email}
-          {role === "coach" ? " · coach" : ""}
-        </span>
-        <button
-          className="btn sm ghost"
-          onClick={() => signOut({ callbackUrl: "/login" })}
-        >
-          Sign out
-        </button>
-      </div>
+      <AppHeader />
 
       {isLoading && (
         <div className="card pad" style={{ color: "var(--ink-dim)" }}>

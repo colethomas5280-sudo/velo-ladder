@@ -1,6 +1,12 @@
 import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
-import type { Athlete, TrainingSession, Throws, TrackerId } from "@/lib/types";
+import type {
+  Athlete,
+  AthleteOverview,
+  TrainingSession,
+  Throws,
+  TrackerId,
+} from "@/lib/types";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
   return {
@@ -41,6 +47,26 @@ export async function listAthletes(
     ? await sql`SELECT * FROM athletes WHERE archived = false AND id = ANY(${opts.ids}) ORDER BY lower(name)`
     : await sql`SELECT * FROM athletes WHERE archived = false ORDER BY lower(name)`;
   return (rows as Record<string, unknown>[]).map(toAthlete);
+}
+
+export async function listAthleteOverview(): Promise<AthleteOverview[]> {
+  const rows = (await sql`
+    SELECT a.*,
+      COUNT(*) FILTER (WHERE s.type = 'mound')    AS mound_n,
+      COUNT(*) FILTER (WHERE s.type = 'pulldown') AS pulldown_n,
+      MAX(s.date) AS last_date
+    FROM athletes a
+    LEFT JOIN training_sessions s ON s.athlete_id = a.id
+    WHERE a.archived = false
+    GROUP BY a.id
+    ORDER BY lower(a.name)
+  `) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    ...toAthlete(r),
+    mound: Number(r.mound_n ?? 0),
+    pulldown: Number(r.pulldown_n ?? 0),
+    lastDate: r.last_date ? isoDate(r.last_date) : null,
+  }));
 }
 
 export async function getAthlete(id: string): Promise<Athlete | null> {
