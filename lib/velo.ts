@@ -179,6 +179,17 @@ export function sAvgG(s: TrainingSession, keys: string[]): number | null {
   }
   return mean(a);
 }
+export function sMinG(s: TrainingSession, keys: string[]): number | null {
+  let m: number | null = null;
+  for (const k of keys) {
+    const t = s.throws[k];
+    if (t) for (let i = 1; i < 4; i++) {
+      const v = num(t[i]);
+      if (v) m = m == null ? v : Math.min(m, v);
+    }
+  }
+  return m;
+}
 export function recStatsG(sessions: TrainingSession[], keys: string[]): RecordStats {
   const h = hundredsG(sessions, keys);
   return {

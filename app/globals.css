@@ -576,17 +576,15 @@ canvas {
   vertical-align: middle;
   margin-right: 5px;
 }
-.chart-legend .l-b {
-  border-top-style: solid;
+.chart-legend .l-best {
+  border-top-width: 3px;
   color: var(--accent);
 }
-.chart-legend .l-a {
-  border-top-style: dashed;
+.chart-legend .l-avg {
   color: var(--chalk);
 }
-.chart-legend .l-p {
-  border-top-style: dashed;
-  color: var(--accent);
+.chart-legend .l-floor {
+  color: var(--good);
 }
 
 /* ---------- history ---------- */
