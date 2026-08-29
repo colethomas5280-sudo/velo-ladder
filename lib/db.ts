@@ -106,9 +106,20 @@ export async function execScript(script: string): Promise<void> {
     await db.exec(script);
     return;
   }
-  // Run statements one at a time (safe with connection poolers).
-  for (const stmt of splitStatements(script)) {
-    await nodePool.query(stmt);
+  // Run statements one at a time (safe with connection poolers). On failure,
+  // say which statement blew up — a bare Postgres message is not enough to
+  // find it in a multi-statement script.
+  const statements = splitStatements(script);
+  for (let i = 0; i < statements.length; i++) {
+    try {
+      await nodePool.query(statements[i]);
+    } catch (e) {
+      const first = statements[i].split("\n")[0].slice(0, 120);
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        `statement ${i + 1}/${statements.length} failed [${first}]: ${msg}`,
+      );
+    }
   }
 }
 
