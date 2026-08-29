@@ -91,9 +91,15 @@ export function num(v: unknown): number | null {
 export function mean(a: number[]): number | null {
   return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
 }
-export function fmt(v: number | null | undefined, decimals = 0): string {
+/**
+ * Velocity for display: at most one decimal, and no trailing ".0".
+ * 94.85 -> "94.9", 87 -> "87", 84.3 -> "84.3". Used for every velocity on
+ * screen (PR, floor, average, session best) so they all read the same way.
+ */
+export function fmt(v: number | null | undefined): string {
   if (v == null || !isFinite(v)) return EMPTY;
-  return decimals ? (Math.round(v * 10) / 10).toFixed(1) : String(Math.round(v));
+  const r = Math.round(v * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
 export function fmtDate(iso: string): string {
   const p = (iso || "").split("-");
@@ -367,8 +373,8 @@ export function sessionsToCsv(
           t[2] ?? "",
           t[3] ?? "",
           t[4] ?? "",
-          best == null ? "" : fmt(best, 0),
-          avg == null ? "" : fmt(avg, 1),
+          best == null ? "" : fmt(best),
+          avg == null ? "" : fmt(avg),
         ]);
       }
     }

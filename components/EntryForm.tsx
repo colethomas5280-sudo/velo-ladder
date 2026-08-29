@@ -49,7 +49,13 @@ export default function EntryForm({
   const editing = !!draft.editingId;
 
   const setCell = (key: string, i: number, raw: string) => {
-    const v = raw.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+    // digits and one dot only, and at most one decimal place — what is stored
+    // should always be exactly what the lane displays. A trailing "." is left
+    // alone so "94." is typeable on the way to "94.9".
+    const v = raw
+      .replace(/[^0-9.]/g, "")
+      .replace(/(\..*)\./g, "$1")
+      .replace(/^(\d*\.\d).+$/, "$1");
     const arr = draft.throws[key]?.slice() ?? BOX_INDEXES.map(() => "");
     arr[i] = v;
     setDraft({ ...draft, throws: { ...draft.throws, [key]: arr } });
@@ -111,25 +117,25 @@ export default function EntryForm({
               ))}
               <div className="lane-rec">
                 <div className="s pr">
-                  <span className="v">{fmt(r.pr, 0)}</span>
+                  <span className="v">{fmt(r.pr)}</span>
                   <span className="k">PR</span>
                 </div>
                 <div className="s">
-                  <span className="v">{fmt(r.avg, 1)}</span>
+                  <span className="v">{fmt(r.avg)}</span>
                   <span className="k">Avg</span>
                 </div>
                 <div className="s">
-                  <span className="v">{fmt(r.min, 0)}</span>
+                  <span className="v">{fmt(r.min)}</span>
                   <span className="k">Floor</span>
                 </div>
               </div>
               <div className="lane-ref">
-                last <b>{fmt(last, 0)}</b> &middot; {r.n} throw{r.n === 1 ? "" : "s"}
+                last <b>{fmt(last)}</b> &middot; {r.n} throw{r.n === 1 ? "" : "s"}
               </div>
               <div className="lane-stat">
                 {h.length > 0 && (
                   <>
-                    max <b>{fmt(liveMax, 0)}</b> · avg {fmt(mean(h), 1)}
+                    max <b>{fmt(liveMax)}</b> · avg {fmt(mean(h))}
                     {beat && <span className="pr-hit"> new PR</span>}
                   </>
                 )}
@@ -143,8 +149,8 @@ export default function EntryForm({
         <b>PLEASE READ:</b> Throw a regulation ball (5oz) for 1 rep at 80% effort
         to lock in timing, then 3-4 reps at 100%. Repeat that same pattern (1 rep
         @ 80%, then 3-4 @ 100%) through the 6 oz, 7 oz, back to 5oz, 4 oz, and
-        finally 3 oz weighted balls, in that exact order. Track your best (or
-        average) velocity on each ball as you go.
+        finally 3 oz weighted balls, in that exact order. Track each throw as
+        you go.
       </p>
 
       <div className="field" style={{ marginTop: 14 }}>
@@ -193,7 +199,7 @@ export default function EntryForm({
             {editing ? "Cancel" : "Clear"}
           </button>
           {sessionTop != null && (
-            <span className="note">session top: {fmt(sessionTop, 0)}</span>
+            <span className="note">session top: {fmt(sessionTop)}</span>
           )}
         </div>
       )}

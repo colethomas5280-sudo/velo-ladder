@@ -147,7 +147,7 @@ export default function ProgressChart({
         g.fillStyle = color;
         g.textAlign = "left";
         g.font = '600 11px var(--font-mono), monospace';
-        g.fillText(fmt(last[key] as number, 1), W - P.r + 5, y + 3.5);
+        g.fillText(fmt(last[key] as number), W - P.r + 5, y + 3.5);
       }
 
       // x date labels

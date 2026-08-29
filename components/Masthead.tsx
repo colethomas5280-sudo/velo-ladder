@@ -42,11 +42,11 @@ export default function Masthead({
       </div>
       <div className="readouts">
         <div className="ro">
-          <div className="n">{fmt(mPR, 0)}</div>
+          <div className="n">{fmt(mPR)}</div>
           <div className="l">Mound 5oz PR</div>
         </div>
         <div className="ro">
-          <div className="n">{fmt(pPR, 0)}</div>
+          <div className="n">{fmt(pPR)}</div>
           <div className="l">Pull-Down 5oz PR</div>
         </div>
       </div>

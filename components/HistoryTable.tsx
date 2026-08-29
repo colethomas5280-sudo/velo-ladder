@@ -92,7 +92,7 @@ export default function HistoryTable({
                           return (
                             <td key={gid(gp)}>
                               <span className={isPr ? "v is-pr" : "v"}>
-                                {fmt(b, 0)}
+                                {fmt(b)}
                               </span>
                             </td>
                           );
@@ -134,7 +134,7 @@ export default function HistoryTable({
                                   <div key={sl.key}>
                                     {sl.oz}oz&nbsp; 80%: <b>{primer}</b> &nbsp; 100%:{" "}
                                     <b>{hs}</b> &nbsp; avg{" "}
-                                    <b>{fmt(sAvg(s, sl.key), 1)}</b>
+                                    <b>{fmt(sAvg(s, sl.key))}</b>
                                   </div>
                                 );
                               })}
