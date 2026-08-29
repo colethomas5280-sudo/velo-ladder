@@ -79,11 +79,11 @@ export default function EntryForm({
         {cfg.slots.map((sl) => {
           const t = draft.throws[sl.key] || [];
           const grp = groupOf(cfg, sl.key);
-          const pr = recStatsG(ss, grp.keys).pr;
+          const r = recStatsG(ss, grp.keys);
           const last = lastBest(ss, grp.keys, draft.editingId);
           const h = [1, 2, 3].map((i) => num(t[i])).filter((v): v is number => !!v);
           const liveMax = h.length ? Math.max(...h) : null;
-          const beat = pr != null && liveMax != null && liveMax > pr;
+          const beat = r.pr != null && liveMax != null && liveMax > r.pr;
           return (
             <div className="lane" key={sl.key}>
               <div className="lane-h">
@@ -104,9 +104,22 @@ export default function EntryForm({
                   />
                 </div>
               ))}
+              <div className="lane-rec">
+                <div className="s pr">
+                  <span className="v">{fmt(r.pr, 0)}</span>
+                  <span className="k">PR</span>
+                </div>
+                <div className="s">
+                  <span className="v">{fmt(r.avg, 1)}</span>
+                  <span className="k">Avg</span>
+                </div>
+                <div className="s">
+                  <span className="v">{fmt(r.min, 0)}</span>
+                  <span className="k">Floor</span>
+                </div>
+              </div>
               <div className="lane-ref">
-                last <b>{fmt(last, 0)}</b> ·{" "}
-                <span className="pr">PR {fmt(pr, 0)}</span>
+                last <b>{fmt(last, 0)}</b> &middot; {r.n} throw{r.n === 1 ? "" : "s"}
               </div>
               <div className="lane-stat">
                 {h.length > 0 && (
