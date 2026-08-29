@@ -863,3 +863,175 @@ tr.sess.open .caret {
 .login-card input {
   width: 100%;
 }
+
+/* ---------- header nav ---------- */
+.appbar .mark {
+  text-decoration: none;
+  color: var(--ink);
+}
+.topnav {
+  display: flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+.topnav a {
+  text-decoration: none;
+  color: var(--ink-dim);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 11px;
+  border-radius: 8px;
+}
+.topnav a[aria-current="page"] {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+/* ---------- athletes page ---------- */
+.athletes-page {
+  padding-bottom: 80px;
+}
+table.roster-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.roster-table th {
+  text-align: left;
+  font-size: 9.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.roster-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.roster-table tr:hover td {
+  background: var(--panel-2);
+}
+.roster-table td.mono {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+.roster-table .cell-edit .tin {
+  border-color: transparent;
+  background: transparent;
+  width: 100%;
+  min-width: 120px;
+}
+.roster-table .cell-edit .tin:hover,
+.roster-table .cell-edit .tin:focus {
+  border-color: var(--line);
+  background: var(--panel);
+}
+.add-athlete {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 14px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.select-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 10px 14px 10px 18px;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  z-index: 40;
+  font-size: 13px;
+  font-weight: 600;
+}
+.select-bar .btn.ghost {
+  color: var(--bg);
+  border-color: color-mix(in srgb, var(--bg) 35%, transparent);
+}
+
+/* ---------- group entry ---------- */
+.group-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.group-bar b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 12, 0.4);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 16px;
+  z-index: 60;
+  overflow-y: auto;
+}
+.modal-panel {
+  width: 100%;
+  max-width: 880px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px -20px rgba(20, 18, 12, 0.45);
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.modal-title {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.modal-head .seg {
+  margin-left: auto;
+}
+.modal-x {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-dim);
+}
+.modal-tabs {
+  margin: 12px 12px 0;
+}
+.modal-body {
+  padding: 4px 14px 16px;
+}
+.modal-body .card {
+  border: 0;
+  box-shadow: none;
+  padding: 8px 0 0;
+  background: transparent;
+}

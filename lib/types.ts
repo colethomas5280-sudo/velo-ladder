@@ -24,6 +24,12 @@ export interface TrainingSession {
   throws: Throws;
 }
 
+export interface AthleteOverview extends Athlete {
+  mound: number;
+  pulldown: number;
+  lastDate: string | null;
+}
+
 export type Role = "coach" | "athlete" | "none";
 
 export interface Scope {
