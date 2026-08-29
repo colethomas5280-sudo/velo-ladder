@@ -28,15 +28,19 @@ export const TRACKERS: Record<TrackerId, TrackerConfig> = {
   mound: {
     label: "Mound",
     tag: "off the mound · game posture",
+    // Same 5-6-7-5-4-3 ladder as pull-downs. "m5b" is the second 5 oz set; it
+    // was added after the first sessions were logged, so older mound sessions
+    // simply have no m5b entry and still read correctly.
     slots: [
       { key: "m5", oz: 5 },
       { key: "m6", oz: 6 },
       { key: "m7", oz: 7 },
+      { key: "m5b", oz: 5 },
       { key: "m4", oz: 4 },
       { key: "m3", oz: 3 },
     ],
     groups: [
-      { oz: 5, keys: ["m5"] },
+      { oz: 5, keys: ["m5", "m5b"] },
       { oz: 6, keys: ["m6"] },
       { oz: 7, keys: ["m7"] },
       { oz: 4, keys: ["m4"] },
@@ -47,10 +51,10 @@ export const TRACKERS: Record<TrackerId, TrackerConfig> = {
     label: "Pull-Down",
     tag: "run-and-gun · max intent",
     slots: [
-      { key: "p1", oz: 5, tag: "opener" },
+      { key: "p1", oz: 5 },
       { key: "p2", oz: 6 },
       { key: "p3", oz: 7 },
-      { key: "p4", oz: 5, tag: "2nd 5oz" },
+      { key: "p4", oz: 5 },
       { key: "p5", oz: 4 },
       { key: "p6", oz: 3 },
     ],

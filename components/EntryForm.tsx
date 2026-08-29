@@ -93,7 +93,7 @@ export default function EntryForm({
               <div className="lane-h">
                 <span className="oz">{sl.oz}</span>
                 <span className="u">oz</span>
-                <span className="tag">{sl.tag || " "}</span>
+                {sl.tag && <span className="tag">{sl.tag}</span>}
               </div>
               {[0, 1, 2, 3].map((i) => (
                 <div className={`throw${i === 0 ? " warm" : ""}`} key={i}>
@@ -139,8 +139,11 @@ export default function EntryForm({
       </div>
 
       <p className="legend">
-        <b>Box 80%</b> is the primer — not scored. <b>Boxes 1–3</b> are 100% intent
-        and set the PR, average, and velocity floor.
+        <b>PLEASE READ:</b> Throw a regulation ball (5oz) for 1 rep at 80% effort
+        to lock in timing, then 3-4 reps at 100%. Repeat that same pattern (1 rep
+        @ 80%, then 3-4 @ 100%) through the 6 oz, 7 oz, back to 5oz, 4 oz, and
+        finally 3 oz weighted balls, in that exact order. Track your best (or
+        average) velocity on each ball as you go.
       </p>
 
       <div className="field" style={{ marginTop: 14 }}>
