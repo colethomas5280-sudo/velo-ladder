@@ -4,12 +4,13 @@ import type { TrainingSession } from "@/lib/types";
 import {
   type TrackerConfig,
   groupOf,
-  recStatsG,
+  prWithDate,
   lastBest,
   sessionsOfType,
   num,
   mean,
   fmt,
+  fmtDate,
   todayISO,
   BOX_INDEXES,
 } from "@/lib/velo";
@@ -90,11 +91,11 @@ export default function EntryForm({
         {cfg.slots.map((sl) => {
           const t = draft.throws[sl.key] || [];
           const grp = groupOf(cfg, sl.key);
-          const r = recStatsG(ss, grp.keys);
+          const pr = prWithDate(ss, grp.keys);
           const last = lastBest(ss, grp.keys, draft.editingId);
           const h = BOX_INDEXES.slice(1).map((i) => num(t[i])).filter((v): v is number => !!v);
           const liveMax = h.length ? Math.max(...h) : null;
-          const beat = r.pr != null && liveMax != null && liveMax > r.pr;
+          const beat = pr != null && liveMax != null && liveMax > pr.value;
           return (
             <div className="lane" key={sl.key}>
               <div className="lane-h">
@@ -116,21 +117,20 @@ export default function EntryForm({
                 </div>
               ))}
               <div className="lane-rec">
-                <div className="s pr">
-                  <span className="v">{fmt(r.pr)}</span>
+                <div
+                  className="s"
+                  data-date={last ? fmtDate(last.date) : undefined}
+                >
+                  <span className="v">{fmt(last?.value)}</span>
+                  <span className="k">Last</span>
+                </div>
+                <div
+                  className="s pr"
+                  data-date={pr ? fmtDate(pr.date) : undefined}
+                >
+                  <span className="v">{fmt(pr?.value)}</span>
                   <span className="k">PR</span>
                 </div>
-                <div className="s">
-                  <span className="v">{fmt(r.avg)}</span>
-                  <span className="k">Avg</span>
-                </div>
-                <div className="s">
-                  <span className="v">{fmt(r.min)}</span>
-                  <span className="k">Floor</span>
-                </div>
-              </div>
-              <div className="lane-ref">
-                last <b>{fmt(last)}</b> &middot; {r.n} throw{r.n === 1 ? "" : "s"}
               </div>
               <div className="lane-stat">
                 {h.length > 0 && (
