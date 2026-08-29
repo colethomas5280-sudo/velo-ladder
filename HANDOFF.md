@@ -63,11 +63,13 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 
 | Path | What |
 |---|---|
-| `/` | Coach → the Athletes roster. Athlete → redirected to their own profile. |
+| `/` | Coach → the **dashboard** (customizable widgets). Athlete → redirected to their own profile. |
+| `/athletes` | The roster/spreadsheet (coach only). |
 | `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
 | `/login` | Email + password. |
 | `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
 | `/api/me` | `{ role, email, athleteId }` for the signed-in user. |
+| `/api/dashboard` | GET — everything the dashboard widgets need, in one call (coach only). |
 | `/api/athletes` | GET (scoped list), POST (coach: create). |
 | `/api/athletes/overview` | GET — roster + session counts + last date (coach only). Powers the home table. |
 | `/api/athletes/[id]` | GET / PATCH (name, email, hand, password, archive) / DELETE (soft). |
@@ -83,7 +85,12 @@ athletes; **athlete** = their own only; anyone else = 403.
 
 ### Key components
 
-- `HomeView` → `AthletesTable` (spreadsheet: inline-edit email/hand, per-row invite
+- `HomeView` → `Dashboard` — widget grid; which widgets show is per-browser in
+  `localStorage["veloladder:dashboard"]`, edited via `CustomizeDashboard`. **To add a
+  widget: append to `WIDGETS` in `CustomizeDashboard.tsx`, add its data to
+  `lib/dashboard.ts`, and render it in `Dashboard.tsx`.** Unknown ids in a saved
+  choice are dropped on load, so removing a widget can't wedge someone's dashboard.
+- `RosterView` → `AthletesTable` (spreadsheet: inline-edit email/hand, per-row invite
   and password reset, remove, search; check rows → **`GroupSession`** modal;
   **+ Invite athlete** → `InviteAthleteModal`, which creates the athlete and mints
   the link in one step).

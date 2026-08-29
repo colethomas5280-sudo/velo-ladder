@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { signOut } from "next-auth/react";
 import { fetcher } from "@/lib/fetcher";
@@ -16,6 +17,7 @@ export default function AppHeader({
 }) {
   const { data } = useSWR<Me>("/api/me", fetcher);
   const isCoach = data?.role === "coach";
+  const path = usePathname();
 
   return (
     <div className="appbar">
@@ -24,9 +26,22 @@ export default function AppHeader({
         Velo Ladder
       </Link>
       {back && isCoach && (
-        <Link href="/" className="back-link">
+        <Link href="/athletes" className="back-link">
           ← Athletes
         </Link>
+      )}
+      {!back && isCoach && (
+        <nav className="topnav">
+          <Link href="/" aria-current={path === "/" ? "page" : undefined}>
+            Dashboard
+          </Link>
+          <Link
+            href="/athletes"
+            aria-current={path === "/athletes" ? "page" : undefined}
+          >
+            Athletes
+          </Link>
+        </nav>
       )}
       <span className="spacer" />
       {(email || data?.email) && (

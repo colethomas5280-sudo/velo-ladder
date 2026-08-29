@@ -20,7 +20,8 @@ function toAthlete(r: Record<string, unknown>): Athlete {
   };
 }
 
-function isoDate(v: unknown): string {
+/** Postgres gives DATE as a string (we set a type parser); PGlite gives a Date. */
+export function isoDate(v: unknown): string {
   if (v instanceof Date) return v.toISOString().slice(0, 10);
   return String(v).slice(0, 10);
 }
