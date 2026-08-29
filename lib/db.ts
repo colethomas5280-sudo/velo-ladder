@@ -106,10 +106,50 @@ export async function execScript(script: string): Promise<void> {
     await db.exec(script);
     return;
   }
-  // Run statements one at a time (safe with connection poolers). The schema
-  // has no ';' inside any statement; strip comment lines from each chunk.
-  const statements = script
-    .split(";")
+  // Run statements one at a time (safe with connection poolers).
+  for (const stmt of splitStatements(script)) {
+    await nodePool.query(stmt);
+  }
+}
+
+/**
+ * Split a SQL script on top-level semicolons, respecting dollar-quoted blocks
+ * ($$ ... $$) so a DO block's internal semicolons don't tear it apart.
+ * Comment-only lines are stripped from each statement.
+ */
+export function splitStatements(script: string): string[] {
+  const out: string[] = [];
+  let buf = "";
+  let tag: string | null = null;
+  let i = 0;
+  while (i < script.length) {
+    if (tag) {
+      if (script.startsWith(tag, i)) {
+        buf += tag;
+        i += tag.length;
+        tag = null;
+      } else {
+        buf += script[i++];
+      }
+      continue;
+    }
+    const open = /^\$[A-Za-z_]*\$/.exec(script.slice(i));
+    if (open) {
+      tag = open[0];
+      buf += tag;
+      i += tag.length;
+      continue;
+    }
+    if (script[i] === ";") {
+      out.push(buf);
+      buf = "";
+      i++;
+      continue;
+    }
+    buf += script[i++];
+  }
+  out.push(buf);
+  return out
     .map((chunk) =>
       chunk
         .split("\n")
@@ -118,7 +158,4 @@ export async function execScript(script: string): Promise<void> {
         .trim(),
     )
     .filter(Boolean);
-  for (const stmt of statements) {
-    await nodePool.query(stmt);
-  }
 }
