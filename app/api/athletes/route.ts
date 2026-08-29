@@ -27,7 +27,13 @@ export async function POST(request: Request) {
     typeof body?.inviteEmail === "string" && body.inviteEmail.trim()
       ? body.inviteEmail.trim()
       : null;
+  const password =
+    typeof body?.password === "string" && body.password ? body.password : null;
+  if (password && password.length < 6)
+    return badRequest("Password must be at least 6 characters");
+  if (password && !inviteEmail)
+    return badRequest("An athlete needs an email to log in with a password");
 
-  const athlete = await createAthlete({ name, hand, inviteEmail });
+  const athlete = await createAthlete({ name, hand, inviteEmail, password });
   return json(athlete, 201);
 }

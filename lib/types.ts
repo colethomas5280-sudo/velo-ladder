@@ -8,8 +8,10 @@ export interface Athlete {
   id: string;
   name: string;
   hand: Hand;
+  /** the email this athlete logs in with */
   inviteEmail: string | null;
-  userId: string | null;
+  /** true once a password has been set (the hash itself is never sent to the client) */
+  hasPassword: boolean;
   archived: boolean;
 }
 
@@ -26,7 +28,6 @@ export type Role = "coach" | "athlete" | "none";
 
 export interface Scope {
   role: Role;
-  userId: string;
   email: string;
   /** Athlete rows this user owns (athlete role). Empty for coach/none. */
   athleteIds: string[];

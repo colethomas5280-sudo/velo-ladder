@@ -1,6 +1,6 @@
 import { getScope } from "@/lib/scope";
 import { getAthlete, updateAthlete } from "@/lib/data";
-import { json, unauthorized, forbidden, notFound } from "@/lib/http";
+import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
 import type { Hand } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -20,6 +20,10 @@ export async function PATCH(
   if (!target || target.archived) return notFound();
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const password =
+    typeof body.password === "string" && body.password ? body.password : undefined;
+  if (password && password.length < 6)
+    return badRequest("Password must be at least 6 characters");
 
   if (scope.role === "coach") {
     const updated = await updateAthlete(id, {
@@ -29,13 +33,18 @@ export async function PATCH(
         body.inviteEmail === undefined
           ? undefined
           : String(body.inviteEmail || "") || null,
+      password,
     });
     return json(updated);
   }
 
-  // an athlete may change only their own throwing hand
-  if (scope.athleteIds.includes(id) && isHand(body.hand)) {
-    return json(await updateAthlete(id, { hand: body.hand }));
+  // an athlete may change only their own hand and their own password
+  if (scope.athleteIds.includes(id)) {
+    const patch: { hand?: Hand; password?: string } = {};
+    if (isHand(body.hand)) patch.hand = body.hand;
+    if (password) patch.password = password;
+    if (!Object.keys(patch).length) return forbidden();
+    return json(await updateAthlete(id, patch));
   }
   return forbidden();
 }

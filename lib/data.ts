@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { sql } from "@/lib/db";
 import type { Athlete, TrainingSession, Throws, TrackerId } from "@/lib/types";
 
@@ -7,7 +8,7 @@ function toAthlete(r: Record<string, unknown>): Athlete {
     name: String(r.name),
     hand: (r.hand as Athlete["hand"]) || "",
     inviteEmail: (r.invite_email as string | null) ?? null,
-    userId: (r.user_id as string | null) ?? null,
+    hasPassword: !!r.password_hash,
     archived: Boolean(r.archived),
   };
 }
@@ -31,9 +32,11 @@ function toSession(r: Record<string, unknown>): TrainingSession {
   };
 }
 
-export async function listAthletes(opts: {
-  ids?: string[];
-} = {}): Promise<Athlete[]> {
+export const hashPassword = (pw: string) => bcrypt.hash(pw, 10);
+
+export async function listAthletes(
+  opts: { ids?: string[] } = {},
+): Promise<Athlete[]> {
   const rows = opts.ids
     ? await sql`SELECT * FROM athletes WHERE archived = false AND id = ANY(${opts.ids}) ORDER BY lower(name)`
     : await sql`SELECT * FROM athletes WHERE archived = false ORDER BY lower(name)`;
@@ -52,28 +55,28 @@ export async function createAthlete(input: {
   name: string;
   hand?: string;
   inviteEmail?: string | null;
+  password?: string | null;
 }): Promise<Athlete> {
   const id = crypto.randomUUID();
   const email = input.inviteEmail?.trim().toLowerCase() || null;
+  const hash = input.password ? await hashPassword(input.password) : null;
   const rows = (await sql`
-    INSERT INTO athletes (id, name, hand, invite_email)
-    VALUES (${id}, ${input.name.trim()}, ${input.hand || ""}, ${email})
+    INSERT INTO athletes (id, name, hand, invite_email, password_hash)
+    VALUES (${id}, ${input.name.trim()}, ${input.hand || ""}, ${email}, ${hash})
     RETURNING *
   `) as Record<string, unknown>[];
-  // link immediately if that email already has a login
-  if (email) {
-    await sql`
-      UPDATE athletes SET user_id = u.id
-      FROM users u
-      WHERE athletes.id = ${id} AND athletes.user_id IS NULL AND lower(u.email) = ${email}
-    `;
-  }
   return toAthlete(rows[0]);
 }
 
 export async function updateAthlete(
   id: string,
-  patch: { name?: string; hand?: string; inviteEmail?: string | null; archived?: boolean },
+  patch: {
+    name?: string;
+    hand?: string;
+    inviteEmail?: string | null;
+    archived?: boolean;
+    password?: string;
+  },
 ): Promise<Athlete | null> {
   const cur = await getAthlete(id);
   if (!cur) return null;
@@ -84,11 +87,22 @@ export async function updateAthlete(
       ? cur.inviteEmail
       : patch.inviteEmail?.trim().toLowerCase() || null;
   const archived = patch.archived ?? cur.archived;
+
+  if (patch.password) {
+    const hash = await hashPassword(patch.password);
+    const rows = (await sql`
+      UPDATE athletes
+      SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
+          archived = ${archived}, password_hash = ${hash}
+      WHERE id = ${id} RETURNING *
+    `) as Record<string, unknown>[];
+    return rows[0] ? toAthlete(rows[0]) : null;
+  }
+
   const rows = (await sql`
     UPDATE athletes
     SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail}, archived = ${archived}
-    WHERE id = ${id}
-    RETURNING *
+    WHERE id = ${id} RETURNING *
   `) as Record<string, unknown>[];
   return rows[0] ? toAthlete(rows[0]) : null;
 }
