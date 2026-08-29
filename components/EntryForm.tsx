@@ -63,11 +63,6 @@ export default function EntryForm({
 
   return (
     <div className="card pad">
-      <div className="sec-h">
-        <h3>{editing ? "Edit session" : `New ${cfg.label} session`}</h3>
-        <span className="sub">{cfg.tag}</span>
-      </div>
-
       <div className="entry-top">
         <div className="field">
           <label>Session date</label>

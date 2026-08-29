@@ -1057,3 +1057,115 @@ table.roster-table {
   background: var(--panel-2);
   color: var(--ink);
 }
+
+/* ---------- profile: primary action + view switch ---------- */
+.track-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.01em;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  line-height: 1.5;
+}
+.track-link:hover {
+  border-bottom-color: var(--accent);
+}
+.view-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 26px 2px 12px;
+}
+
+/* ---------- session type picker ---------- */
+.modal-panel.narrow {
+  max-width: 460px;
+}
+.modal-head .modal-sub {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-right: auto;
+}
+.modal-back {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 8px;
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-dim);
+}
+.type-pick {
+  padding: 18px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.type-pick-q {
+  margin: 0 0 4px;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+}
+.type-card {
+  display: block;
+  text-align: left;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.type-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.type-card .tc-name {
+  display: block;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1;
+}
+.type-card .tc-tag {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+  margin-top: 4px;
+}
+.type-card .tc-weights {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--ink-dim);
+  margin-top: 7px;
+}
+
+@media (max-width: 520px) {
+  .modal-backdrop {
+    padding: 12px 10px;
+  }
+  .modal-head {
+    padding: 12px;
+    gap: 9px;
+  }
+  .modal-title {
+    font-size: 17px;
+  }
+  .modal-head .modal-sub {
+    font-size: 11px;
+  }
+  .type-card .tc-name {
+    font-size: 22px;
+  }
+}

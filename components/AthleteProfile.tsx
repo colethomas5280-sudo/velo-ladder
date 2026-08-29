@@ -23,6 +23,7 @@ import Masthead from "./Masthead";
 import EntryForm from "./EntryForm";
 import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
+import SessionModal from "./SessionModal";
 
 const TRACKER_KEY = "veloladder:tracker";
 
@@ -68,6 +69,8 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const [chartGroup, setChartGroup] =
     useState<Partial<Record<TrackerId, string>>>({});
   const [saving, setSaving] = useState(false);
+  /** null = closed, "pick" = choosing session type, "entry" = the weight grid */
+  const [modal, setModal] = useState<null | "pick" | "entry">(null);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (m: string) => {
     setToast(m);
@@ -99,6 +102,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
       clearDraft(athleteId, tracker);
       setDraftState(emptyDraft());
       await mutateSessions();
+      setModal(null);
       showToast(draft.editingId ? "Session updated" : "Session saved");
     } catch (e) {
       err(e, "Couldn't save the session");
@@ -112,8 +116,18 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     for (const [k, arr] of Object.entries(s.throws)) {
       throws[k] = [0, 1, 2, 3].map((i) => (arr[i] == null ? "" : String(arr[i])));
     }
-    setDraft({ date: s.date, notes: s.notes, throws, editingId: s.id });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    const d: Draft = { date: s.date, notes: s.notes, throws, editingId: s.id };
+    // Persist first: switching tracker re-loads the draft from storage.
+    saveDraft(athleteId, s.type, d);
+    if (s.type !== tracker) setTracker(s.type);
+    else setDraftState(d);
+    setModal("entry");
+  }
+
+  /** Picking a session type also switches what the page below is showing. */
+  function pickType(t: TrackerId) {
+    if (t !== tracker) setTracker(t);
+    setModal("entry");
   }
 
   async function deleteSession(s: TrainingSession) {
@@ -132,8 +146,10 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   }
 
   function clearOrCancel() {
+    const wasEditing = !!draft.editingId;
     clearDraft(athleteId, tracker);
     setDraftState(emptyDraft());
+    if (wasEditing) setModal(null);
   }
 
   function exportCsv() {
@@ -188,11 +204,18 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
 
   return (
     <>
-      <div
-        className="appbar"
-        style={{ position: "static", margin: "0 0 18px" }}
-      >
-        <span className="spacer" />
+      <Masthead
+        athlete={athlete}
+        sessions={allSessions}
+        action={
+          <button className="track-link" onClick={() => setModal("pick")}>
+            + Track a new session
+          </button>
+        }
+      />
+
+      <div className="view-switch">
+        <span className="eyebrow">Progress</span>
         <div className="seg" role="group" aria-label="Tracker">
           {TRACKER_IDS.map((t) => (
             <button
@@ -205,27 +228,6 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
           ))}
         </div>
       </div>
-
-      <Masthead athlete={athlete} sessions={allSessions} />
-
-      {(isSelf || canManage) && (
-        <PasswordBox
-          label={isSelf ? "Change my password" : "Reset this athlete's password"}
-          onSave={changePassword}
-        />
-      )}
-
-      <EntryForm
-        cfg={cfg}
-        trackerId={tracker}
-        sessions={allSessions}
-        draft={draft}
-        setDraft={setDraft}
-        onSave={saveSession}
-        onClear={clearOrCancel}
-        saving={saving}
-        readOnly={false}
-      />
 
       <ProgressChart
         cfg={cfg}
@@ -256,10 +258,44 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         />
       )}
 
+      {(isSelf || canManage) && (
+        <div style={{ marginTop: 18 }}>
+          <PasswordBox
+            label={
+              isSelf ? "Change my password" : "Reset this athlete's password"
+            }
+            onSave={changePassword}
+          />
+        </div>
+      )}
+
       <div className="foot">
         PR = best single 100% throw · Avg = mean of all 100% throws · Floor =
         lowest 100% throw
       </div>
+
+      {modal && (
+        <SessionModal
+          step={modal}
+          athleteName={athlete.name}
+          tracker={tracker}
+          onPick={pickType}
+          onBack={() => setModal("pick")}
+          onClose={() => setModal(null)}
+        >
+          <EntryForm
+            cfg={cfg}
+            trackerId={tracker}
+            sessions={allSessions}
+            draft={draft}
+            setDraft={setDraft}
+            onSave={saveSession}
+            onClear={clearOrCancel}
+            saving={saving}
+            readOnly={false}
+          />
+        </SessionModal>
+      )}
 
       {toast && <div className="toast">{toast}</div>}
     </>
