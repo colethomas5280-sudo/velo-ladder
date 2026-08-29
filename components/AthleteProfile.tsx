@@ -69,6 +69,9 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const [chartGroup, setChartGroup] =
     useState<Partial<Record<TrackerId, string>>>({});
   const [saving, setSaving] = useState(false);
+  /** Shown inside the pop-up and kept there until the next attempt — a save
+   *  failure must never be a toast the athlete can miss behind the modal. */
+  const [saveError, setSaveError] = useState<string | null>(null);
   /** null = closed, "pick" = choosing session type, "entry" = the weight grid */
   const [modal, setModal] = useState<null | "pick" | "entry">(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -85,27 +88,46 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
       cfg.slots.map((s) => s.key),
     );
     if (!hasHundred) {
-      showToast("Enter at least one 100% throw before saving");
+      setSaveError(
+        "Enter at least one 100% throw (boxes 1, 2 or 3) before saving. The 80% primer isn't scored.",
+      );
       return;
     }
     setSaving(true);
+    setSaveError(null);
+    const wasEditing = !!draft.editingId;
     try {
       const payload = {
         type: tracker,
         date: draft.date || todayISO(),
-        notes: draft.notes.trim(),
+        notes: (draft.notes || "").trim(),
         throws: padThrows(throws),
       };
-      if (draft.editingId)
-        await api(`/api/sessions/${draft.editingId}`, "PATCH", payload);
-      else await api(`/api/athletes/${athleteId}/sessions`, "POST", payload);
+      if (draft.editingId) {
+        try {
+          await api(`/api/sessions/${draft.editingId}`, "PATCH", payload);
+        } catch (e) {
+          // The session this draft was editing is gone (deleted elsewhere, or a
+          // stale draft from an older visit). Keep the work — save it as new.
+          if (e instanceof ApiError && e.status === 404)
+            await api(`/api/athletes/${athleteId}/sessions`, "POST", payload);
+          else throw e;
+        }
+      } else {
+        await api(`/api/athletes/${athleteId}/sessions`, "POST", payload);
+      }
       clearDraft(athleteId, tracker);
       setDraftState(emptyDraft());
       await mutateSessions();
       setModal(null);
-      showToast(draft.editingId ? "Session updated" : "Session saved");
+      showToast(wasEditing ? "Session updated" : "Session saved");
     } catch (e) {
-      err(e, "Couldn't save the session");
+      console.error("[velo] save failed", e);
+      setSaveError(
+        e instanceof ApiError
+          ? `Couldn't save (${e.status}): ${e.message}`
+          : "Couldn't save — check your connection and try again. Your numbers are still here.",
+      );
     } finally {
       setSaving(false);
     }
@@ -121,12 +143,14 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     saveDraft(athleteId, s.type, d);
     if (s.type !== tracker) setTracker(s.type);
     else setDraftState(d);
+    setSaveError(null);
     setModal("entry");
   }
 
   /** Picking a session type also switches what the page below is showing. */
   function pickType(t: TrackerId) {
     if (t !== tracker) setTracker(t);
+    setSaveError(null);
     setModal("entry");
   }
 
@@ -208,7 +232,13 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         athlete={athlete}
         sessions={allSessions}
         action={
-          <button className="track-link" onClick={() => setModal("pick")}>
+          <button
+            className="track-link"
+            onClick={() => {
+              setSaveError(null);
+              setModal("pick");
+            }}
+          >
             + Track a new session
           </button>
         }
@@ -293,6 +323,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
             onClear={clearOrCancel}
             saving={saving}
             readOnly={false}
+            error={saveError}
           />
         </SessionModal>
       )}

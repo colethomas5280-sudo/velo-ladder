@@ -69,6 +69,7 @@ export default function GroupSession({
 
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (m: string) => {
     setToast(m);
@@ -107,10 +108,13 @@ export default function GroupSession({
     if (!activeId) return;
     saveDraft(activeId, tracker, draft);
     setSaving(true);
+    setSaveError(null);
     try {
       const ok = await postFor(activeId, loadDraft(activeId, tracker));
       if (!ok) {
-        showToast("Enter at least one 100% throw first");
+        setSaveError(
+          "Enter at least one 100% throw (boxes 1, 2 or 3) before saving.",
+        );
         return;
       }
       setSaved((s) => new Set(s).add(activeId));
@@ -118,7 +122,12 @@ export default function GroupSession({
       onSaved?.();
       showToast("Saved");
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : "Couldn't save");
+      console.error("[velo] group save failed", e);
+      setSaveError(
+        e instanceof ApiError
+          ? `Couldn't save (${e.status}): ${e.message}`
+          : "Couldn't save — check your connection. Your numbers are still here.",
+      );
     } finally {
       setSaving(false);
     }
@@ -127,6 +136,7 @@ export default function GroupSession({
   async function saveAll() {
     if (activeId) saveDraft(activeId, tracker, draft);
     setSaving(true);
+    setSaveError(null);
     let count = 0;
     const now = new Set(saved);
     try {
@@ -139,13 +149,18 @@ export default function GroupSession({
       setSaved(now);
       setDraftState(emptyDraft());
       onSaved?.();
-      showToast(
-        count
-          ? `Saved ${count} session${count === 1 ? "" : "s"}`
-          : "Nothing to save — enter some 100% throws first",
-      );
+      if (count) showToast(`Saved ${count} session${count === 1 ? "" : "s"}`);
+      else
+        setSaveError(
+          "Nothing to save — enter at least one 100% throw for someone first.",
+        );
     } catch (e) {
-      showToast(e instanceof ApiError ? e.message : "Couldn't save the group");
+      console.error("[velo] group save failed", e);
+      setSaveError(
+        e instanceof ApiError
+          ? `Couldn't save (${e.status}): ${e.message}`
+          : "Couldn't save the group — check your connection. Your numbers are still here.",
+      );
     } finally {
       setSaving(false);
     }
@@ -163,7 +178,10 @@ export default function GroupSession({
       tracker={tracker}
       setTracker={setTracker}
       activeId={activeId}
-      onPick={setActiveId}
+      onPick={(id) => {
+        setSaveError(null);
+        setActiveId(id);
+      }}
       onClose={onClose}
       tabs={members.map((m) => ({
         id: m.id,
@@ -184,6 +202,7 @@ export default function GroupSession({
         groupSize={members.length}
         onSaveAll={saveAll}
         activeName={activeName}
+        error={saveError}
       />
       {toast && <div className="toast">{toast}</div>}
     </GroupEntryModal>
