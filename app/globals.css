@@ -1237,3 +1237,190 @@ table.roster-table {
   font-size: 12px;
   color: var(--ink-faint);
 }
+
+/* ---------- coach dashboard ---------- */
+.dash {
+  padding-bottom: 60px;
+}
+.snapshot {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.snapshot .ro {
+  min-width: 0;
+}
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.widget .sec-h {
+  margin-bottom: 10px;
+}
+.widget .sec-h h3 {
+  font-size: 21px;
+}
+.widget-empty {
+  margin: 4px 0 2px;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+/* leaderboard */
+.lb {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lb li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.lb li:last-child {
+  border-bottom: 0;
+}
+.lb-rank {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--ink-faint);
+  width: 14px;
+  flex: none;
+}
+.lb-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-left: auto;
+  white-space: nowrap;
+}
+.lb-velo {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  font-size: 23px;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  text-align: right;
+  flex: none;
+}
+
+/* generic feed row */
+.feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.feed + .feed {
+  margin-top: 6px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 6px;
+}
+.feed li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.feed li:last-child {
+  border-bottom: 0;
+}
+.feed-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.feed-sub {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.feed-val {
+  margin-left: auto;
+  text-align: right;
+  white-space: nowrap;
+}
+.feed-val b {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  font-size: 21px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.feed-val .delta {
+  display: block;
+  font-size: 10.5px;
+  color: var(--good);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.pill {
+  margin-left: auto;
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+.pill.warn {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+/* customize dialog */
+.customize {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cz-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cz-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  cursor: pointer;
+}
+.cz-row:hover {
+  border-color: var(--accent);
+}
+.cz-row input {
+  margin-top: 3px;
+  flex: none;
+}
+.cz-row b {
+  display: block;
+  font-size: 14px;
+}
+.cz-row em {
+  display: block;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.cz-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+}

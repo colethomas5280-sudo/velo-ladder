@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
-import AthletesTable from "./AthletesTable";
+import Dashboard from "./Dashboard";
 
 type Me = {
   role: "coach" | "athlete" | "none";
@@ -48,5 +48,5 @@ export default function HomeView() {
       </div>
     );
   }
-  return <AthletesTable />;
+  return <Dashboard />;
 }
