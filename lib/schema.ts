@@ -3,6 +3,9 @@
  * GET /api/setup?key=SETUP_KEY. Every statement is idempotent.
  * `db/schema.sql` is a human-readable copy of this.
  */
+/** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
+export const SCHEMA_VERSION = 3;
+
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
   id            text PRIMARY KEY,
@@ -34,12 +37,10 @@ CREATE INDEX IF NOT EXISTS ts_athlete_idx ON training_sessions(athlete_id, type,
 -- adapter's users table, which the app no longer writes to. CREATE TABLE IF NOT
 -- EXISTS never alters an existing table, so those constraints survive and every
 -- session insert fails with a foreign key violation.
-ALTER TABLE training_sessions DROP CONSTRAINT IF EXISTS training_sessions_created_by_fkey;
-ALTER TABLE athletes DROP CONSTRAINT IF EXISTS athletes_user_id_fkey;
-
--- Same thing again for a constraint that was given a non-default name. Scoped
--- hard to our own two tables in public: a managed Postgres (Supabase) has its
--- own auth.users that this role does not own and must never touch.
+-- Scoped hard to our own two tables in public: a managed Postgres (Supabase)
+-- has its own auth.users that this role does not own and must never touch.
+-- Each drop is individually guarded so a permission problem can only skip that
+-- one constraint, never fail the whole setup.
 DO $mig$
 DECLARE r record;
 BEGIN
@@ -56,7 +57,12 @@ BEGIN
       AND refns.nspname = 'public'
       AND ref.relname = 'users'
   LOOP
-    EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT %I', r.tbl, r.name);
+    BEGIN
+      EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT %I', r.tbl, r.name);
+      RAISE NOTICE 'velo: dropped stale FK %.%', r.tbl, r.name;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'velo: could not drop %.% (%)', r.tbl, r.name, SQLERRM;
+    END;
   END LOOP;
 END
 $mig$;

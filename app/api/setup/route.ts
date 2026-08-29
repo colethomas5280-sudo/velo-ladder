@@ -1,5 +1,5 @@
 import { execScript, assertDbConfigured } from "@/lib/db";
-import { SCHEMA_SQL, SEED_SQL } from "@/lib/schema";
+import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION } from "@/lib/schema";
 import { json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -25,12 +25,20 @@ export async function GET(request: Request) {
     await execScript(SCHEMA_SQL);
     const seed = url.searchParams.get("seed") === "1";
     if (seed) await execScript(SEED_SQL);
-    return json({ ok: true, schema: "applied", seed });
+    return json({
+      ok: true,
+      schema: "applied",
+      seed,
+      // Bumped whenever the schema changes, so a stale deployment is obvious
+      // from the response rather than looking like a fresh failure.
+      schemaVersion: SCHEMA_VERSION,
+    });
   } catch (err) {
     return json(
       {
         error: "setup failed",
         detail: err instanceof Error ? err.message : String(err),
+        schemaVersion: SCHEMA_VERSION,
       },
       500,
     );
