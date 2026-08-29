@@ -24,6 +24,9 @@ export default function EntryForm({
   onClear,
   saving,
   readOnly,
+  groupSize = 0,
+  onSaveAll,
+  activeName,
 }: {
   cfg: TrackerConfig;
   trackerId: "mound" | "pulldown";
@@ -34,6 +37,9 @@ export default function EntryForm({
   onClear: () => void;
   saving: boolean;
   readOnly: boolean;
+  groupSize?: number;
+  onSaveAll?: () => void;
+  activeName?: string;
 }) {
   const ss = sessionsOfType(sessions, trackerId);
   const editing = !!draft.editingId;
@@ -151,13 +157,30 @@ export default function EntryForm({
 
       {!readOnly && (
         <div className="row-actions">
-          <button className="btn primary" onClick={onSave} disabled={saving}>
-            {saving
-              ? "Saving…"
-              : editing
-                ? "Update session"
-                : "Save session"}
-          </button>
+          {groupSize >= 2 && onSaveAll ? (
+            <>
+              <button
+                className="btn primary"
+                onClick={onSaveAll}
+                disabled={saving}
+              >
+                {saving ? "Saving…" : `Save all ${groupSize}`}
+              </button>
+              <button className="btn ghost" onClick={onSave} disabled={saving}>
+                {editing
+                  ? "Update this one"
+                  : `Save ${activeName ?? "this one"} only`}
+              </button>
+            </>
+          ) : (
+            <button className="btn primary" onClick={onSave} disabled={saving}>
+              {saving
+                ? "Saving…"
+                : editing
+                  ? "Update session"
+                  : "Save session"}
+            </button>
+          )}
           <button className="btn ghost" onClick={onClear} disabled={saving}>
             {editing ? "Cancel" : "Clear"}
           </button>
