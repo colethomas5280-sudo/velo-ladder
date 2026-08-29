@@ -9,6 +9,7 @@ import {
   sessionsOfType,
   fmt,
   fmtDate,
+  BOX_INDEXES,
 } from "@/lib/velo";
 
 export default function HistoryTable({
@@ -126,7 +127,7 @@ export default function HistoryTable({
                                     </div>
                                   );
                                 const primer = t[0] == null ? "–" : t[0];
-                                const hs = [1, 2, 3]
+                                const hs = BOX_INDEXES.slice(1)
                                   .map((i) => (t[i] == null ? "–" : t[i]))
                                   .join("  ");
                                 return (

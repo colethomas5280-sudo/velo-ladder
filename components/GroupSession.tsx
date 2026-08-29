@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import type { TrainingSession, TrackerId } from "@/lib/types";
-import { TRACKERS, num, todayISO, throwsFromDraft } from "@/lib/velo";
+import {
+  TRACKERS,
+  num,
+  todayISO,
+  throwsFromDraft,
+  BOX_INDEXES,
+} from "@/lib/velo";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
   type Draft,
@@ -80,7 +86,7 @@ export default function GroupSession({
     const d = id === activeId ? draft : loadDraft(id, tracker);
     const has = cfg.slots.some((sl) => {
       const t = d.throws[sl.key] || [];
-      return [1, 2, 3].some((i) => num(t[i]));
+      return BOX_INDEXES.slice(1).some((i) => num(t[i]));
     });
     if (has) return "data";
     return saved.has(id) ? "saved" : "empty";
@@ -113,7 +119,7 @@ export default function GroupSession({
       const ok = await postFor(activeId, loadDraft(activeId, tracker));
       if (!ok) {
         setSaveError(
-          "Enter at least one 100% throw (boxes 1, 2 or 3) before saving.",
+          "Enter at least one 100% throw (boxes 1-4) before saving.",
         );
         return;
       }
@@ -212,6 +218,6 @@ export default function GroupSession({
 function pad(throws: Record<string, (number | null)[]>) {
   const out: Record<string, (number | null)[]> = {};
   for (const [k, arr] of Object.entries(throws))
-    out[k] = [0, 1, 2, 3].map((i) => arr[i] ?? null);
+    out[k] = BOX_INDEXES.map((i) => arr[i] ?? null);
   return out;
 }

@@ -116,16 +116,25 @@ export function todayISO(): string {
 }
 
 /* ------------------------------------------------------------------ *
- * Stats — everything works off the three 100% throws (indices 1..3);
+ * Stats — everything works off the 100% throws (indices 1..4);
  * index 0 (the 80% primer) is never scored.
  * ------------------------------------------------------------------ */
+
+/**
+ * Boxes per weight: index 0 is the 80% primer, 1..4 are the 100% throws.
+ * Sessions logged when there were only 3 scored boxes are stored as length-4
+ * arrays; every read below walks the array it is given rather than assuming a
+ * length, so both shapes work.
+ */
+export const BOXES_PER_SLOT = 5;
+export const BOX_INDEXES = [0, 1, 2, 3, 4] as const;
 
 function hundredsOfSlot(sessions: TrainingSession[], key: string): number[] {
   const out: number[] = [];
   for (const s of sessions) {
     const t = s.throws[key];
     if (!t) continue;
-    for (let i = 1; i < 4; i++) {
+    for (let i = 1; i < t.length; i++) {
       const v = num(t[i]);
       if (v) out.push(v);
     }
@@ -137,7 +146,7 @@ export function sBest(s: TrainingSession, key: string): number | null {
   const t = s.throws[key];
   if (!t) return null;
   let m: number | null = null;
-  for (let i = 1; i < 4; i++) {
+  for (let i = 1; i < t.length; i++) {
     const v = num(t[i]);
     if (v) m = m == null ? v : Math.max(m, v);
   }
@@ -147,7 +156,7 @@ export function sAvg(s: TrainingSession, key: string): number | null {
   const t = s.throws[key];
   if (!t) return null;
   const a: number[] = [];
-  for (let i = 1; i < 4; i++) {
+  for (let i = 1; i < t.length; i++) {
     const v = num(t[i]);
     if (v) a.push(v);
   }
@@ -176,7 +185,7 @@ export function sAvgG(s: TrainingSession, keys: string[]): number | null {
   const a: number[] = [];
   for (const k of keys) {
     const t = s.throws[k];
-    if (t) for (let i = 1; i < 4; i++) {
+    if (t) for (let i = 1; i < t.length; i++) {
       const v = num(t[i]);
       if (v) a.push(v);
     }
@@ -187,7 +196,7 @@ export function sMinG(s: TrainingSession, keys: string[]): number | null {
   let m: number | null = null;
   for (const k of keys) {
     const t = s.throws[k];
-    if (t) for (let i = 1; i < 4; i++) {
+    if (t) for (let i = 1; i < t.length; i++) {
       const v = num(t[i]);
       if (v) m = m == null ? v : Math.min(m, v);
     }
@@ -280,8 +289,8 @@ export function validateSessionInput(input: unknown): {
   let hasHundred = false;
   for (const [k, raw] of Object.entries(o.throws as Record<string, unknown>)) {
     if (!validKeys.has(k)) return { ok: false, error: `unknown slot '${k}' for ${type}` };
-    if (!Array.isArray(raw) || raw.length !== 4)
-      return { ok: false, error: `throws['${k}'] must be an array of 4` };
+    if (!Array.isArray(raw) || raw.length < 4 || raw.length > BOXES_PER_SLOT)
+      return { ok: false, error: `throws['${k}'] must be an array of 4 or ${BOXES_PER_SLOT}` };
     const arr = raw.map((v) => {
       if (v == null || v === "") return null;
       const n = Number(v);
@@ -307,7 +316,7 @@ export function throwsFromDraft(
   for (const key of slotKeys) {
     const raw = draftThrows[key];
     if (!raw) continue;
-    const arr = [0, 1, 2, 3].map((i) => num(raw[i]));
+    const arr = BOX_INDEXES.map((i) => num(raw[i]));
     if (arr.some((v) => v != null)) throws[key] = arr;
   }
   const hasHundred = Object.values(throws).some((a) =>
@@ -335,6 +344,7 @@ export function sessionsToCsv(
       "throw_1",
       "throw_2",
       "throw_3",
+      "throw_4",
       "session_max",
       "session_avg",
     ],
@@ -356,6 +366,7 @@ export function sessionsToCsv(
           t[1] ?? "",
           t[2] ?? "",
           t[3] ?? "",
+          t[4] ?? "",
           best == null ? "" : fmt(best, 0),
           avg == null ? "" : fmt(avg, 1),
         ]);

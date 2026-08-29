@@ -5,7 +5,7 @@ import { todayISO } from "@/lib/velo";
 export interface Draft {
   date: string;
   notes: string;
-  /** slot key -> 4 raw string inputs ["80%", "1", "2", "3"] */
+  /** slot key -> raw string inputs, one per box: ["80%", "1", "2", "3", "4"] */
   throws: Record<string, string[]>;
   editingId: string | null;
 }

@@ -1,7 +1,8 @@
 export type TrackerId = "mound" | "pulldown";
 export type Hand = "" | "R" | "L";
 
-/** Per-slot arrays of exactly 4 entries: [80% primer, 100% #1, #2, #3]. null = blank. */
+/** Per-slot arrays: [80% primer, 100% #1, #2, #3, #4]. null = blank.
+ *  Sessions logged before the 4th box exist as length-4 arrays. */
 export type Throws = Record<string, (number | null)[]>;
 
 export interface Athlete {
