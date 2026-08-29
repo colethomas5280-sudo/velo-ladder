@@ -66,12 +66,15 @@ GitHub is at the latest commit.
 | `/` | Coach → the Athletes roster. Athlete → redirected to their own profile. |
 | `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
 | `/login` | Email + password. |
+| `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
 | `/api/me` | `{ role, email, athleteId }` for the signed-in user. |
 | `/api/athletes` | GET (scoped list), POST (coach: create). |
 | `/api/athletes/overview` | GET — roster + session counts + last date (coach only). Powers the home table. |
 | `/api/athletes/[id]` | GET / PATCH (name, email, hand, password, archive) / DELETE (soft). |
 | `/api/athletes/[id]/sessions` | GET / POST. |
 | `/api/sessions/[id]` | PATCH / DELETE. |
+| `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); DELETE cancels one. |
+| `/api/join/[token]` | Public. GET reveals only the invited athlete's name/email; POST spends the invite. |
 | `/api/setup?key=…&seed=1` | One-time (idempotent) schema + seed. `SETUP_KEY`-guarded. |
 | `/api/auth/*` | Auth.js. |
 
@@ -189,6 +192,19 @@ npm run dev
   group modal lossless across reloads.
 
 ---
+
+## Onboarding an athlete
+
+Add them on the roster with a name and login email (password optional), then
+click **Copy invite link** and send it. They set their own password and land on
+their profile. Links are single-use and expire after `INVITE_TTL_DAYS` (14).
+Re-issuing revokes the previous link, which is how you fix one sent to the wrong
+person. The raw token is returned only from the POST that mints it and never
+appears in any athlete listing.
+
+Coaches are still env-based: add the address to `COACH_EMAILS` (comma-separated)
+and redeploy; they sign in with the shared `COACH_PASSWORD`. If coaches ever need
+individual passwords, that wants a `coaches` table rather than an env var.
 
 ## Next steps / open questions
 

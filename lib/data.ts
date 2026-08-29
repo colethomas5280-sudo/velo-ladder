@@ -15,6 +15,7 @@ function toAthlete(r: Record<string, unknown>): Athlete {
     hand: (r.hand as Athlete["hand"]) || "",
     inviteEmail: (r.invite_email as string | null) ?? null,
     hasPassword: !!r.password_hash,
+    hasInvite: !!r.invite_token,
     archived: Boolean(r.archived),
   };
 }
@@ -131,6 +132,97 @@ export async function updateAthlete(
     WHERE id = ${id} RETURNING *
   `) as Record<string, unknown>[];
   return rows[0] ? toAthlete(rows[0]) : null;
+}
+
+/* ---------------- invites ---------------- */
+
+/** How long a freshly issued invite link stays usable. */
+export const INVITE_TTL_DAYS = 14;
+
+/**
+ * Issue a fresh single-use invite for an athlete and return the raw token.
+ * Any previous invite for that athlete stops working — the token column is
+ * overwritten — so re-inviting safely revokes a link that went to the wrong
+ * person. The raw token is returned once here and never included in any
+ * athlete listing.
+ */
+export async function createInvite(id: string): Promise<string | null> {
+  const cur = await getAthlete(id);
+  if (!cur || cur.archived) return null;
+  const token = randomToken();
+  await sql`
+    UPDATE athletes
+    SET invite_token = ${token},
+        invite_expires = now() + ${`${INVITE_TTL_DAYS} days`}::interval
+    WHERE id = ${id}
+  `;
+  return token;
+}
+
+export async function revokeInvite(id: string): Promise<void> {
+  await sql`UPDATE athletes SET invite_token = NULL, invite_expires = NULL WHERE id = ${id}`;
+}
+
+export interface InviteTarget {
+  id: string;
+  name: string;
+  email: string | null;
+}
+
+/** Look up a pending, unexpired invite. Returns null for unknown/expired/used. */
+export async function getInvite(token: string): Promise<InviteTarget | null> {
+  if (!token) return null;
+  const rows = (await sql`
+    SELECT id, name, invite_email FROM athletes
+    WHERE invite_token = ${token}
+      AND archived = false
+      AND invite_expires IS NOT NULL
+      AND invite_expires > now()
+    LIMIT 1
+  `) as Record<string, unknown>[];
+  const r = rows[0];
+  return r
+    ? {
+        id: String(r.id),
+        name: String(r.name),
+        email: (r.invite_email as string | null) ?? null,
+      }
+    : null;
+}
+
+/**
+ * Spend the invite: set the athlete's password and clear the token in one
+ * statement, so the same link can't be redeemed twice even if two requests
+ * arrive together. Returns the athlete, or null if the token was already used.
+ */
+export async function consumeInvite(
+  token: string,
+  password: string,
+): Promise<InviteTarget | null> {
+  const hash = await hashPassword(password);
+  const rows = (await sql`
+    UPDATE athletes
+    SET password_hash = ${hash}, invite_token = NULL, invite_expires = NULL
+    WHERE invite_token = ${token}
+      AND archived = false
+      AND invite_expires IS NOT NULL
+      AND invite_expires > now()
+    RETURNING id, name, invite_email
+  `) as Record<string, unknown>[];
+  const r = rows[0];
+  return r
+    ? {
+        id: String(r.id),
+        name: String(r.name),
+        email: (r.invite_email as string | null) ?? null,
+      }
+    : null;
+}
+
+function randomToken(): string {
+  const b = new Uint8Array(24);
+  crypto.getRandomValues(b);
+  return Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 }
 
 export async function listSessions(athleteId: string): Promise<TrainingSession[]> {

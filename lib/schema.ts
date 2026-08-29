@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -17,6 +17,12 @@ CREATE TABLE IF NOT EXISTS athletes (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS password_hash text;
+-- Single-use invite: the athlete sets their own password from a link, so a
+-- password never has to be sent to them over text or email.
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS invite_token text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS invite_expires timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS athletes_invite_token_idx
+  ON athletes(invite_token) WHERE invite_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS athletes_email_idx ON athletes(lower(invite_email));
 
 CREATE TABLE IF NOT EXISTS training_sessions (
