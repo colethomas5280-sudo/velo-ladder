@@ -24,6 +24,7 @@ export default function AthletesTable() {
   const [ne, setNe] = useState("");
   const [np, setNp] = useState("");
   const [sessionIds, setSessionIds] = useState<string[] | null>(null);
+  const [inviting, setInviting] = useState<string | null>(null);
 
   const show = (m: string) => {
     setToast(m);
@@ -61,21 +62,59 @@ export default function AthletesTable() {
     }
   };
 
+  /** Password is optional — the normal path is to add, then send an invite. */
   const addAthlete = async () => {
-    if (!nn.trim() || !ne.trim() || np.length < 6) return;
+    if (!nn.trim() || !ne.trim()) return;
+    if (np && np.length < 6) {
+      show("Password must be at least 6 characters (or leave it blank)");
+      return;
+    }
     try {
       await api("/api/athletes", "POST", {
         name: nn.trim(),
         inviteEmail: ne.trim(),
-        password: np,
+        password: np || null,
       });
       await mutate();
       setNn("");
       setNe("");
       setNp("");
-      show(`Added ${nn.trim()}`);
+      show(`Added ${nn.trim()} — send them an invite link`);
     } catch (e) {
       errMsg(e);
+    }
+  };
+
+  /**
+   * Issue a fresh single-use link and put it on the clipboard. Each click
+   * mints a new token, which also revokes any link already sent out.
+   */
+  const invite = async (a: AthleteOverview) => {
+    if (!a.inviteEmail) {
+      show("Add a login email for this athlete first");
+      return;
+    }
+    setInviting(a.id);
+    try {
+      const res = await api<{ url: string; expiresInDays: number }>(
+        `/api/athletes/${a.id}/invite`,
+        "POST",
+      );
+      let copied = false;
+      try {
+        await navigator.clipboard.writeText(res.url);
+        copied = true;
+      } catch {
+        /* clipboard blocked — fall back to showing the link */
+      }
+      await mutate();
+      if (copied)
+        show(`Invite link copied — good for ${res.expiresInDays} days`);
+      else window.prompt("Copy this invite link and send it:", res.url);
+    } catch (e) {
+      errMsg(e);
+    } finally {
+      setInviting(null);
     }
   };
 
@@ -114,7 +153,7 @@ export default function AthletesTable() {
                 <th>Name</th>
                 <th>Login email</th>
                 <th>Hand</th>
-                <th>Password</th>
+                <th>Access</th>
                 <th>Mound</th>
                 <th>Pull-Down</th>
                 <th>Last session</th>
@@ -193,15 +232,39 @@ export default function AthletesTable() {
                         </button>
                       </span>
                     ) : (
-                      <button
-                        className="btn sm ghost"
-                        onClick={() => {
-                          setResetFor(a.id);
-                          setResetPw("");
-                        }}
-                      >
-                        {a.hasPassword ? "● set · reset" : "set password"}
-                      </button>
+                      <span className="access-cell">
+                        <button
+                          className={`btn sm${a.hasPassword ? " ghost" : " primary"}`}
+                          disabled={inviting === a.id}
+                          onClick={() => invite(a)}
+                          title={
+                            a.inviteEmail
+                              ? "Copy a single-use link that lets them set their own password"
+                              : "Add a login email first"
+                          }
+                        >
+                          {inviting === a.id
+                            ? "…"
+                            : a.hasPassword
+                              ? "New invite"
+                              : a.hasInvite
+                                ? "Copy invite again"
+                                : "Copy invite link"}
+                        </button>
+                        <button
+                          className="btn sm ghost"
+                          onClick={() => {
+                            setResetFor(a.id);
+                            setResetPw("");
+                          }}
+                        >
+                          {a.hasPassword
+                            ? "● active"
+                            : a.hasInvite
+                              ? "invite sent"
+                              : "set password"}
+                        </button>
+                      </span>
                     )}
                   </td>
                   <td className="mono">{a.mound}</td>
@@ -246,7 +309,7 @@ export default function AthletesTable() {
           />
           <input
             className="tin"
-            placeholder="password (6+)"
+            placeholder="password (optional)"
             value={np}
             onChange={(e) => setNp(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addAthlete()}

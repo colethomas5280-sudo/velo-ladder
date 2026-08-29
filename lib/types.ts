@@ -13,6 +13,8 @@ export interface Athlete {
   inviteEmail: string | null;
   /** true once a password has been set (the hash itself is never sent to the client) */
   hasPassword: boolean;
+  /** true while an unused invite link is outstanding (the token is never sent to the client) */
+  hasInvite: boolean;
   archived: boolean;
 }
 

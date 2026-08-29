@@ -1210,3 +1210,10 @@ table.roster-table {
   font-weight: 500;
   line-height: 1.45;
 }
+
+.access-cell {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
