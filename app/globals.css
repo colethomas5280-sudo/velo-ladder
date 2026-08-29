@@ -1217,3 +1217,23 @@ table.roster-table {
   align-items: center;
   white-space: nowrap;
 }
+
+.sec-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.sec-actions .tin {
+  min-width: 200px;
+}
+.invite-link {
+  width: 100%;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+}
+.type-pick-note {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+}

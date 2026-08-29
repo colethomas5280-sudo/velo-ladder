@@ -7,6 +7,7 @@ import type { AthleteOverview, Hand } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import { fmtDate } from "@/lib/velo";
 import GroupSession from "./GroupSession";
+import InviteAthleteModal from "./InviteAthleteModal";
 
 export default function AthletesTable() {
   const { data, mutate, isLoading } = useSWR<AthleteOverview[]>(
@@ -20,11 +21,9 @@ export default function AthletesTable() {
   const [toast, setToast] = useState<string | null>(null);
   const [resetFor, setResetFor] = useState<string | null>(null);
   const [resetPw, setResetPw] = useState("");
-  const [nn, setNn] = useState("");
-  const [ne, setNe] = useState("");
-  const [np, setNp] = useState("");
   const [sessionIds, setSessionIds] = useState<string[] | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const show = (m: string) => {
     setToast(m);
@@ -57,29 +56,6 @@ export default function AthletesTable() {
         return n;
       });
       show(`Removed ${a.name}`);
-    } catch (e) {
-      errMsg(e);
-    }
-  };
-
-  /** Password is optional — the normal path is to add, then send an invite. */
-  const addAthlete = async () => {
-    if (!nn.trim() || !ne.trim()) return;
-    if (np && np.length < 6) {
-      show("Password must be at least 6 characters (or leave it blank)");
-      return;
-    }
-    try {
-      await api("/api/athletes", "POST", {
-        name: nn.trim(),
-        inviteEmail: ne.trim(),
-        password: np || null,
-      });
-      await mutate();
-      setNn("");
-      setNe("");
-      setNp("");
-      show(`Added ${nn.trim()} — send them an invite link`);
     } catch (e) {
       errMsg(e);
     }
@@ -135,13 +111,17 @@ export default function AthletesTable() {
     <div className="athletes-page">
       <div className="sec-h">
         <h3>Athletes</h3>
-        <input
-          className="tin"
-          placeholder="Search name or email…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          style={{ minWidth: 220 }}
-        />
+        <div className="sec-actions">
+          <input
+            className="tin"
+            placeholder="Search name or email…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <button className="btn primary" onClick={() => setInviteOpen(true)}>
+            + Invite athlete
+          </button>
+        </div>
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>
@@ -293,31 +273,6 @@ export default function AthletesTable() {
           </table>
         </div>
 
-        <div className="add-athlete">
-          <input
-            className="tin"
-            placeholder="New athlete name"
-            value={nn}
-            onChange={(e) => setNn(e.target.value)}
-          />
-          <input
-            className="tin"
-            type="email"
-            placeholder="login email"
-            value={ne}
-            onChange={(e) => setNe(e.target.value)}
-          />
-          <input
-            className="tin"
-            placeholder="password (optional)"
-            value={np}
-            onChange={(e) => setNp(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addAthlete()}
-          />
-          <button className="btn sm primary" onClick={addAthlete}>
-            Add athlete
-          </button>
-        </div>
       </div>
 
       {checked.size > 0 && (
@@ -336,6 +291,13 @@ export default function AthletesTable() {
             Log a session for {checked.size} →
           </button>
         </div>
+      )}
+
+      {inviteOpen && (
+        <InviteAthleteModal
+          onClose={() => setInviteOpen(false)}
+          onCreated={() => mutate()}
+        />
       )}
 
       {sessionIds && (
