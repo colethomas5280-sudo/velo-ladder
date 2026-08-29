@@ -63,15 +63,7 @@ export default function HistoryTable({
                 <tr>
                   <th>Date</th>
                   {cfg.groups.map((gp) => (
-                    <th key={gid(gp)}>
-                      {gp.oz}oz
-                      {gp.keys.length > 1 ? (
-                        <>
-                          <br />
-                          <span style={{ fontWeight: 400 }}>both sets</span>
-                        </>
-                      ) : null}
-                    </th>
+                    <th key={gid(gp)}>{gp.oz}oz</th>
                   ))}
                   {!readOnly && <th />}
                 </tr>

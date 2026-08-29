@@ -189,7 +189,7 @@ export default function ProgressChart({
               aria-pressed={id === groupId}
               onClick={() => setGroupId(id)}
             >
-              {gp.oz} oz{gp.keys.length > 1 ? " · both sets" : ""}
+              {gp.oz} oz
             </button>
           );
         })}
