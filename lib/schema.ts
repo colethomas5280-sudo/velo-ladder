@@ -33,18 +33,30 @@ CREATE INDEX IF NOT EXISTS ts_athlete_idx ON training_sessions(athlete_id, type,
 -- passwords. Back then created_by and athletes.user_id referenced the Auth.js
 -- adapter's users table, which the app no longer writes to. CREATE TABLE IF NOT
 -- EXISTS never alters an existing table, so those constraints survive and every
--- session insert fails with a foreign key violation. Drop any FK still pointing
--- at users, whatever it was named.
+-- session insert fails with a foreign key violation.
+ALTER TABLE training_sessions DROP CONSTRAINT IF EXISTS training_sessions_created_by_fkey;
+ALTER TABLE athletes DROP CONSTRAINT IF EXISTS athletes_user_id_fkey;
+
+-- Same thing again for a constraint that was given a non-default name. Scoped
+-- hard to our own two tables in public: a managed Postgres (Supabase) has its
+-- own auth.users that this role does not own and must never touch.
 DO $mig$
 DECLARE r record;
 BEGIN
   FOR r IN
-    SELECT c.conrelid::regclass::text AS tbl, c.conname AS name
+    SELECT src.relname AS tbl, c.conname AS name
     FROM pg_constraint c
-    JOIN pg_class ref ON ref.oid = c.confrelid
-    WHERE c.contype = 'f' AND ref.relname = 'users'
+    JOIN pg_class src       ON src.oid = c.conrelid
+    JOIN pg_namespace srcns ON srcns.oid = src.relnamespace
+    JOIN pg_class ref       ON ref.oid = c.confrelid
+    JOIN pg_namespace refns ON refns.oid = ref.relnamespace
+    WHERE c.contype = 'f'
+      AND srcns.nspname = 'public'
+      AND src.relname IN ('athletes', 'training_sessions')
+      AND refns.nspname = 'public'
+      AND ref.relname = 'users'
   LOOP
-    EXECUTE format('ALTER TABLE %s DROP CONSTRAINT %I', r.tbl, r.name);
+    EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT %I', r.tbl, r.name);
   END LOOP;
 END
 $mig$;
