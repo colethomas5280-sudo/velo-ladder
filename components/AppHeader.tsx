@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import useSWR from "swr";
 import { signOut } from "next-auth/react";
 import { fetcher } from "@/lib/fetcher";
 
 type Me = { role: "coach" | "athlete" | "none"; email: string };
 
-export default function AppHeader() {
+export default function AppHeader({
+  email,
+  back = false,
+}: {
+  email?: string;
+  back?: boolean;
+}) {
   const { data } = useSWR<Me>("/api/me", fetcher);
-  const path = usePathname();
   const isCoach = data?.role === "coach";
 
   return (
@@ -19,25 +23,14 @@ export default function AppHeader() {
         <span className="dot" />
         Velo Ladder
       </Link>
-      {isCoach && (
-        <nav className="topnav">
-          <Link href="/" aria-current={path === "/" ? "page" : undefined}>
-            Tracker
-          </Link>
-          <Link
-            href="/athletes"
-            aria-current={path === "/athletes" ? "page" : undefined}
-          >
-            Athletes
-          </Link>
-        </nav>
+      {back && isCoach && (
+        <Link href="/" className="back-link">
+          ← Athletes
+        </Link>
       )}
       <span className="spacer" />
-      {data && (
-        <span className="who">
-          {data.email}
-          {isCoach ? " · coach" : ""}
-        </span>
+      {(email || data?.email) && (
+        <span className="who">{email ?? data?.email}</span>
       )}
       <button
         className="btn sm ghost"

@@ -1035,3 +1035,27 @@ table.roster-table {
   padding: 8px 0 0;
   background: transparent;
 }
+
+/* ---------- profile / links ---------- */
+.name-link {
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+}
+.name-link:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.back-link {
+  color: var(--ink-dim);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.back-link:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
