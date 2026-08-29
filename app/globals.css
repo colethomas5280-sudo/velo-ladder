@@ -674,6 +674,43 @@ tr.sess.open .caret {
   transform: rotate(90deg);
 }
 
+/* ---------- track-together ---------- */
+.group-pick {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.tabstrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 2px 12px;
+}
+.atab {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  border-bottom: 3px solid transparent;
+}
+.atab.data {
+  color: var(--ink);
+}
+.atab.saved {
+  color: var(--good);
+}
+.atab.on {
+  background: var(--panel);
+  color: var(--ink);
+  border-color: var(--line);
+  border-bottom-color: var(--accent);
+}
+
 /* ---------- roster ---------- */
 .roster-d {
   margin-bottom: 18px;

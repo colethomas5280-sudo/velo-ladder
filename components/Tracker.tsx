@@ -87,6 +87,62 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
     {},
   );
   const [saving, setSaving] = useState(false);
+
+  // --- "track together": enter for several athletes in one session ---
+  const [groupIds, setGroupIds] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("veloladder:group");
+      if (raw) setGroupIds(JSON.parse(raw));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const persistGroup = (
+    next: string[] | ((prev: string[]) => string[]),
+  ) => {
+    setGroupIds((prev) => {
+      const ids = typeof next === "function" ? next(prev) : next;
+      try {
+        window.localStorage.setItem("veloladder:group", JSON.stringify(ids));
+      } catch {
+        /* ignore */
+      }
+      return ids;
+    });
+  };
+  const [groupSaved, setGroupSaved] = useState<Set<string>>(new Set());
+  const group = useMemo(
+    () => groupIds.filter((id) => athletes.some((a) => a.id === id)),
+    [groupIds, athletes],
+  );
+  const groupMode = group.length >= 2;
+  const groupKey = group.join(",");
+  useEffect(() => {
+    if (group.length >= 2 && (!selectedId || !group.includes(selectedId))) {
+      setSelectedId(group[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupKey]);
+
+  function toggleGroup(id: string) {
+    const adding = !groupIds.includes(id);
+    persistGroup((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+    setGroupSaved(new Set());
+    if (adding) setSelectedId(id);
+  }
+
+  function memberStatus(id: string): "saved" | "data" | "empty" {
+    const d = id === selectedId ? draft : loadDraft(id, tracker);
+    const has = cfg.slots.some((sl) => {
+      const t = d.throws[sl.key] || [];
+      return [1, 2, 3].some((i) => num(t[i]));
+    });
+    if (has) return "data";
+    return groupSaved.has(id) ? "saved" : "empty";
+  }
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (m: string) => {
     setToast(m);
@@ -132,6 +188,59 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
       showToast(draft.editingId ? "Session updated" : "Session saved");
     } catch (e) {
       err(e, "Couldn't save the session");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function draftToThrows(d: Draft): { throws: Throws; hasHundred: boolean } {
+    const throws: Throws = {};
+    for (const sl of cfg.slots) {
+      const raw = d.throws[sl.key];
+      if (!raw) continue;
+      const arr = [0, 1, 2, 3].map((i) => num(raw[i]));
+      if (arr.some((v) => v != null)) throws[sl.key] = arr;
+    }
+    const hasHundred = Object.values(throws).some((a) =>
+      a.slice(1).some((v) => v != null),
+    );
+    return { throws: padThrows(throws, []), hasHundred };
+  }
+
+  async function saveAll() {
+    if (!group.length) return;
+    if (selectedId) saveDraft(selectedId, tracker, draft); // flush active
+    setSaving(true);
+    let count = 0;
+    const nowSaved = new Set(groupSaved);
+    try {
+      for (const id of group) {
+        const d = loadDraft(id, tracker);
+        const { throws, hasHundred } = draftToThrows(d);
+        if (!hasHundred) continue;
+        const payload = {
+          type: tracker,
+          date: d.date || todayISO(),
+          notes: (d.notes || "").trim(),
+          throws,
+        };
+        if (d.editingId)
+          await api(`/api/sessions/${d.editingId}`, "PATCH", payload);
+        else await api(`/api/athletes/${id}/sessions`, "POST", payload);
+        clearDraft(id, tracker);
+        nowSaved.add(id);
+        count++;
+      }
+      setGroupSaved(nowSaved);
+      setDraftState(emptyDraft());
+      await mutateSessions();
+      showToast(
+        count
+          ? `Saved ${count} session${count === 1 ? "" : "s"}`
+          : "Nothing to save — enter some 100% throws first",
+      );
+    } catch (e) {
+      err(e, "Couldn't save the group");
     } finally {
       setSaving(false);
     }
@@ -300,12 +409,42 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
       </div>
 
       {isCoach ? (
-        <RosterManager
-          athletes={athletes}
-          onAdd={addAthlete}
-          onUpdate={updateAthlete}
-          onArchive={archiveAthlete}
-        />
+        <>
+          <RosterManager
+            athletes={athletes}
+            onAdd={addAthlete}
+            onUpdate={updateAthlete}
+            onArchive={archiveAthlete}
+          />
+          <details className="roster-d" open={group.length > 0}>
+            <summary>
+              Track together{group.length ? ` — ${group.length} in session` : ""}
+            </summary>
+            <div className="group-pick">
+              {athletes.map((a) => (
+                <button
+                  key={a.id}
+                  className="chip"
+                  aria-pressed={groupIds.includes(a.id)}
+                  onClick={() => toggleGroup(a.id)}
+                >
+                  {a.name}
+                </button>
+              ))}
+              {group.length > 0 && (
+                <button
+                  className="btn sm ghost"
+                  onClick={() => {
+                    persistGroup([]);
+                    setGroupSaved(new Set());
+                  }}
+                >
+                  Clear session
+                </button>
+              )}
+            </div>
+          </details>
+        </>
       ) : (
         <AthleteAccount
           onSave={(pw) => updateAthlete(athlete.id, { password: pw })}
@@ -313,6 +452,26 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
       )}
 
       <Masthead athlete={athlete} sessions={allSessions} />
+
+      {groupMode && (
+        <div className="tabstrip">
+          {group.map((id) => {
+            const a = athletes.find((x) => x.id === id);
+            if (!a) return null;
+            const st = memberStatus(id);
+            return (
+              <button
+                key={id}
+                className={`atab ${st}${id === selectedId ? " on" : ""}`}
+                onClick={() => setSelectedId(id)}
+              >
+                {a.name.split(" ")[0]}
+                {st === "saved" ? " ✓" : st === "data" ? " ●" : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <EntryForm
         cfg={cfg}
@@ -324,6 +483,9 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
         onClear={clearOrCancel}
         saving={saving}
         readOnly={readOnly}
+        groupSize={groupMode ? group.length : 0}
+        onSaveAll={saveAll}
+        activeName={athlete.name.split(" ")[0]}
       />
 
       <ProgressChart
