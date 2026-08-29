@@ -1,10 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import type { AthleteOverview, Hand } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import { fmtDate } from "@/lib/velo";
+import GroupSession from "./GroupSession";
 
 export default function AthletesTable() {
   const { data, mutate, isLoading } = useSWR<AthleteOverview[]>(
@@ -21,6 +23,7 @@ export default function AthletesTable() {
   const [nn, setNn] = useState("");
   const [ne, setNe] = useState("");
   const [np, setNp] = useState("");
+  const [sessionIds, setSessionIds] = useState<string[] | null>(null);
 
   const show = (m: string) => {
     setToast(m);
@@ -84,14 +87,9 @@ export default function AthletesTable() {
     });
 
   const startSession = () => {
-    const ids = filtered.filter((a) => checked.has(a.id)).map((a) => a.id);
+    const ids = rows.filter((a) => checked.has(a.id)).map((a) => a.id);
     if (ids.length < 1) return;
-    try {
-      window.localStorage.setItem("veloladder:group", JSON.stringify(ids));
-    } catch {
-      /* ignore */
-    }
-    window.location.href = "/";
+    setSessionIds(ids);
   };
 
   return (
@@ -141,16 +139,10 @@ export default function AthletesTable() {
                       aria-label={`Select ${a.name}`}
                     />
                   </td>
-                  <td className="cell-edit">
-                    <input
-                      className="tin"
-                      defaultValue={a.name}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v && v !== a.name) patch(a.id, { name: v });
-                        else e.target.value = a.name;
-                      }}
-                    />
+                  <td>
+                    <Link href={`/athletes/${a.id}`} className="name-link">
+                      {a.name}
+                    </Link>
                   </td>
                   <td className="cell-edit">
                     <input
@@ -281,6 +273,19 @@ export default function AthletesTable() {
             Log a session for {checked.size} →
           </button>
         </div>
+      )}
+
+      {sessionIds && (
+        <GroupSession
+          people={rows.map((a) => ({ id: a.id, name: a.name }))}
+          ids={sessionIds}
+          onSaved={() => mutate()}
+          onClose={() => {
+            setSessionIds(null);
+            setChecked(new Set());
+            mutate();
+          }}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

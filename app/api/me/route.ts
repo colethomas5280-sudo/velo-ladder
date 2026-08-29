@@ -7,5 +7,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const scope = await getScope();
   if (!scope) return unauthorized();
-  return json({ role: scope.role, email: scope.email });
+  return json({
+    role: scope.role,
+    email: scope.email,
+    athleteId: scope.athleteIds[0] ?? null,
+  });
 }

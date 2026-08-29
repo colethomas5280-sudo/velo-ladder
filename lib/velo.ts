@@ -281,6 +281,27 @@ export function validateSessionInput(input: unknown): {
 }
 
 /* ------------------------------------------------------------------ *
+ * Draft -> session payload (client side, before POST)
+ * ------------------------------------------------------------------ */
+
+export function throwsFromDraft(
+  draftThrows: Record<string, string[]>,
+  slotKeys: string[],
+): { throws: Throws; hasHundred: boolean } {
+  const throws: Throws = {};
+  for (const key of slotKeys) {
+    const raw = draftThrows[key];
+    if (!raw) continue;
+    const arr = [0, 1, 2, 3].map((i) => num(raw[i]));
+    if (arr.some((v) => v != null)) throws[key] = arr;
+  }
+  const hasHundred = Object.values(throws).some((a) =>
+    a.slice(1).some((v) => v != null),
+  );
+  return { throws, hasHundred };
+}
+
+/* ------------------------------------------------------------------ *
  * CSV export
  * ------------------------------------------------------------------ */
 

@@ -1,4 +1,4 @@
-import { getScope } from "@/lib/scope";
+import { getScope, canSeeAthlete } from "@/lib/scope";
 import { getAthlete, updateAthlete } from "@/lib/data";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
 import type { Hand } from "@/lib/types";
@@ -7,6 +7,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const isHand = (v: unknown): v is Hand => v === "R" || v === "L" || v === "";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const scope = await getScope();
+  if (!scope) return unauthorized();
+  if (!canSeeAthlete(scope, id)) return forbidden();
+  const athlete = await getAthlete(id);
+  if (!athlete || athlete.archived) return notFound();
+  return json(athlete);
+}
 
 export async function PATCH(
   request: Request,
