@@ -234,19 +234,45 @@ export function fiveOzPR(sessions: TrainingSession[], type: TrackerId): number |
   return g ? recStatsG(sessions, g.keys).pr : null;
 }
 
+/** A velocity together with the session date it happened on. */
+export interface DatedValue {
+  value: number;
+  date: string;
+}
+
 /** Previous session's best for a record group, skipping the session being edited. */
 export function lastBest(
   sessions: TrainingSession[],
   keys: string[],
   skipId?: string | null,
-): number | null {
-  const sorted = [...sessions].sort((a, b) => (a.date < b.date ? 1 : -1));
+): DatedValue | null {
+  const sorted = [...sessions].sort((a, b) =>
+    a.date !== b.date ? (a.date < b.date ? 1 : -1) : a.id < b.id ? 1 : -1,
+  );
   for (const s of sorted) {
     if (skipId && s.id === skipId) continue;
     const v = sBestG(s, keys);
-    if (v != null) return v;
+    if (v != null) return { value: v, date: s.date };
   }
   return null;
+}
+
+/**
+ * All-time best for a record group and the date it was set. On a tie the
+ * earliest session wins — that is when the athlete first reached it.
+ */
+export function prWithDate(
+  sessions: TrainingSession[],
+  keys: string[],
+): DatedValue | null {
+  let best: DatedValue | null = null;
+  for (const s of sessions) {
+    const v = sBestG(s, keys);
+    if (v == null) continue;
+    if (!best || v > best.value || (v === best.value && s.date < best.date))
+      best = { value: v, date: s.date };
+  }
+  return best;
 }
 
 export function sessionsOfType(
