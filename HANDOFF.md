@@ -83,8 +83,10 @@ athletes; **athlete** = their own only; anyone else = 403.
 
 ### Key components
 
-- `HomeView` → `AthletesTable` (spreadsheet: inline-edit email/hand/password, add,
-  remove, search; check rows → **`GroupSession`** modal).
+- `HomeView` → `AthletesTable` (spreadsheet: inline-edit email/hand, per-row invite
+  and password reset, remove, search; check rows → **`GroupSession`** modal;
+  **+ Invite athlete** → `InviteAthleteModal`, which creates the athlete and mints
+  the link in one step).
 - `AthleteProfile` → `Masthead` + view toggle + `ProgressChart` + `HistoryTable`
   + password box. Entry is **not** on the page — it opens in `SessionModal`.
 - `SessionModal` — single-athlete entry pop-up, two steps: **pick** (Mound or
@@ -207,8 +209,9 @@ npm run dev
 
 ## Onboarding an athlete
 
-Add them on the roster with a name and login email (password optional), then
-click **Copy invite link** and send it. They set their own password and land on
+Click **+ Invite athlete** (top right of the roster), enter a name and login email,
+and it creates the athlete and copies their invite link in one step. For someone
+already on the roster, **Copy invite link** in their Access column does the same. They set their own password and land on
 their profile. Links are single-use and expire after `INVITE_TTL_DAYS` (14).
 Re-issuing revokes the previous link, which is how you fix one sent to the wrong
 person. The raw token is returned only from the POST that mints it and never
