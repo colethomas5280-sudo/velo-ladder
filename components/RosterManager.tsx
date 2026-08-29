@@ -10,18 +10,29 @@ export default function RosterManager({
   onArchive,
 }: {
   athletes: Athlete[];
-  onAdd: (name: string, email: string) => Promise<void>;
-  onUpdate: (id: string, patch: Partial<Athlete>) => Promise<void>;
+  onAdd: (name: string, email: string, password: string) => Promise<void>;
+  onUpdate: (id: string, patch: Partial<Athlete> & { password?: string }) => Promise<void>;
   onArchive: (a: Athlete) => Promise<void>;
 }) {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newPass, setNewPass] = useState("");
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [resetPass, setResetPass] = useState("");
 
   const add = async () => {
-    if (!newName.trim()) return;
-    await onAdd(newName.trim(), newEmail.trim());
+    if (!newName.trim() || !newEmail.trim() || newPass.length < 6) return;
+    await onAdd(newName.trim(), newEmail.trim(), newPass);
     setNewName("");
     setNewEmail("");
+    setNewPass("");
+  };
+
+  const saveReset = async (id: string) => {
+    if (resetPass.length < 6) return;
+    await onUpdate(id, { password: resetPass });
+    setResetFor(null);
+    setResetPass("");
   };
 
   return (
@@ -29,7 +40,7 @@ export default function RosterManager({
       <summary>Manage roster ({athletes.length})</summary>
       <div className="roster">
         {athletes.map((a) => (
-          <div className="r" key={a.id}>
+          <div className="r" key={a.id} style={{ flexWrap: "wrap" }}>
             <input
               className="tin"
               defaultValue={a.name}
@@ -45,7 +56,7 @@ export default function RosterManager({
               type="email"
               placeholder="athlete@email.com"
               defaultValue={a.inviteEmail ?? ""}
-              aria-label="Invite email"
+              aria-label="Login email"
               onBlur={(e) => {
                 const v = e.target.value.trim().toLowerCase();
                 if (v !== (a.inviteEmail ?? ""))
@@ -61,9 +72,18 @@ export default function RosterManager({
               <option value="R">R</option>
               <option value="L">L</option>
             </select>
-            <span className={a.userId ? "linked" : "unlinked"}>
-              {a.userId ? "● signed in" : "not yet joined"}
+            <span className={a.hasPassword ? "linked" : "unlinked"}>
+              {a.hasPassword ? "● password set" : "no password"}
             </span>
+            <button
+              className="btn sm ghost"
+              onClick={() => {
+                setResetFor(resetFor === a.id ? null : a.id);
+                setResetPass("");
+              }}
+            >
+              {a.hasPassword ? "Reset password" : "Set password"}
+            </button>
             <button
               className="btn sm danger"
               onClick={() => {
@@ -73,29 +93,69 @@ export default function RosterManager({
             >
               Remove
             </button>
+
+            {resetFor === a.id && (
+              <div
+                style={{
+                  flexBasis: "100%",
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 6,
+                }}
+              >
+                <input
+                  className="tin"
+                  type="text"
+                  autoFocus
+                  placeholder="new password (min 6)"
+                  value={resetPass}
+                  onChange={(e) => setResetPass(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && saveReset(a.id)}
+                />
+                <button className="btn sm primary" onClick={() => saveReset(a.id)}>
+                  Save
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
-        <div className="r" style={{ borderBottom: 0, paddingTop: 10 }}>
+        <div className="r" style={{ borderBottom: 0, paddingTop: 12, flexWrap: "wrap" }}>
           <input
             className="tin"
             placeholder="New athlete name"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && add()}
           />
           <input
             className="tin em"
             type="email"
-            placeholder="their email (for login)"
+            placeholder="their login email"
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
+          />
+          <input
+            className="tin"
+            type="text"
+            placeholder="password (min 6)"
+            value={newPass}
+            onChange={(e) => setNewPass(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && add()}
           />
           <button className="btn sm primary" onClick={add}>
-            Add
+            Add athlete
           </button>
         </div>
+        <p
+          style={{
+            fontSize: 12,
+            color: "var(--ink-faint)",
+            margin: "8px 0 0",
+          }}
+        >
+          Give each athlete their email + password directly. They can change the
+          password once they&rsquo;re in.
+        </p>
       </div>
     </details>
   );

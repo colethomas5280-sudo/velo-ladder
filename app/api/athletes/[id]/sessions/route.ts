@@ -39,7 +39,7 @@ export async function POST(
     date: v.value.date,
     notes: v.value.notes ?? "",
     throws: v.value.throws,
-    createdBy: scope.userId,
+    createdBy: scope.email,
   });
   return json(created, 201);
 }

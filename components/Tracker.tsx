@@ -171,11 +171,12 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
 
   /* ---------------- roster mutations ---------------- */
 
-  async function addAthlete(name: string, emailStr: string) {
+  async function addAthlete(name: string, emailStr: string, password: string) {
     try {
       const created = await api<Athlete>("/api/athletes", "POST", {
         name,
         inviteEmail: emailStr || null,
+        password: password || null,
       });
       await mutateAthletes();
       setSelectedId(created.id);
@@ -184,10 +185,14 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
       err(e, "Couldn't add athlete");
     }
   }
-  async function updateAthlete(id: string, patch: Partial<Athlete>) {
+  async function updateAthlete(
+    id: string,
+    patch: Partial<Athlete> & { password?: string },
+  ) {
     try {
       await api(`/api/athletes/${id}`, "PATCH", patch);
       await mutateAthletes();
+      if (patch.password) showToast("Password updated");
     } catch (e) {
       err(e, "Couldn't update athlete");
     }
@@ -238,10 +243,15 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
         <div className="eyebrow">Velocity development</div>
         <h3>Build your roster</h3>
         <p>
-          Add your first athlete with their email. They&rsquo;ll sign in with that
-          email and see only their own tracker.
+          Add your first athlete with an email and a password. Give them those
+          two things and they sign in to their own tracker.
         </p>
-        <RosterManagerInline onAdd={addAthlete} />
+        <RosterManager
+          athletes={[]}
+          onAdd={addAthlete}
+          onUpdate={updateAthlete}
+          onArchive={archiveAthlete}
+        />
       </div>
     );
   }
@@ -292,12 +302,16 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
 
       <Masthead athlete={athlete} sessions={allSessions} />
 
-      {isCoach && (
+      {isCoach ? (
         <RosterManager
           athletes={athletes}
           onAdd={addAthlete}
           onUpdate={updateAthlete}
           onArchive={archiveAthlete}
+        />
+      ) : (
+        <AthleteAccount
+          onSave={(pw) => updateAthlete(athlete.id, { password: pw })}
         />
       )}
 
@@ -364,17 +378,42 @@ function padThrows(throws: Throws, _keys: string[]): Throws {
   return out;
 }
 
-function RosterManagerInline({
-  onAdd,
-}: {
-  onAdd: (name: string, email: string) => Promise<void>;
-}) {
+function AthleteAccount({ onSave }: { onSave: (pw: string) => Promise<void> }) {
+  const [pw, setPw] = useState("");
+  const [done, setDone] = useState(false);
   return (
-    <RosterManager
-      athletes={[]}
-      onAdd={onAdd}
-      onUpdate={async () => {}}
-      onArchive={async () => {}}
-    />
+    <details className="roster-d">
+      <summary>Change my password</summary>
+      <div
+        className="roster"
+        style={{ flexDirection: "row", gap: 8, alignItems: "center" }}
+      >
+        <input
+          className="tin"
+          type="password"
+          placeholder="new password (min 6)"
+          value={pw}
+          onChange={(e) => {
+            setPw(e.target.value);
+            setDone(false);
+          }}
+        />
+        <button
+          className="btn sm primary"
+          disabled={pw.length < 6}
+          onClick={async () => {
+            await onSave(pw);
+            setPw("");
+            setDone(true);
+          }}
+        >
+          Save
+        </button>
+        {done && (
+          <span style={{ color: "var(--good)", fontSize: 12 }}>Saved</span>
+        )}
+      </div>
+    </details>
   );
 }
+

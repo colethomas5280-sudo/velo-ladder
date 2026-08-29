@@ -46,11 +46,11 @@ export default function AppShell({ email }: { email: string }) {
       {role === "none" && (
         <div className="card pad empty">
           <div className="eyebrow">Velocity development</div>
-          <h3>You&rsquo;re almost in</h3>
+          <h3>No tracker for this account</h3>
           <p>
-            You&rsquo;re signed in as <b>{email}</b>, but your coach hasn&rsquo;t
-            added this email to the roster yet. Ask them to add you, then reload
-            this page.
+            You&rsquo;re signed in as <b>{email}</b>, but that email isn&rsquo;t on
+            the roster. Ask your coach to add it (or check you used the right
+            email), then sign out and back in.
           </p>
         </div>
       )}
