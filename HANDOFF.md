@@ -39,7 +39,12 @@ GitHub is at the latest commit.
    The app no longer sends email — login is password-based.
 3. **Re-run DB setup after any schema change:**
    `https://velo-ladder.vercel.app/api/setup?key=<SETUP_KEY>&seed=1` — idempotent,
-   safe to hit anytime.
+   safe to hit anytime. Check `schemaVersion` in the response matches
+   `SCHEMA_VERSION` in `lib/schema.ts`; if it doesn't, the deploy is stale.
+4. **Optional cleanup:** the retired Auth.js adapter tables (`users`, `accounts`,
+   `sessions`, `verification_token`) are still in the production database, orphaned and
+   unused. Their foreign keys into our tables are now dropped, so they are harmless.
+   Drop them by hand in the Supabase SQL editor whenever convenient.
 
 ---
 
@@ -143,6 +148,28 @@ npm run dev
 ---
 
 ## Gotchas learned (read before next session)
+
+- **`CREATE TABLE IF NOT EXISTS` is not a migration.** It silently does nothing when
+  the table exists, so changing `lib/schema.ts` does **not** change a database that
+  was already set up. This bit hard: the magic-link schema had
+  `created_by text REFERENCES users(id)`, the password rewrite dropped the `users`
+  table from the file, and production kept the constraint — so *every* session insert
+  failed with `23503 ... is not present in table "users"` while looking like a broken
+  Save button. Any column/constraint change needs an explicit `ALTER ... IF EXISTS`
+  statement added to `SCHEMA_SQL`, and `SCHEMA_VERSION` bumped.
+- **Never write a migration that matches objects by name alone.** Supabase has its own
+  managed `auth.users`; a cleanup loop keyed on `relname = 'users'` tried to alter
+  `auth.identities` and failed with `must be owner of table identities`. Scope
+  migrations to `nspname = 'public'` *and* an explicit list of our own tables, and wrap
+  each DDL in a `BEGIN ... EXCEPTION WHEN OTHERS` so one failure can't abort setup.
+- **`/api/setup` returns `schemaVersion`** — if it's missing from the response you are
+  hitting a stale deployment, not a real failure. Errors name the failing statement
+  (`statement 6/6 failed [...]`).
+- **`execScript` splits on top-level `;` only** (`splitStatements` in `lib/db.ts`),
+  respecting `$tag$ ... $tag$`, so `DO` blocks survive. Don't go back to `script.split(";")`.
+- **Never let a save failure be a toast.** Errors from saving render inside the modal
+  and persist (`form-error`); a 2.6 s toast behind a modal is invisible and makes a
+  server error look like a dead button.
 
 - **PGlite does not work inside React Server Components** — throws
   `The "path" argument must be of type string … Received an instance of URL`.
