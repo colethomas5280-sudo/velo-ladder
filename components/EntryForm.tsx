@@ -121,15 +121,15 @@ export default function EntryForm({
                   className="s"
                   data-date={last ? fmtDate(last.date) : undefined}
                 >
-                  <span className="v">{fmt(last?.value)}</span>
                   <span className="k">Last</span>
+                  <span className="v">{fmt(last?.value)}</span>
                 </div>
                 <div
                   className="s pr"
                   data-date={pr ? fmtDate(pr.date) : undefined}
                 >
-                  <span className="v">{fmt(pr?.value)}</span>
                   <span className="k">PR</span>
+                  <span className="v">{fmt(pr?.value)}</span>
                 </div>
               </div>
               <div className="lane-stat">

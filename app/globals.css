@@ -330,14 +330,14 @@ select {
 .lanes {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(134px, 1fr);
+  grid-auto-columns: minmax(112px, 1fr);
   gap: 10px;
   overflow-x: auto;
   padding-bottom: 6px;
 }
 @media (max-width: 720px) {
   .lanes {
-    grid-auto-columns: 128px;
+    grid-auto-columns: 112px;
   }
 }
 .lane {
@@ -408,24 +408,28 @@ select {
 .throw input::placeholder {
   color: var(--ink-faint);
 }
+/* Last stacked over PR — keeps the lane narrow enough that a full ladder
+   fits without scrolling sideways. */
 .lane-rec {
   display: flex;
+  flex-direction: column;
   gap: 3px;
   margin-top: 5px;
   border-top: 1px solid var(--line-soft);
   padding-top: 6px;
 }
 .lane-rec .s {
-  flex: 1;
-  text-align: center;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
   min-width: 0;
 }
 .lane-rec .s .v {
-  display: block;
   font-family: var(--font-display), sans-serif;
   font-weight: 600;
   font-size: 20px;
-  line-height: 0.9;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 .lane-rec .s.pr .v {
