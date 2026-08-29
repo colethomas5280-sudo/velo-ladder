@@ -22,7 +22,6 @@ import {
 import Masthead from "./Masthead";
 import RosterManager from "./RosterManager";
 import EntryForm from "./EntryForm";
-import RecordsPanel from "./RecordsPanel";
 import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 
@@ -300,8 +299,6 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
         </div>
       </div>
 
-      <Masthead athlete={athlete} sessions={allSessions} />
-
       {isCoach ? (
         <RosterManager
           athletes={athletes}
@@ -315,20 +312,19 @@ export default function Tracker({ role }: { role: "coach" | "athlete" }) {
         />
       )}
 
-      <div className="grid-main">
-        <EntryForm
-          cfg={cfg}
-          trackerId={tracker}
-          sessions={allSessions}
-          draft={draft}
-          setDraft={setDraft}
-          onSave={saveSession}
-          onClear={clearOrCancel}
-          saving={saving}
-          readOnly={readOnly}
-        />
-        <RecordsPanel cfg={cfg} trackerId={tracker} sessions={allSessions} />
-      </div>
+      <Masthead athlete={athlete} sessions={allSessions} />
+
+      <EntryForm
+        cfg={cfg}
+        trackerId={tracker}
+        sessions={allSessions}
+        draft={draft}
+        setDraft={setDraft}
+        onSave={saveSession}
+        onClear={clearOrCancel}
+        saving={saving}
+        readOnly={readOnly}
+      />
 
       <ProgressChart
         cfg={cfg}
