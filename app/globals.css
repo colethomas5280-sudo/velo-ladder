@@ -14,22 +14,22 @@ html {
 }
 
 :root {
-  --bg: #efece3;
-  --panel: #f7f5ef;
-  --panel-2: #e7e2d5;
-  --ink: #211e18;
-  --ink-dim: #6c6353;
-  --ink-faint: #9a917d;
-  --line: #d6d0c0;
-  --line-soft: #e4dfd0;
-  --accent: #c1550e;
-  --accent-soft: #ecdccb;
+  --bg: #f2f0e8;
+  --panel: #ffffff;
+  --panel-2: #ebe8dd;
+  --ink: #1a1813;
+  --ink-dim: #544e43;
+  --ink-faint: #6f6858;
+  --line: #dad4c5;
+  --line-soft: #e6e1d4;
+  --accent: #bd5310;
+  --accent-soft: #f5e7d9;
   --on-accent: #fff;
-  --chalk: #2f6f93;
-  --good: #2e8b55;
-  --bad: #bf4a2a;
-  --glow: rgba(193, 85, 14, 0);
-  --shadow: 0 1px 2px rgba(45, 33, 15, 0.06), 0 10px 26px -14px rgba(45, 33, 15, 0.2);
+  --chalk: #2c6b8f;
+  --good: #2c8a52;
+  --bad: #bd4526;
+  --glow: rgba(189, 83, 16, 0);
+  --shadow: 0 1px 2px rgba(40, 30, 15, 0.06), 0 8px 22px -14px rgba(40, 30, 15, 0.18);
   --r: 11px;
   --maxw: 1160px;
 }
