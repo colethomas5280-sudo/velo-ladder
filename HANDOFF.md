@@ -20,9 +20,8 @@ Everything below is working and verified: password login, per-athlete authorizat
 the roster/spreadsheet home page, athlete profile pages, single- and multi-athlete
 session entry, the 3-line progress chart, CSV export.
 
-**Last commit:** `7043317` (3-line progress chart). Also one uncommitted cleanup
-(removed the now-orphaned `RosterManager.tsx`) — commit + push it. Confirm the repo on
-GitHub is at the latest commit.
+Onboarding is by invite link; entry is a pop-up with a 6-weight ladder of five
+boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 
 ---
 
@@ -53,7 +52,8 @@ GitHub is at the latest commit.
 - **Next.js 16** (App Router, Turbopack), **React 19**, TypeScript.
 - **Auth.js v5 beta** — Credentials provider, JWT sessions, **no database adapter**.
   Coach = any `COACH_EMAILS` address + shared `COACH_PASSWORD`. Athlete = their
-  `invite_email` + a bcrypt password the coach sets. `lib/auth.ts`.
+  `invite_email` + a bcrypt password they set themselves from an invite link (or one
+  the coach sets manually). `lib/auth.ts`.
 - **Postgres** via `pg` (node-postgres) — works with any Postgres. Local dev uses
   **PGlite** (in-process, `USE_PGLITE=1`). `lib/db.ts`.
 - **Client data** via SWR against REST route handlers. No global state library.
@@ -94,28 +94,40 @@ athletes; **athlete** = their own only; anyone else = 403.
 - `GroupSession` → `GroupEntryModal` wrapping `EntryForm` — athlete tabs, per-athlete
   draft, "Save all N" / "Save one". Type is chosen with the seg control in its header
   (not the two-step picker).
-- `EntryForm` — the weight lanes; each shows PR/Avg/Floor for that weight, `last` +
-  throw count, and a live `max·avg·new PR` while typing. **Renders no header of its
-  own** — both call sites are modals whose chrome supplies the title.
+- `EntryForm` — the weight lanes. Each shows five boxes (80% primer + four 100%
+  throws) and, stacked beneath, **Last** over **PR** with the session date on hover;
+  plus a live `max·avg·new PR` while typing. Average and floor live on the chart, not
+  here. **Renders no header of its own** — both call sites are modals whose chrome
+  supplies the title.
+- `JoinForm` (`/join/[token]`) — invited athlete sets a password, then is signed in
+  via `signIn("credentials")` and dropped on their profile.
 
 ### Data model (`lib/schema.ts`, `db/schema.sql`)
 
 ```
-athletes(id, name, hand, invite_email, password_hash, archived, created_at)
+athletes(id, name, hand, invite_email, password_hash,
+         invite_token, invite_expires, archived, created_at)
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
                   throws jsonb, created_by, created_at, updated_at)
 ```
 
-`throws` shape: `{ "p1": [primer, t1, t2, t3], ... }` — index 0 is the **80% primer
-(never scored)**; indices 1–3 are the 100% throws that feed every stat. `null` = blank.
+`throws` shape: `{ "p1": [primer, t1, t2, t3, t4], ... }` — index 0 is the **80% primer
+(never scored)**; indices 1..4 are the 100% throws that feed every stat. `null` = blank.
+**Sessions logged before the 4th box exist as length-4 arrays**, so every read walks the
+array it is given rather than assuming a length, and validation accepts 4 or 5.
 
 ### Tracker config (`lib/velo.ts` → `TRACKERS`)
 
-- **Mound:** weights `5, 6, 7, 4, 3` oz — slots `m5,m6,m7,m4,m3`, one record group each.
-- **Pull-Down:** weights `5, 6, 7, 5, 4, 3` oz — slots `p1,p2,p3,p4,p5,p6`. The two 5 oz
-  sets (`p1` opener, `p4` "2nd 5oz") **fold into ONE combined 5 oz record** (Cole's
-  explicit call) — one PR / avg / floor / chart line / history column. The expanded
-  history detail still shows each set separately.
+Both trackers run the same ladder: **5, 6, 7, 5, 4, 3 oz**.
+
+- **Mound:** slots `m5,m6,m7,m5b,m4,m3`. `m5b` was added later, so mound sessions
+  logged before that have no `m5b` key and still read correctly.
+- **Pull-Down:** slots `p1,p2,p3,p4,p5,p6`.
+- On both, the **two 5 oz sets fold into ONE combined 5 oz record** (Cole's explicit
+  call) — one PR / avg / floor / chart line / history column. The expanded history
+  detail still shows each set separately.
+- Velocities display via `fmt()`: at most one decimal, no trailing `.0` (94.9, 87,
+  84.3). Entry boxes cap typing at one decimal so stored always equals displayed.
 
 ---
 
