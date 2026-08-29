@@ -10,6 +10,7 @@ import {
   todayISO,
   throwsFromDraft,
   sessionsToCsv,
+  BOX_INDEXES,
 } from "@/lib/velo";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
@@ -89,7 +90,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     );
     if (!hasHundred) {
       setSaveError(
-        "Enter at least one 100% throw (boxes 1, 2 or 3) before saving. The 80% primer isn't scored.",
+        "Enter at least one 100% throw (boxes 1-4) before saving. The 80% primer isn't scored.",
       );
       return;
     }
@@ -136,7 +137,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   function editSession(s: TrainingSession) {
     const throws: Record<string, string[]> = {};
     for (const [k, arr] of Object.entries(s.throws)) {
-      throws[k] = [0, 1, 2, 3].map((i) => (arr[i] == null ? "" : String(arr[i])));
+      throws[k] = BOX_INDEXES.map((i) => (arr[i] == null ? "" : String(arr[i])));
     }
     const d: Draft = { date: s.date, notes: s.notes, throws, editingId: s.id };
     // Persist first: switching tracker re-loads the draft from storage.
@@ -337,7 +338,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
 function padThrows(throws: Record<string, (number | null)[]>) {
   const out: Record<string, (number | null)[]> = {};
   for (const [k, arr] of Object.entries(throws)) {
-    out[k] = [0, 1, 2, 3].map((i) => arr[i] ?? null);
+    out[k] = BOX_INDEXES.map((i) => arr[i] ?? null);
   }
   return out;
 }

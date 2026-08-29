@@ -11,6 +11,7 @@ import {
   mean,
   fmt,
   todayISO,
+  BOX_INDEXES,
 } from "@/lib/velo";
 import type { Draft } from "@/lib/draft";
 
@@ -49,7 +50,7 @@ export default function EntryForm({
 
   const setCell = (key: string, i: number, raw: string) => {
     const v = raw.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
-    const arr = draft.throws[key]?.slice() ?? ["", "", "", ""];
+    const arr = draft.throws[key]?.slice() ?? BOX_INDEXES.map(() => "");
     arr[i] = v;
     setDraft({ ...draft, throws: { ...draft.throws, [key]: arr } });
   };
@@ -58,7 +59,7 @@ export default function EntryForm({
     const tops: number[] = [];
     for (const sl of cfg.slots) {
       const t = draft.throws[sl.key] || [];
-      const h = [1, 2, 3].map((i) => num(t[i])).filter((v): v is number => !!v);
+      const h = BOX_INDEXES.slice(1).map((i) => num(t[i])).filter((v): v is number => !!v);
       if (h.length) tops.push(Math.max(...h));
     }
     return tops.length ? Math.max(...tops) : null;
@@ -85,7 +86,7 @@ export default function EntryForm({
           const grp = groupOf(cfg, sl.key);
           const r = recStatsG(ss, grp.keys);
           const last = lastBest(ss, grp.keys, draft.editingId);
-          const h = [1, 2, 3].map((i) => num(t[i])).filter((v): v is number => !!v);
+          const h = BOX_INDEXES.slice(1).map((i) => num(t[i])).filter((v): v is number => !!v);
           const liveMax = h.length ? Math.max(...h) : null;
           const beat = r.pr != null && liveMax != null && liveMax > r.pr;
           return (
@@ -95,7 +96,7 @@ export default function EntryForm({
                 <span className="u">oz</span>
                 {sl.tag && <span className="tag">{sl.tag}</span>}
               </div>
-              {[0, 1, 2, 3].map((i) => (
+              {BOX_INDEXES.map((i) => (
                 <div className={`throw${i === 0 ? " warm" : ""}`} key={i}>
                   <label>{i === 0 ? "80%" : i}</label>
                   <input
