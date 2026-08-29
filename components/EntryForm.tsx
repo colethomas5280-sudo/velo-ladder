@@ -27,6 +27,7 @@ export default function EntryForm({
   groupSize = 0,
   onSaveAll,
   activeName,
+  error,
 }: {
   cfg: TrackerConfig;
   trackerId: "mound" | "pulldown";
@@ -40,6 +41,8 @@ export default function EntryForm({
   groupSize?: number;
   onSaveAll?: () => void;
   activeName?: string;
+  /** Save failure, shown in place until the next attempt. */
+  error?: string | null;
 }) {
   const ss = sessionsOfType(sessions, trackerId);
   const editing = !!draft.editingId;
@@ -149,6 +152,12 @@ export default function EntryForm({
           onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
         />
       </div>
+
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
 
       {!readOnly && (
         <div className="row-actions">

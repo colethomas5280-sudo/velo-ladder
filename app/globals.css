@@ -1169,3 +1169,15 @@ table.roster-table {
     font-size: 22px;
   }
 }
+
+.form-error {
+  margin: 14px 0 0;
+  padding: 10px 13px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--bad) 10%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line));
+  color: var(--bad);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+}
