@@ -59,7 +59,7 @@ GitHub is at the latest commit.
 | Path | What |
 |---|---|
 | `/` | Coach → the Athletes roster. Athlete → redirected to their own profile. |
-| `/athletes/[id]` | One athlete's profile: entry form, PR/Avg/Floor per weight, progress chart, session history. |
+| `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
 | `/login` | Email + password. |
 | `/api/me` | `{ role, email, athleteId }` for the signed-in user. |
 | `/api/athletes` | GET (scoped list), POST (coach: create). |
@@ -77,12 +77,18 @@ athletes; **athlete** = their own only; anyone else = 403.
 
 - `HomeView` → `AthletesTable` (spreadsheet: inline-edit email/hand/password, add,
   remove, search; check rows → **`GroupSession`** modal).
-- `AthleteProfile` → `Masthead` + `EntryForm` + `ProgressChart` + `HistoryTable`
-  + password box.
+- `AthleteProfile` → `Masthead` + view toggle + `ProgressChart` + `HistoryTable`
+  + password box. Entry is **not** on the page — it opens in `SessionModal`.
+- `SessionModal` — single-athlete entry pop-up, two steps: **pick** (Mound or
+  Pull-Down cards) → **entry** (the grid, with a ← back arrow). Picking a type also
+  switches what the page behind it is showing. History "Edit" opens it straight at the
+  entry step with that session's type and values pre-filled.
 - `GroupSession` → `GroupEntryModal` wrapping `EntryForm` — athlete tabs, per-athlete
-  draft, "Save all N" / "Save one".
+  draft, "Save all N" / "Save one". Type is chosen with the seg control in its header
+  (not the two-step picker).
 - `EntryForm` — the weight lanes; each shows PR/Avg/Floor for that weight, `last` +
-  throw count, and a live `max·avg·new PR` while typing.
+  throw count, and a live `max·avg·new PR` while typing. **Renders no header of its
+  own** — both call sites are modals whose chrome supplies the title.
 
 ### Data model (`lib/schema.ts`, `db/schema.sql`)
 
@@ -170,7 +176,9 @@ scope undefined. Likely candidates, none confirmed:
   by coach vs. self".
 - No pull-down vs. mound cross-comparison view yet.
 - No date-range filtering on the progress chart or history.
+- Per-weight PR/Avg/Floor cards were deliberately **removed from the profile page**
+  (Cole's call — chart + history only). They still appear inside the entry lanes while
+  logging. Revisit if athletes ask for exact numbers at a glance.
 
-**Open question:** confirm the 3-line progress chart colors read clearly on Cole's
-screen (best = amber, average = blue, floor = green) — couldn't verify visually
-during the build.
+**Resolved:** the 3-line chart (best = amber, average = blue, floor = green) reads
+clearly in light theme on both desktop and mobile — verified.

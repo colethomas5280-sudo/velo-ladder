@@ -4,9 +4,12 @@ import { fiveOzPR, fmt, fmtDate, sessionsOfType } from "@/lib/velo";
 export default function Masthead({
   athlete,
   sessions,
+  action,
 }: {
   athlete: Athlete;
   sessions: TrainingSession[];
+  /** Optional control rendered directly under the name (e.g. "Track a new session"). */
+  action?: React.ReactNode;
 }) {
   const mCount = sessionsOfType(sessions, "mound").length;
   const pCount = sessionsOfType(sessions, "pulldown").length;
@@ -35,6 +38,7 @@ export default function Masthead({
             </span>
           )}
         </div>
+        {action}
       </div>
       <div className="readouts">
         <div className="ro">
