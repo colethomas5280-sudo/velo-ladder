@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -37,6 +37,30 @@ CREATE TABLE IF NOT EXISTS training_sessions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ts_athlete_idx ON training_sessions(athlete_id, type, date);
+
+-- Daily recovery check-in. One row per athlete per day (upserted), logged
+-- whether or not they threw, so rest days count too.
+-- Every 1-5 rating points the same way: 5 is always the good end.
+-- sleep_hours is real (not numeric) so the driver hands back a number.
+CREATE TABLE IF NOT EXISTS recovery_entries (
+  id            text PRIMARY KEY,
+  athlete_id    text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  date          date NOT NULL,
+  sleep_hours   real,
+  sleep_quality int,
+  soreness      int,
+  energy        int,
+  stress        int,
+  mood          int,
+  resting_hr    int,
+  hrv           int,
+  notes         text NOT NULL DEFAULT '',
+  created_by    text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS recovery_athlete_date_idx
+  ON recovery_entries(athlete_id, date);
 
 -- Shared library of protocols and how-tos. Coaches write, everyone reads.
 CREATE TABLE IF NOT EXISTS resources (

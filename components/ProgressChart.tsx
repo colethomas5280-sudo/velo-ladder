@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { TrainingSession } from "@/lib/types";
+import type { TrainingSession, RecoveryEntry } from "@/lib/types";
+import { recoveryScore } from "@/lib/recovery";
 import {
   type TrackerConfig,
   groupById,
@@ -20,12 +21,14 @@ export default function ProgressChart({
   sessions,
   groupId,
   setGroupId,
+  recovery = [],
 }: {
   cfg: TrackerConfig;
   trackerId: "mound" | "pulldown";
   sessions: TrainingSession[];
   groupId: string;
   setGroupId: (id: string) => void;
+  recovery?: RecoveryEntry[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const group = groupById(cfg, groupId);
@@ -78,6 +81,15 @@ export default function ProgressChart({
         return;
       }
 
+      // Recovery for the same days, if the athlete logged any.
+      const recByDate = new Map<string, number>();
+      for (const e of recovery) {
+        const sc = recoveryScore(e);
+        if (sc != null) recByDate.set(e.date, sc);
+      }
+      const recPts = rows.map((r) => recByDate.get(r.d) ?? null);
+      const hasRecovery = recPts.some((v) => v != null);
+
       const P = { l: 34, r: 40, t: 14, b: 24 };
       const allVals = rows.flatMap((r) => [r.best, r.avg, r.min]);
       const mn = Math.min(...allVals);
@@ -115,6 +127,36 @@ export default function ProgressChart({
       g.stroke();
       g.globalAlpha = 1;
       g.setLineDash([]);
+
+      // Recovery 0-100 mapped to the plot height on its own scale — the point
+      // is the shape against velocity, so it is drawn faint and unlabelled
+      // rather than pretending to share the velocity axis.
+      if (hasRecovery) {
+        const RY = (v: number) => P.t + (1 - v / 100) * (H - P.t - P.b);
+        g.strokeStyle = chalk;
+        g.globalAlpha = 0.28;
+        g.lineWidth = 8;
+        g.lineJoin = "round";
+        g.lineCap = "round";
+        g.beginPath();
+        let started = false;
+        recPts.forEach((v, i) => {
+          if (v == null) {
+            started = false;
+            return;
+          }
+          const x = X(i);
+          const y = RY(v);
+          if (started) g.lineTo(x, y);
+          else {
+            g.moveTo(x, y);
+            started = true;
+          }
+        });
+        g.stroke();
+        g.globalAlpha = 1;
+        g.lineWidth = 1;
+      }
 
       const series: [keyof (typeof rows)[number], string, number][] = [
         ["min", good, 1.6],
@@ -171,7 +213,7 @@ export default function ProgressChart({
       ro.disconnect();
       mq.removeEventListener("change", draw);
     };
-  }, [sessions, group.keys, trackerId]);
+  }, [sessions, group.keys, trackerId, recovery]);
 
   return (
     <div className="card pad chart-card">
@@ -210,6 +252,12 @@ export default function ProgressChart({
           <i className="l-floor" />
           Floor
         </span>
+        {recovery.length > 0 && (
+          <span>
+            <i className="l-recovery" />
+            Recovery (own scale)
+          </span>
+        )}
       </div>
     </div>
   );

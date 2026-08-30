@@ -51,3 +51,19 @@ export interface Resource {
   position: number;
   archived: boolean;
 }
+
+/** Daily recovery check-in. Every 1-5 rating: 5 is the good end. */
+export interface RecoveryEntry {
+  id: string;
+  athleteId: string;
+  date: string;
+  sleepHours: number | null;
+  sleepQuality: number | null;
+  soreness: number | null;
+  energy: number | null;
+  stress: number | null;
+  mood: number | null;
+  restingHr: number | null;
+  hrv: number | null;
+  notes: string;
+}

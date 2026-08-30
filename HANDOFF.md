@@ -76,6 +76,7 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/athletes/overview` | GET — roster + session counts + last date (coach only). Powers the home table. |
 | `/api/athletes/[id]` | GET / PATCH (name, email, hand, password, archive) / DELETE (soft). |
 | `/api/athletes/[id]/sessions` | GET / POST. |
+| `/api/athletes/[id]/recovery` | GET / POST (upsert by date) / DELETE `?date=`. Athlete-scoped. |
 | `/api/sessions/[id]` | PATCH / DELETE. |
 | `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); DELETE cancels one. |
 | `/api/join/[token]` | Public. GET reveals only the invited athlete's name/email; POST spends the invite. |
@@ -123,6 +124,9 @@ athletes(id, name, hand, invite_email, password_hash,
          invite_token, invite_expires, archived, created_at)
 resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
+recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
+                 energy, stress, mood, resting_hr, hrv, notes, created_by,
+                 created_at, updated_at)   -- UNIQUE(athlete_id, date)
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
                   throws jsonb, created_by, created_at, updated_at)
 ```
@@ -146,6 +150,27 @@ Both trackers run the same ladder: **5, 6, 7, 5, 4, 3 oz**.
   84.3). Entry boxes cap typing at one decimal so stored always equals displayed.
 
 ---
+
+## Recovery scoring (`lib/recovery.ts`)
+
+Daily check-in, one row per athlete per day (upserted, so re-saving a date edits it).
+**Every 1-5 rating points the same way — 5 is always the good end** ("Arm soreness:
+very sore → none"), which is what lets them be averaged directly. Sleep hours maps
+onto the same 1-5 range (4h → 1, 8.5h+ → 5). The score is the mean of whatever was
+filled in, ×20, so a partial check-in still scores.
+
+**Resting HR and HRV are stored and shown but deliberately excluded from the score** —
+they're personal baselines and averaging one athlete's 48bpm against another's 62
+would be meaningless.
+
+`buildInsight` pairs each throwing day with that day's check-in, then compares the top
+third of days by velocity against the bottom third. It needs **6+ paired days**, and
+the panel only makes a claim when the gap clears a threshold (5 score points or 0.5h
+sleep) — otherwise it says there's no clear pattern. It's association, and the UI says
+so.
+
+The progress chart draws recovery as a thick faint line on **its own 0-100 scale** with
+no axis labels, since the point is shape against velocity, not shared units.
 
 ## Local development
 
