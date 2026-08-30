@@ -1703,3 +1703,214 @@ table.roster-table {
 .ci-wearable .tin {
   width: 100px;
 }
+
+/* ---------- guidance / setback ---------- */
+.guidance {
+  margin: 0 0 16px;
+  border-left: 4px solid var(--line);
+}
+.guidance.g-clear {
+  border-left-color: var(--good);
+}
+.guidance.g-recovery {
+  border-left-color: var(--chalk);
+}
+.guidance.g-caution {
+  border-left-color: var(--accent);
+}
+.guidance.g-stop {
+  border-left-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 5%, var(--panel));
+}
+.g-head {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+.g-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-top: 7px;
+  flex: none;
+  background: var(--line);
+}
+.g-clear .g-dot {
+  background: var(--good);
+}
+.g-recovery .g-dot {
+  background: var(--chalk);
+}
+.g-caution .g-dot {
+  background: var(--accent);
+}
+.g-stop .g-dot {
+  background: var(--bad);
+}
+.g-head h3 {
+  font-size: 23px;
+}
+.g-head p {
+  margin: 5px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  max-width: 66ch;
+}
+.g-flags {
+  list-style: none;
+  margin: 13px 0 0;
+  padding: 11px 0 0;
+  border-top: 1px solid var(--line-soft);
+}
+.g-flags li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 5px 0;
+}
+.g-detail {
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  color: var(--ink-dim);
+}
+.g-since {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-left: auto;
+}
+.g-note {
+  margin-top: 8px;
+}
+.g-explain-toggle {
+  margin-top: 13px;
+  padding: 0;
+  border: 0;
+  background: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+.g-explain-toggle .caret {
+  transition: transform 0.12s;
+}
+.g-explain-toggle[aria-expanded="true"] .caret {
+  transform: rotate(90deg);
+}
+.g-explain-toggle:hover {
+  color: var(--accent);
+}
+
+.explainer {
+  margin-top: 12px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line-soft);
+  max-width: 70ch;
+}
+.ex-intro {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ex-card {
+  display: flex;
+  gap: 11px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.ex-n {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--accent);
+  flex: none;
+  width: 20px;
+}
+.ex-card b {
+  display: block;
+  font-size: 14.5px;
+  margin-bottom: 3px;
+}
+.ex-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+.ex-close {
+  margin: 13px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.ex-kicker {
+  margin: 10px 0 0;
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+  line-height: 1.25;
+  color: var(--accent);
+  max-width: 40ch;
+}
+
+/* arm status question */
+.arm-q {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.arm-opts {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+}
+.arm-opt {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 9px;
+  padding: 9px 6px;
+  text-align: center;
+}
+.arm-opt b {
+  display: block;
+  font-size: 14px;
+}
+.arm-opt span {
+  display: block;
+  font-size: 10px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+.arm-opt[aria-pressed="true"].good {
+  background: color-mix(in srgb, var(--good) 14%, var(--panel));
+  border-color: var(--good);
+}
+.arm-opt[aria-pressed="true"].sore {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.arm-opt[aria-pressed="true"].pain {
+  background: color-mix(in srgb, var(--bad) 12%, var(--panel));
+  border-color: var(--bad);
+}
+
+.g-band {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.g-band b {
+  color: var(--ink-dim);
+}

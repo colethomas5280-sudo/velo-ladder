@@ -8,7 +8,9 @@ import type {
   TrackerId,
   Resource,
   RecoveryEntry,
+  Setback,
 } from "@/lib/types";
+import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
   return {
@@ -18,6 +20,7 @@ function toAthlete(r: Record<string, unknown>): Athlete {
     inviteEmail: (r.invite_email as string | null) ?? null,
     hasPassword: !!r.password_hash,
     hasInvite: !!r.invite_token,
+    cnsThresholdPct: r.cns_threshold_pct == null ? null : Number(r.cns_threshold_pct),
     archived: Boolean(r.archived),
   };
 }
@@ -106,6 +109,7 @@ export async function updateAthlete(
     inviteEmail?: string | null;
     archived?: boolean;
     password?: string;
+    cnsThresholdPct?: number | null;
   },
 ): Promise<Athlete | null> {
   const cur = await getAthlete(id);
@@ -117,13 +121,17 @@ export async function updateAthlete(
       ? cur.inviteEmail
       : patch.inviteEmail?.trim().toLowerCase() || null;
   const archived = patch.archived ?? cur.archived;
+  const cns =
+    patch.cnsThresholdPct === undefined
+      ? cur.cnsThresholdPct
+      : patch.cnsThresholdPct;
 
   if (patch.password) {
     const hash = await hashPassword(patch.password);
     const rows = (await sql`
       UPDATE athletes
       SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
-          archived = ${archived}, password_hash = ${hash}
+          archived = ${archived}, cns_threshold_pct = ${cns}, password_hash = ${hash}
       WHERE id = ${id} RETURNING *
     `) as Record<string, unknown>[];
     return rows[0] ? toAthlete(rows[0]) : null;
@@ -131,7 +139,8 @@ export async function updateAthlete(
 
   const rows = (await sql`
     UPDATE athletes
-    SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail}, archived = ${archived}
+    SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
+        archived = ${archived}, cns_threshold_pct = ${cns}
     WHERE id = ${id} RETURNING *
   `) as Record<string, unknown>[];
   return rows[0] ? toAthlete(rows[0]) : null;
@@ -370,6 +379,7 @@ function toRecovery(r: Record<string, unknown>): RecoveryEntry {
     mood: n(r.mood),
     restingHr: n(r.resting_hr),
     hrv: n(r.hrv),
+    armStatus: (r.arm_status as RecoveryEntry["armStatus"]) ?? null,
     notes: String(r.notes ?? ""),
   };
 }
@@ -392,6 +402,7 @@ export interface RecoveryInput {
   mood?: number | null;
   restingHr?: number | null;
   hrv?: number | null;
+  armStatus?: import("@/lib/types").ArmStatus | null;
   notes?: string;
 }
 
@@ -408,13 +419,13 @@ export async function upsertRecovery(
   const rows = (await sql`
     INSERT INTO recovery_entries
       (id, athlete_id, date, sleep_hours, sleep_quality, soreness, energy,
-       stress, mood, resting_hr, hrv, notes, created_by)
+       stress, mood, resting_hr, hrv, arm_status, notes, created_by)
     VALUES
       (${id}, ${athleteId}, ${input.date}, ${input.sleepHours ?? null},
        ${input.sleepQuality ?? null}, ${input.soreness ?? null},
        ${input.energy ?? null}, ${input.stress ?? null}, ${input.mood ?? null},
        ${input.restingHr ?? null}, ${input.hrv ?? null},
-       ${input.notes ?? ""}, ${createdBy})
+       ${input.armStatus ?? null}, ${input.notes ?? ""}, ${createdBy})
     ON CONFLICT (athlete_id, date) DO UPDATE SET
       sleep_hours = EXCLUDED.sleep_hours,
       sleep_quality = EXCLUDED.sleep_quality,
@@ -424,6 +435,7 @@ export async function upsertRecovery(
       mood = EXCLUDED.mood,
       resting_hr = EXCLUDED.resting_hr,
       hrv = EXCLUDED.hrv,
+      arm_status = EXCLUDED.arm_status,
       notes = EXCLUDED.notes,
       updated_at = now()
     RETURNING *
@@ -436,4 +448,107 @@ export async function deleteRecovery(
   date: string,
 ): Promise<void> {
   await sql`DELETE FROM recovery_entries WHERE athlete_id = ${athleteId} AND date = ${date}`;
+}
+
+/* ---------------- setbacks ---------------- */
+
+function toSetback(r: Record<string, unknown>): Setback {
+  return {
+    id: String(r.id),
+    athleteId: String(r.athlete_id),
+    kind: r.kind as Setback["kind"],
+    openedOn: isoDate(r.opened_on),
+    resolvedOn: r.resolved_on ? isoDate(r.resolved_on) : null,
+    resolvedBy: (r.resolved_by as string | null) ?? null,
+    detail: String(r.detail ?? ""),
+  };
+}
+
+export async function listSetbacks(
+  athleteId: string,
+  opts: { openOnly?: boolean } = {},
+): Promise<Setback[]> {
+  const rows = opts.openOnly
+    ? await sql`SELECT * FROM setbacks WHERE athlete_id = ${athleteId} AND resolved_on IS NULL ORDER BY opened_on DESC`
+    : await sql`SELECT * FROM setbacks WHERE athlete_id = ${athleteId} ORDER BY opened_on DESC LIMIT 40`;
+  return (rows as Record<string, unknown>[]).map(toSetback);
+}
+
+/** Every open flag across the roster, for the coach dashboard. */
+export async function listOpenSetbacks(): Promise<
+  (Setback & { name: string })[]
+> {
+  const rows = (await sql`
+    SELECT s.*, a.name FROM setbacks s
+    JOIN athletes a ON a.id = s.athlete_id
+    WHERE s.resolved_on IS NULL AND a.archived = false
+    ORDER BY
+      CASE s.kind WHEN 'injury' THEN 0 WHEN 'cns' THEN 1 ELSE 2 END,
+      s.opened_on
+  `) as Record<string, unknown>[];
+  return rows.map((r) => ({ ...toSetback(r), name: String(r.name) }));
+}
+
+export async function resolveSetback(
+  id: string,
+  by: string,
+): Promise<Setback | null> {
+  const rows = (await sql`
+    UPDATE setbacks SET resolved_on = CURRENT_DATE, resolved_by = ${by}
+    WHERE id = ${id} AND resolved_on IS NULL
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return rows[0] ? toSetback(rows[0]) : null;
+}
+
+/**
+ * Bring the stored flags in line with what the data currently says. Runs after
+ * any session or check-in is written, so no scheduled job is needed.
+ *
+ * Soreness and CNS open and close themselves. Injury opens automatically but
+ * is NEVER auto-resolved — a coach has to review it before an athlete goes
+ * back to full-intent work.
+ */
+export async function reconcileSetbacks(athleteId: string): Promise<Setback[]> {
+  const athlete = await getAthlete(athleteId);
+  if (!athlete || athlete.archived) return [];
+
+  const [sessions, entries, open] = await Promise.all([
+    listSessions(athleteId),
+    listRecovery(athleteId),
+    listSetbacks(athleteId, { openOnly: true }),
+  ]);
+
+  const findings = evaluate(
+    sessions,
+    entries,
+    athlete.cnsThresholdPct ?? CNS_DEFAULT_PCT,
+  );
+  const firing = new Set(findings.map((f) => f.kind));
+
+  for (const f of findings) {
+    const already = open.find((o) => o.kind === f.kind);
+    if (already) {
+      // Keep the reason current — a soreness flag opened on day 1 should read
+      // "3 days running" by day 3, not still say 1.
+      if (already.detail !== f.detail)
+        await sql`UPDATE setbacks SET detail = ${f.detail} WHERE id = ${already.id}`;
+      continue;
+    }
+    await sql`
+      INSERT INTO setbacks (id, athlete_id, kind, opened_on, detail)
+      VALUES (${crypto.randomUUID()}, ${athleteId}, ${f.kind}, CURRENT_DATE, ${f.detail})
+    `;
+  }
+
+  for (const o of open) {
+    if (o.kind === "injury") continue; // human checkpoint required
+    if (!firing.has(o.kind))
+      await sql`
+        UPDATE setbacks SET resolved_on = CURRENT_DATE, resolved_by = 'auto'
+        WHERE id = ${o.id} AND resolved_on IS NULL
+      `;
+  }
+
+  return listSetbacks(athleteId, { openOnly: true });
 }

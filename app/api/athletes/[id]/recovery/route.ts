@@ -1,5 +1,11 @@
 import { getScope, canSeeAthlete } from "@/lib/scope";
-import { listRecovery, upsertRecovery, deleteRecovery } from "@/lib/data";
+import {
+  listRecovery,
+  upsertRecovery,
+  deleteRecovery,
+  reconcileSetbacks,
+} from "@/lib/data";
+import type { ArmStatus } from "@/lib/types";
 import { json, unauthorized, forbidden, badRequest } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -50,6 +56,11 @@ export async function POST(
     stress: rating(b.stress),
     mood: rating(b.mood),
     restingHr: positive(b.restingHr, 200),
+    armStatus: (["good", "sore", "pain"] as const).includes(
+      b.armStatus as ArmStatus,
+    )
+      ? (b.armStatus as ArmStatus)
+      : null,
     hrv: positive(b.hrv, 400),
     notes: typeof b.notes === "string" ? b.notes.slice(0, 2000) : "",
   };
@@ -62,10 +73,14 @@ export async function POST(
     entry.mood != null ||
     entry.restingHr != null ||
     entry.hrv != null ||
+    entry.armStatus != null ||
     entry.notes.trim() !== "";
   if (!anything) return badRequest("Fill in at least one field");
 
-  return json(await upsertRecovery(id, entry, scope.email), 201);
+  const saved = await upsertRecovery(id, entry, scope.email);
+  // Re-evaluate the setback branches against the new data.
+  await reconcileSetbacks(id);
+  return json(saved, 201);
 }
 
 export async function DELETE(
@@ -79,5 +94,6 @@ export async function DELETE(
   const date = new URL(request.url).searchParams.get("date") || "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return badRequest("date required");
   await deleteRecovery(id, date);
+  await reconcileSetbacks(id);
   return json({ ok: true });
 }
