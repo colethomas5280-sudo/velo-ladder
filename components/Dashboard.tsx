@@ -45,6 +45,7 @@ export default function Dashboard() {
           <div className="dash-grid">
             {shown("leaderboard") && <Leaderboard data={data} />}
             {shown("prs") && <RecentPrs data={data} />}
+            {shown("setbacks") && <Setbacks data={data} />}
             {shown("attention") && <NeedsAttention data={data} />}
             {shown("activity") && <Activity data={data} />}
             {shown("resources") && <ResourcesWidget data={data} />}
@@ -262,6 +263,38 @@ function Activity({ data }: { data: DashboardData }) {
               <div className="feed-val">
                 <b>{fmt(a.best)}</b>
               </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </WidgetShell>
+  );
+}
+
+const SETBACK_LABEL = {
+  soreness: "Soreness",
+  cns: "CNS readiness",
+  injury: "Reported pain",
+} as const;
+
+function Setbacks({ data }: { data: DashboardData }) {
+  return (
+    <WidgetShell title="Setback flags" sub="worst first">
+      {data.setbacks.length === 0 ? (
+        <Empty>Nothing flagged. Everyone&rsquo;s clear to work.</Empty>
+      ) : (
+        <ul className="feed">
+          {data.setbacks.map((s) => (
+            <li key={s.id}>
+              <div className="feed-main">
+                <Link href={`/athletes/${s.athleteId}`} className="name-link">
+                  {s.name}
+                </Link>
+                <span className="feed-sub">{s.detail}</span>
+              </div>
+              <span className={`pill ${s.kind === "injury" ? "warn" : ""}`}>
+                {SETBACK_LABEL[s.kind]}
+              </span>
             </li>
           ))}
         </ul>

@@ -31,6 +31,7 @@ import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
+import GuidanceCard from "./GuidanceCard";
 
 const TRACKER_KEY = "veloladder:tracker";
 
@@ -255,6 +256,8 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
           </button>
         }
       />
+
+      <GuidanceCard athleteId={athleteId} isCoach={!!canManage} />
 
       <div className="view-switch">
         <span className="eyebrow">Progress</span>

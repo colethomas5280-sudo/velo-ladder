@@ -46,6 +46,16 @@ export async function PATCH(
         body.inviteEmail === undefined
           ? undefined
           : String(body.inviteEmail || "") || null,
+      // null clears the override and falls back to the facility default
+      cnsThresholdPct:
+        body.cnsThresholdPct === undefined
+          ? undefined
+          : body.cnsThresholdPct === null || body.cnsThresholdPct === ""
+            ? null
+            : Number(body.cnsThresholdPct) > 0 &&
+                Number(body.cnsThresholdPct) <= 50
+              ? Number(body.cnsThresholdPct)
+              : undefined,
       password,
     });
     return json(updated);

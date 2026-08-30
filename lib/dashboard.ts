@@ -1,5 +1,5 @@
 import { sql } from "@/lib/db";
-import { isoDate } from "@/lib/data";
+import { isoDate, listOpenSetbacks } from "@/lib/data";
 import type { TrackerId, Throws } from "@/lib/types";
 import { TRACKERS, TRACKER_IDS, sBestG, todayISO } from "@/lib/velo";
 
@@ -45,6 +45,14 @@ export interface DashboardData {
   pendingInvites: { athleteId: string; name: string; hasEmail: boolean }[];
   activity: ActivityRow[];
   resources: { id: string; title: string; category: string }[];
+  setbacks: {
+    id: string;
+    athleteId: string;
+    name: string;
+    kind: "soreness" | "cns" | "injury";
+    openedOn: string;
+    detail: string;
+  }[];
   snapshot: {
     athletes: number;
     sessionsThisWeek: number;
@@ -207,6 +215,8 @@ export async function getDashboard(): Promise<DashboardData> {
     ORDER BY lower(category), position, lower(title) LIMIT 6
   `) as Record<string, unknown>[];
 
+  const openSetbacks = await listOpenSetbacks();
+
   const thisWeek = sessions.filter((s) => daysAgo(s.date) <= RECENT_DAYS);
   return {
     leaderboard: { date: lastDay, rows: leaderRows },
@@ -214,6 +224,14 @@ export async function getDashboard(): Promise<DashboardData> {
     stale: stale.slice(0, 8),
     pendingInvites,
     activity,
+    setbacks: openSetbacks.map((s) => ({
+      id: s.id,
+      athleteId: s.athleteId,
+      name: s.name,
+      kind: s.kind,
+      openedOn: s.openedOn,
+      detail: s.detail,
+    })),
     resources: resourceRows.map((r) => ({
       id: String(r.id),
       title: String(r.title),

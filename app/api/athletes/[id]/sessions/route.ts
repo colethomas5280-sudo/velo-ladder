@@ -1,5 +1,10 @@
 import { getScope, canSeeAthlete } from "@/lib/scope";
-import { getAthlete, listSessions, createSession } from "@/lib/data";
+import {
+  getAthlete,
+  listSessions,
+  createSession,
+  reconcileSetbacks,
+} from "@/lib/data";
 import { validateSessionInput } from "@/lib/velo";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
 
@@ -41,5 +46,6 @@ export async function POST(
     throws: v.value.throws,
     createdBy: scope.email,
   });
+  await reconcileSetbacks(id);
   return json(created, 201);
 }

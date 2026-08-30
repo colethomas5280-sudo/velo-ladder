@@ -76,6 +76,8 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/athletes/overview` | GET — roster + session counts + last date (coach only). Powers the home table. |
 | `/api/athletes/[id]` | GET / PATCH (name, email, hand, password, archive) / DELETE (soft). |
 | `/api/athletes/[id]/sessions` | GET / POST. |
+| `/api/athletes/[id]/status` | GET — today's guidance, open flags, flag history, CNS band. |
+| `/api/setbacks/[id]` | PATCH marks a flag reviewed. **Coach-only** — the human checkpoint. |
 | `/api/athletes/[id]/recovery` | GET / POST (upsert by date) / DELETE `?date=`. Athlete-scoped. |
 | `/api/sessions/[id]` | PATCH / DELETE. |
 | `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); DELETE cancels one. |
@@ -125,8 +127,11 @@ athletes(id, name, hand, invite_email, password_hash,
 resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
 recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
-                 energy, stress, mood, resting_hr, hrv, notes, created_by,
-                 created_at, updated_at)   -- UNIQUE(athlete_id, date)
+                 energy, stress, mood, resting_hr, hrv, arm_status, notes,
+                 created_by, created_at, updated_at)  -- UNIQUE(athlete_id, date)
+setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
+         resolved_on, resolved_by, detail, created_at)
+athletes.cns_threshold_pct  -- per-athlete CNS band; null = facility default
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
                   throws jsonb, created_by, created_at, updated_at)
 ```
@@ -171,6 +176,32 @@ so.
 
 The progress chart draws recovery as a thick faint line on **its own 0-100 scale** with
 no axis labels, since the point is shape against velocity, not shared units.
+
+## Setback logic (`lib/setback.ts`)
+
+Three branches off Cole's protocol. Pure functions — `evaluate`, `guidance`,
+`sorenessRun`, `cnsCheck` — so the rules can be reasoned about without a database.
+
+| Branch | Trigger | Clears |
+|---|---|---|
+| `soreness` | athlete reports a **sore** arm. Day 1 → recovery day, day 2 → self-selected intensity, **day 3+ → full day off**. A missing check-in breaks the run. | automatically, when the arm comes back good |
+| `cns` | latest session's best 5 oz lands ≥ threshold% under that athlete's own trailing 30-day average for the same tracker. Needs **3+ prior sessions**. | automatically, when velocity returns to band |
+| `injury` | athlete reports **pain** (not soreness) | **never automatically** — a coach must PATCH `/api/setbacks/[id]` |
+
+Serious injury is deliberately not modelled. That's medical, and the app should not
+own a return timeline.
+
+**The `arm_status` field (good/sore/pain) is what separates branch 1 from branch 3** —
+without it there's no way to tell "sore from throwing" from "something is wrong".
+
+Flags are reconciled by `reconcileSetbacks(athleteId)` in `lib/data.ts`, called after
+any session or check-in write. No cron: the inputs only change on those writes. An open
+flag's `detail` is refreshed each pass, so a soreness flag opened on day 1 reads
+"3 days running" by day 3.
+
+CNS threshold: `CNS_DEFAULT_PCT` (5) unless `athletes.cns_threshold_pct` is set —
+tunable per athlete from the guidance card. The athlete-facing explainer copy lives in
+`EXPLAINER` in the same file, beside the logic it describes.
 
 ## Local development
 

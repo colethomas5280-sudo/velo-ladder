@@ -15,6 +15,8 @@ export interface Athlete {
   hasPassword: boolean;
   /** true while an unused invite link is outstanding (the token is never sent to the client) */
   hasInvite: boolean;
+  /** percent below the 30-day average that trips the CNS flag; null = facility default */
+  cnsThresholdPct: number | null;
   archived: boolean;
 }
 
@@ -65,5 +67,21 @@ export interface RecoveryEntry {
   mood: number | null;
   restingHr: number | null;
   hrv: number | null;
+  armStatus: ArmStatus | null;
   notes: string;
+}
+
+/** What the athlete says the arm is doing — the discriminator the setback logic needs. */
+export type ArmStatus = "good" | "sore" | "pain";
+
+export type SetbackKind = "soreness" | "cns" | "injury";
+
+export interface Setback {
+  id: string;
+  athleteId: string;
+  kind: SetbackKind;
+  openedOn: string;
+  resolvedOn: string | null;
+  resolvedBy: string | null;
+  detail: string;
 }

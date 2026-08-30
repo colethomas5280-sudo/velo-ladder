@@ -8,7 +8,8 @@ export type WidgetId =
   | "prs"
   | "attention"
   | "activity"
-  | "resources";
+  | "resources"
+  | "setbacks";
 
 interface WidgetDef {
   id: WidgetId;
@@ -44,6 +45,13 @@ export const WIDGETS: WidgetDef[] = [
     name: "Needs attention",
     blurb:
       "Athletes with no session in 14+ days, and invites that haven't been accepted",
+  },
+  {
+    id: "setbacks",
+    group: "Athlete monitoring",
+    name: "Setback flags",
+    blurb:
+      "Open soreness, CNS-readiness and pain flags across the roster, worst first",
   },
   {
     id: "resources",
