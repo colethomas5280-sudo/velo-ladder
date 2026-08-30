@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import type { Athlete, TrainingSession, TrackerId } from "@/lib/types";
+import type {
+  Athlete,
+  TrainingSession,
+  TrackerId,
+  RecoveryEntry,
+} from "@/lib/types";
 import {
   TRACKERS,
   TRACKER_IDS,
@@ -25,6 +30,7 @@ import EntryForm from "./EntryForm";
 import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
+import RecoveryPanel from "./RecoveryPanel";
 
 const TRACKER_KEY = "veloladder:tracker";
 
@@ -45,6 +51,11 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     isLoading: sessionsLoading,
   } = useSWR<TrainingSession[]>(`/api/athletes/${athleteId}/sessions`, fetcher);
   const allSessions = useMemo(() => sessionsData ?? [], [sessionsData]);
+  const { data: recoveryData, mutate: mutateRecovery } = useSWR<RecoveryEntry[]>(
+    `/api/athletes/${athleteId}/recovery`,
+    fetcher,
+  );
+  const recovery = useMemo(() => recoveryData ?? [], [recoveryData]);
 
   const [tracker, setTrackerState] = useState<TrackerId>("mound");
   useEffect(() => {
@@ -266,6 +277,13 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         sessions={allSessions}
         groupId={groupId}
         setGroupId={(id) => setChartGroup((p) => ({ ...p, [tracker]: id }))}
+        recovery={recovery}
+      />
+
+      <RecoveryPanel
+        athleteId={athleteId}
+        sessions={allSessions}
+        onChanged={() => mutateRecovery()}
       />
 
       {sessionsLoading ? (

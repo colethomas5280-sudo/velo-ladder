@@ -7,6 +7,7 @@ import type {
   Throws,
   TrackerId,
   Resource,
+  RecoveryEntry,
 } from "@/lib/types";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
@@ -351,4 +352,88 @@ export async function updateResource(
     WHERE id = ${id} RETURNING *
   `) as Record<string, unknown>[];
   return out[0] ? toResource(out[0]) : null;
+}
+
+/* ---------------- recovery ---------------- */
+
+function toRecovery(r: Record<string, unknown>): RecoveryEntry {
+  const n = (v: unknown) => (v == null ? null : Number(v));
+  return {
+    id: String(r.id),
+    athleteId: String(r.athlete_id),
+    date: isoDate(r.date),
+    sleepHours: n(r.sleep_hours),
+    sleepQuality: n(r.sleep_quality),
+    soreness: n(r.soreness),
+    energy: n(r.energy),
+    stress: n(r.stress),
+    mood: n(r.mood),
+    restingHr: n(r.resting_hr),
+    hrv: n(r.hrv),
+    notes: String(r.notes ?? ""),
+  };
+}
+
+export async function listRecovery(athleteId: string): Promise<RecoveryEntry[]> {
+  const rows = (await sql`
+    SELECT * FROM recovery_entries WHERE athlete_id = ${athleteId}
+    ORDER BY date ASC
+  `) as Record<string, unknown>[];
+  return rows.map(toRecovery);
+}
+
+export interface RecoveryInput {
+  date: string;
+  sleepHours?: number | null;
+  sleepQuality?: number | null;
+  soreness?: number | null;
+  energy?: number | null;
+  stress?: number | null;
+  mood?: number | null;
+  restingHr?: number | null;
+  hrv?: number | null;
+  notes?: string;
+}
+
+/**
+ * One check-in per athlete per day: saving the same date again updates it
+ * rather than stacking duplicates.
+ */
+export async function upsertRecovery(
+  athleteId: string,
+  input: RecoveryInput,
+  createdBy: string,
+): Promise<RecoveryEntry> {
+  const id = crypto.randomUUID();
+  const rows = (await sql`
+    INSERT INTO recovery_entries
+      (id, athlete_id, date, sleep_hours, sleep_quality, soreness, energy,
+       stress, mood, resting_hr, hrv, notes, created_by)
+    VALUES
+      (${id}, ${athleteId}, ${input.date}, ${input.sleepHours ?? null},
+       ${input.sleepQuality ?? null}, ${input.soreness ?? null},
+       ${input.energy ?? null}, ${input.stress ?? null}, ${input.mood ?? null},
+       ${input.restingHr ?? null}, ${input.hrv ?? null},
+       ${input.notes ?? ""}, ${createdBy})
+    ON CONFLICT (athlete_id, date) DO UPDATE SET
+      sleep_hours = EXCLUDED.sleep_hours,
+      sleep_quality = EXCLUDED.sleep_quality,
+      soreness = EXCLUDED.soreness,
+      energy = EXCLUDED.energy,
+      stress = EXCLUDED.stress,
+      mood = EXCLUDED.mood,
+      resting_hr = EXCLUDED.resting_hr,
+      hrv = EXCLUDED.hrv,
+      notes = EXCLUDED.notes,
+      updated_at = now()
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toRecovery(rows[0]);
+}
+
+export async function deleteRecovery(
+  athleteId: string,
+  date: string,
+): Promise<void> {
+  await sql`DELETE FROM recovery_entries WHERE athlete_id = ${athleteId} AND date = ${date}`;
 }
