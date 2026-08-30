@@ -41,3 +41,13 @@ export interface Scope {
   /** Athlete rows this user owns (athlete role). Empty for coach/none. */
   athleteIds: string[];
 }
+
+export interface Resource {
+  id: string;
+  title: string;
+  category: string;
+  body: string;
+  link: string | null;
+  position: number;
+  archived: boolean;
+}

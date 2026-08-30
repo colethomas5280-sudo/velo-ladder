@@ -47,6 +47,7 @@ export default function Dashboard() {
             {shown("prs") && <RecentPrs data={data} />}
             {shown("attention") && <NeedsAttention data={data} />}
             {shown("activity") && <Activity data={data} />}
+            {shown("resources") && <ResourcesWidget data={data} />}
           </div>
 
           {on.length === 0 && (
@@ -264,6 +265,40 @@ function Activity({ data }: { data: DashboardData }) {
             </li>
           ))}
         </ul>
+      )}
+    </WidgetShell>
+  );
+}
+
+function ResourcesWidget({ data }: { data: DashboardData }) {
+  return (
+    <WidgetShell title="Resources" sub="protocols & how-tos">
+      {data.resources.length === 0 ? (
+        <Empty>
+          Nothing in the library yet.{" "}
+          <Link href="/resources" className="name-link">
+            Add the first one
+          </Link>
+          .
+        </Empty>
+      ) : (
+        <>
+          <ul className="feed">
+            {data.resources.map((r) => (
+              <li key={r.id}>
+                <div className="feed-main">
+                  <Link href="/resources" className="name-link">
+                    {r.title}
+                  </Link>
+                  <span className="feed-sub">{r.category || "General"}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <Link className="btn sm ghost" href="/resources" style={{ marginTop: 10, display: "inline-block" }}>
+            Open resources
+          </Link>
+        </>
       )}
     </WidgetShell>
   );
