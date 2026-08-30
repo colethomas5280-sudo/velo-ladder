@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -37,6 +37,21 @@ CREATE TABLE IF NOT EXISTS training_sessions (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ts_athlete_idx ON training_sessions(athlete_id, type, date);
+
+-- Shared library of protocols and how-tos. Coaches write, everyone reads.
+CREATE TABLE IF NOT EXISTS resources (
+  id         text PRIMARY KEY,
+  title      text NOT NULL,
+  category   text NOT NULL DEFAULT '',
+  body       text NOT NULL DEFAULT '',
+  link       text,
+  position   int NOT NULL DEFAULT 0,
+  archived   boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS resources_order_idx
+  ON resources(lower(category), position, lower(title)) WHERE archived = false;
 
 -- Migration for databases created before the switch from magic-link auth to
 -- passwords. Back then created_by and athletes.user_id referenced the Auth.js

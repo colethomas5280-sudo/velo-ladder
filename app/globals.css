@@ -1424,3 +1424,100 @@ table.roster-table {
   font-size: 12px;
   color: var(--ink-faint);
 }
+
+/* ---------- resources ---------- */
+.resources {
+  padding-bottom: 60px;
+}
+.res-group {
+  margin-bottom: 20px;
+}
+.res-group > .eyebrow {
+  margin-bottom: 8px;
+}
+.res-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.res {
+  overflow: hidden;
+}
+.res-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 15px;
+  background: transparent;
+  border: 0;
+  text-align: left;
+}
+.res.open .res-head {
+  border-bottom: 1px solid var(--line-soft);
+}
+.res-head .caret {
+  transition: transform 0.12s;
+  flex: none;
+}
+.res.open .res-head .caret {
+  transform: rotate(90deg);
+}
+.res-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.res-head .pill {
+  font-size: 9.5px;
+  padding: 2px 8px;
+}
+.res-body {
+  padding: 14px 15px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.res-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+  width: 100%;
+}
+.res-editor {
+  min-height: 190px;
+  font-family: var(--font-mono), monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* rendered resource body */
+.rich {
+  max-width: 68ch;
+}
+.rich p {
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+.rich p:last-child {
+  margin-bottom: 0;
+}
+.rich h4 {
+  margin: 16px 0 7px;
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: 0.01em;
+}
+.rich h4:first-child {
+  margin-top: 0;
+}
+.rich ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+.rich li {
+  margin-bottom: 4px;
+  line-height: 1.55;
+}

@@ -44,6 +44,7 @@ export interface DashboardData {
   stale: StaleRow[];
   pendingInvites: { athleteId: string; name: string; hasEmail: boolean }[];
   activity: ActivityRow[];
+  resources: { id: string; title: string; category: string }[];
   snapshot: {
     athletes: number;
     sessionsThisWeek: number;
@@ -201,6 +202,11 @@ export async function getDashboard(): Promise<DashboardData> {
       };
     });
 
+  const resourceRows = (await sql`
+    SELECT id, title, category FROM resources WHERE archived = false
+    ORDER BY lower(category), position, lower(title) LIMIT 6
+  `) as Record<string, unknown>[];
+
   const thisWeek = sessions.filter((s) => daysAgo(s.date) <= RECENT_DAYS);
   return {
     leaderboard: { date: lastDay, rows: leaderRows },
@@ -208,6 +214,11 @@ export async function getDashboard(): Promise<DashboardData> {
     stale: stale.slice(0, 8),
     pendingInvites,
     activity,
+    resources: resourceRows.map((r) => ({
+      id: String(r.id),
+      title: String(r.title),
+      category: String(r.category ?? ""),
+    })),
     snapshot: {
       athletes: athleteRows.length,
       sessionsThisWeek: thisWeek.length,

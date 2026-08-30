@@ -6,6 +6,7 @@ import type {
   TrainingSession,
   Throws,
   TrackerId,
+  Resource,
 } from "@/lib/types";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
@@ -281,4 +282,73 @@ export async function updateSession(
 
 export async function deleteSession(id: string): Promise<void> {
   await sql`DELETE FROM training_sessions WHERE id = ${id}`;
+}
+
+/* ---------------- resources ---------------- */
+
+function toResource(r: Record<string, unknown>): Resource {
+  return {
+    id: String(r.id),
+    title: String(r.title),
+    category: String(r.category ?? ""),
+    body: String(r.body ?? ""),
+    link: (r.link as string | null) ?? null,
+    position: Number(r.position ?? 0),
+    archived: Boolean(r.archived),
+  };
+}
+
+export async function listResources(): Promise<Resource[]> {
+  const rows = (await sql`
+    SELECT * FROM resources WHERE archived = false
+    ORDER BY lower(category), position, lower(title)
+  `) as Record<string, unknown>[];
+  return rows.map(toResource);
+}
+
+export async function createResource(input: {
+  title: string;
+  category?: string;
+  body?: string;
+  link?: string | null;
+}): Promise<Resource> {
+  const id = crypto.randomUUID();
+  const rows = (await sql`
+    INSERT INTO resources (id, title, category, body, link)
+    VALUES (${id}, ${input.title.trim()}, ${input.category?.trim() || ""},
+            ${input.body ?? ""}, ${input.link?.trim() || null})
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toResource(rows[0]);
+}
+
+export async function updateResource(
+  id: string,
+  patch: {
+    title?: string;
+    category?: string;
+    body?: string;
+    link?: string | null;
+    position?: number;
+    archived?: boolean;
+  },
+): Promise<Resource | null> {
+  const rows = (await sql`SELECT * FROM resources WHERE id = ${id}`) as Record<
+    string,
+    unknown
+  >[];
+  if (!rows[0]) return null;
+  const cur = toResource(rows[0]);
+  const out = (await sql`
+    UPDATE resources SET
+      title = ${patch.title?.trim() ?? cur.title},
+      category = ${patch.category?.trim() ?? cur.category},
+      body = ${patch.body ?? cur.body},
+      link = ${patch.link === undefined ? cur.link : patch.link?.trim() || null},
+      position = ${patch.position ?? cur.position},
+      archived = ${patch.archived ?? cur.archived},
+      updated_at = now()
+    WHERE id = ${id} RETURNING *
+  `) as Record<string, unknown>[];
+  return out[0] ? toResource(out[0]) : null;
 }

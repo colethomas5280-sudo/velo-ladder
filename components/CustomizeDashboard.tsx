@@ -7,7 +7,8 @@ export type WidgetId =
   | "leaderboard"
   | "prs"
   | "attention"
-  | "activity";
+  | "activity"
+  | "resources";
 
 interface WidgetDef {
   id: WidgetId;
@@ -43,6 +44,12 @@ export const WIDGETS: WidgetDef[] = [
     name: "Needs attention",
     blurb:
       "Athletes with no session in 14+ days, and invites that haven't been accepted",
+  },
+  {
+    id: "resources",
+    group: "Coaching",
+    name: "Resources",
+    blurb: "Quick links into your protocols and how-to library",
   },
   {
     id: "activity",

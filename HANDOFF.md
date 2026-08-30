@@ -65,10 +65,12 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 |---|---|
 | `/` | Coach → the **dashboard** (customizable widgets). Athlete → redirected to their own profile. |
 | `/athletes` | The roster/spreadsheet (coach only). |
+| `/resources` | Shared protocol/how-to library. Coaches write, athletes read. |
 | `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
 | `/login` | Email + password. |
 | `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
 | `/api/me` | `{ role, email, athleteId }` for the signed-in user. |
+| `/api/resources` | GET any signed-in user; POST coach-only. `/[id]` PATCH + DELETE (soft) coach-only. |
 | `/api/dashboard` | GET — everything the dashboard widgets need, in one call (coach only). |
 | `/api/athletes` | GET (scoped list), POST (coach: create). |
 | `/api/athletes/overview` | GET — roster + session counts + last date (coach only). Powers the home table. |
@@ -90,6 +92,9 @@ athletes; **athlete** = their own only; anyone else = 403.
   widget: append to `WIDGETS` in `CustomizeDashboard.tsx`, add its data to
   `lib/dashboard.ts`, and render it in `Dashboard.tsx`.** Unknown ids in a saved
   choice are dropped on load, so removing a widget can't wedge someone's dashboard.
+- `Resources` (`/resources`) — grouped by category, expandable. Bodies render via
+  `RichText`, a ~50-line formatter supporting `## heading`, `- bullet`, `**bold**` and
+  auto-linked URLs. It builds **React nodes, never HTML**, so nothing typed can execute.
 - `RosterView` → `AthletesTable` (spreadsheet: inline-edit email/hand, per-row invite
   and password reset, remove, search; check rows → **`GroupSession`** modal;
   **+ Invite athlete** → `InviteAthleteModal`, which creates the athlete and mints
@@ -116,6 +121,8 @@ athletes; **athlete** = their own only; anyone else = 403.
 ```
 athletes(id, name, hand, invite_email, password_hash,
          invite_token, invite_expires, archived, created_at)
+resources(id, title, category, body, link, position, archived,
+          created_at, updated_at)
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
                   throws jsonb, created_by, created_at, updated_at)
 ```

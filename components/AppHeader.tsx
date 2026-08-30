@@ -6,18 +6,30 @@ import useSWR from "swr";
 import { signOut } from "next-auth/react";
 import { fetcher } from "@/lib/fetcher";
 
-type Me = { role: "coach" | "athlete" | "none"; email: string };
+type Me = { role: "coach" | "athlete" | "none"; email: string; athleteId: string | null };
 
-export default function AppHeader({
-  email,
-  back = false,
-}: {
-  email?: string;
-  back?: boolean;
-}) {
+export default function AppHeader({ email }: { email?: string }) {
   const { data } = useSWR<Me>("/api/me", fetcher);
-  const isCoach = data?.role === "coach";
   const path = usePathname();
+  const isCoach = data?.role === "coach";
+  const isAthlete = data?.role === "athlete";
+
+  // Athletes get a link back to their own profile; coaches get the roster.
+  const links: { href: string; label: string }[] = isCoach
+    ? [
+        { href: "/", label: "Dashboard" },
+        { href: "/athletes", label: "Athletes" },
+        { href: "/resources", label: "Resources" },
+      ]
+    : isAthlete
+      ? [
+          {
+            href: data?.athleteId ? `/athletes/${data.athleteId}` : "/",
+            label: "My tracker",
+          },
+          { href: "/resources", label: "Resources" },
+        ]
+      : [];
 
   return (
     <div className="appbar">
@@ -25,22 +37,17 @@ export default function AppHeader({
         <span className="dot" />
         Velo Ladder
       </Link>
-      {back && isCoach && (
-        <Link href="/athletes" className="back-link">
-          ← Athletes
-        </Link>
-      )}
-      {!back && isCoach && (
+      {links.length > 0 && (
         <nav className="topnav">
-          <Link href="/" aria-current={path === "/" ? "page" : undefined}>
-            Dashboard
-          </Link>
-          <Link
-            href="/athletes"
-            aria-current={path === "/athletes" ? "page" : undefined}
-          >
-            Athletes
-          </Link>
+          {links.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              aria-current={path === l.href ? "page" : undefined}
+            >
+              {l.label}
+            </Link>
+          ))}
         </nav>
       )}
       <span className="spacer" />
