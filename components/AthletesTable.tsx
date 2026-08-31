@@ -47,7 +47,16 @@ export default function AthletesTable() {
   };
 
   const archive = async (a: AthleteOverview) => {
-    if (!confirm(`Remove ${a.name} and all their sessions?`)) return;
+    if (
+      !confirm(
+        `Remove ${a.name} from the active roster?\n\n` +
+          `Their sessions are kept, and any leaderboard records they set stay ` +
+          `on the boards under their name — every athlete in the facility still ` +
+          `sees them there. Taking them off the leaderboard needs a full delete, ` +
+          `not this.`,
+      )
+    )
+      return;
     try {
       await api(`/api/athletes/${a.id}`, "DELETE");
       await mutate();

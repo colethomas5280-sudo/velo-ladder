@@ -1,6 +1,6 @@
 import { getInvite, consumeInvite } from "@/lib/data";
 import { json, notFound, badRequest } from "@/lib/http";
-import { LEVELS, type Level } from "@/lib/leaderboard";
+import { LEVELS, type Level, isValidBirthDate } from "@/lib/leaderboard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,11 +38,7 @@ export async function POST(
   const level = LEVELS.includes(body.level as Level)
     ? (body.level as Level)
     : null;
-  const birthDate =
-    typeof body.birthDate === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate)
-      ? body.birthDate
-      : null;
+  const birthDate = isValidBirthDate(body.birthDate) ? body.birthDate : null;
 
   const athlete = await consumeInvite(token, password, level, birthDate);
   if (!athlete)

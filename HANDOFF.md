@@ -436,7 +436,10 @@ built. `coach` and `athlete` can read the board; `role: "none"` gets a 403.
   five slots and it stops being a leaderboard.
 - **Ties go to whoever set the mark first.**
 - **Archived athletes keep their records and still rank.** A departing athlete should
-  not wipe a facility record he set.
+  not wipe a facility record he set. This means the roster **Remove** button (a soft
+  archive) does **not** take someone off the boards — their marks stay, ranked, under
+  their name, visible to every athlete in the facility. Fully removing someone from the
+  leaderboard requires a real hard delete of the athlete and their sessions.
 - The **facility board shows 10**, level boards show 5. A board with no rows is
   omitted entirely.
 - An athlete who ranks **below the visible rows still sees their own standing** printed

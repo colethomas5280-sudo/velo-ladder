@@ -43,6 +43,37 @@ export function ageOn(birthDate: string, onDate: string): number {
 }
 
 /**
+ * True iff `value` is a real `YYYY-MM-DD` calendar day that is not in the
+ * future. A shape-only regex (`/^\d{4}-\d{2}-\d{2}$/`) is not enough: it lets
+ * `2009-99-99` through to die in Postgres, and `2103-06-15` through to a
+ * negative age that lands an adult on the 12U board. One home for the date
+ * semantics that both write paths (`/api/join`, `/api/athletes/[id]`) share.
+ */
+export function isValidBirthDate(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  // round-trips only if the day actually exists (rejects 2009-02-30, 2009-99-99)
+  if (
+    dt.getUTCFullYear() !== y ||
+    dt.getUTCMonth() !== mo - 1 ||
+    dt.getUTCDate() !== d
+  )
+    return false;
+  const now = new Date();
+  const todayUTC = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  return dt.getTime() <= todayUTC;
+}
+
+/**
  * Which board one session belongs to, or null for facility-only.
  * Order matters: a stamped level is an override and always wins.
  */
@@ -61,6 +92,9 @@ export function bandForSession(
   if (sessionLevel === "Youth") {
     if (!athlete.birthDate) return null;
     const age = ageOn(athlete.birthDate, sessionDate);
+    // A mistyped birth date (e.g. a future year) yields a negative age; without
+    // this floor `age <= 12` would put that session on the 12U board.
+    if (age < 0) return null;
     if (age <= 12) return "12U";
     if (age <= 14) return "14U";
     return null; // 15+ still marked Youth: facility board only
@@ -125,7 +159,9 @@ function rank(
   }
 
   const ranked = [...best.values()].sort(
-    (a, b) => b.velocity - a.velocity || (a.date < b.date ? -1 : 1),
+    (a, b) =>
+      b.velocity - a.velocity ||
+      (a.date < b.date ? -1 : a.date > b.date ? 1 : a.name.localeCompare(b.name)),
   );
 
   const rows: BoardRow[] = ranked.slice(0, limit).map((m, i) => ({

@@ -1,7 +1,7 @@
 import { getScope, canSeeAthlete } from "@/lib/scope";
 import { getAthlete, updateAthlete } from "@/lib/data";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
-import { LEVELS, type Level } from "@/lib/leaderboard";
+import { LEVELS, type Level, isValidBirthDate } from "@/lib/leaderboard";
 import type { Hand } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -66,8 +66,7 @@ export async function PATCH(
       birthDate:
         body.birthDate === undefined
           ? undefined
-          : typeof body.birthDate === "string" &&
-              /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate)
+          : isValidBirthDate(body.birthDate)
             ? body.birthDate
             : null,
       password,

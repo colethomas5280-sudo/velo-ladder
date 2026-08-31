@@ -245,10 +245,16 @@ export async function consumeInvite(
   birthDate: string | null,
 ): Promise<InviteTarget | null> {
   const hash = await hashPassword(password);
+  // COALESCE, not assignment: the athlete can fill a blank the coach left, but
+  // must never clear a value the coach already entered. Re-inviting is how the
+  // app does password recovery (AthletesTable "New invite"), and both pickers
+  // default to empty, so an unconditional write silently nulls the coach's
+  // level + birth date every time an existing athlete redeems a fresh link.
   const rows = (await sql`
     UPDATE athletes
     SET password_hash = ${hash}, invite_token = NULL, invite_expires = NULL,
-        level = ${level}, birth_date = ${birthDate}
+        level = COALESCE(${level}::text, level),
+        birth_date = COALESCE(${birthDate}::date, birth_date)
     WHERE invite_token = ${token}
       AND archived = false
       AND invite_expires IS NOT NULL
@@ -256,7 +262,11 @@ export async function consumeInvite(
     RETURNING id, name, invite_email
   `) as Record<string, unknown>[];
   const r = rows[0];
-  if (r) await stampUnleveledSessions(String(r.id), level);
+  // Deliberately NOT stamping existing sessions from the athlete's self-declared
+  // level: a wrong pick ("Pro" at 15) would permanently rewrite his whole
+  // history with no UI to undo it. athletes.level is still set, so his FUTURE
+  // sessions stamp correctly; the backfill of existing history waits for the
+  // coach's first roster edit — which is what makes "coach edits win" true.
   return r
     ? {
         id: String(r.id),
@@ -625,7 +635,7 @@ export async function listLeaderboardData(): Promise<{
 }> {
   const [aRows, sRows] = await Promise.all([
     sql`SELECT id, name, hand, birth_date, level FROM athletes`,
-    sql`SELECT * FROM training_sessions`,
+    sql`SELECT * FROM training_sessions ORDER BY date ASC, created_at ASC, id ASC`,
   ]);
   return {
     athletes: (aRows as Record<string, unknown>[]).map((r) => ({
