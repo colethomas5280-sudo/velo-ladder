@@ -1,5 +1,6 @@
 import { getInvite, consumeInvite } from "@/lib/data";
 import { json, notFound, badRequest } from "@/lib/http";
+import { LEVELS, type Level } from "@/lib/leaderboard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,12 +28,23 @@ export async function POST(
   const { token } = await params;
   const body = (await request.json().catch(() => ({}))) as {
     password?: unknown;
+    level?: unknown;
+    birthDate?: unknown;
   };
   const password = typeof body.password === "string" ? body.password : "";
   if (password.length < 6)
     return badRequest("Password must be at least 6 characters");
 
-  const athlete = await consumeInvite(token, password);
+  const level = LEVELS.includes(body.level as Level)
+    ? (body.level as Level)
+    : null;
+  const birthDate =
+    typeof body.birthDate === "string" &&
+    /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate)
+      ? body.birthDate
+      : null;
+
+  const athlete = await consumeInvite(token, password, level, birthDate);
   if (!athlete)
     return notFound("This invite link has already been used or has expired");
 

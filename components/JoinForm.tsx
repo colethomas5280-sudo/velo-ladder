@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { signIn } from "next-auth/react";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
+import { LEVELS } from "@/lib/leaderboard";
 
 type Invite = { name: string; email: string | null };
 
@@ -14,6 +15,8 @@ export default function JoinForm({ token }: { token: string }) {
     { shouldRetryOnError: false },
   );
 
+  const [level, setLevel] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,7 +56,7 @@ export default function JoinForm({ token }: { token: string }) {
       const res = await api<{ email: string | null }>(
         `/api/join/${token}`,
         "POST",
-        { password: pw },
+        { password: pw, level: level || null, birthDate: birthDate || null },
       );
       // Password is set — sign them straight in rather than bouncing to /login.
       if (res.email) {
@@ -88,6 +91,27 @@ export default function JoinForm({ token }: { token: string }) {
       </p>
 
       <label className="field" style={{ marginTop: 6 }}>
+        <span>Your level</span>
+        <select value={level} onChange={(e) => setLevel(e.target.value)}>
+          <option value="">Choose…</option>
+          {LEVELS.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="field">
+        <span>Date of birth</span>
+        <input
+          type="date"
+          value={birthDate}
+          onChange={(e) => setBirthDate(e.target.value)}
+        />
+      </label>
+
+      <label className="field">
         <span>Password</span>
         <input
           type="password"

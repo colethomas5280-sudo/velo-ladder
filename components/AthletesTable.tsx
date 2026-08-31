@@ -5,6 +5,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { AthleteOverview, Hand } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
+import { LEVELS } from "@/lib/leaderboard";
 import { fmtDate } from "@/lib/velo";
 import GroupSession from "./GroupSession";
 import InviteAthleteModal from "./InviteAthleteModal";
@@ -133,6 +134,8 @@ export default function AthletesTable() {
                 <th>Name</th>
                 <th>Login email</th>
                 <th>Hand</th>
+                <th>Level</th>
+                <th>Date of birth</th>
                 <th>Access</th>
                 <th>Mound</th>
                 <th>Pull-Down</th>
@@ -143,7 +146,7 @@ export default function AthletesTable() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={9} style={{ color: "var(--ink-dim)" }}>
+                  <td colSpan={11} style={{ color: "var(--ink-dim)" }}>
                     Loading…
                   </td>
                 </tr>
@@ -186,6 +189,33 @@ export default function AthletesTable() {
                       <option value="R">R</option>
                       <option value="L">L</option>
                     </select>
+                  </td>
+                  <td>
+                    <select
+                      aria-label={`${a.name} level`}
+                      value={a.level ?? ""}
+                      onChange={(e) =>
+                        patch(a.id, { level: e.target.value || null })
+                      }
+                    >
+                      <option value="">–</option>
+                      {LEVELS.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      className="tin"
+                      type="date"
+                      aria-label={`${a.name} date of birth`}
+                      value={a.birthDate ?? ""}
+                      onChange={(e) =>
+                        patch(a.id, { birthDate: e.target.value || null })
+                      }
+                    />
                   </td>
                   <td>
                     {resetFor === a.id ? (
@@ -264,7 +294,7 @@ export default function AthletesTable() {
               ))}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ color: "var(--ink-dim)" }}>
+                  <td colSpan={11} style={{ color: "var(--ink-dim)" }}>
                     No athletes match.
                   </td>
                 </tr>
