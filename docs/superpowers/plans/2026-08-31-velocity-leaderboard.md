@@ -250,13 +250,20 @@ Adds Node's built-in test runner via tsx — the project had none."
   ): Board[]
   ```
 
-- [ ] **Step 1: Add `level` to the session type**
+- [ ] **Step 1: Add `level` to the session type and read it**
 
 In `lib/types.ts`, inside `interface TrainingSession`, add:
 
 ```ts
   /** level stamped at save time; null for sessions logged before levels existed */
   level: string | null;
+```
+
+And in `lib/data.ts`, add the matching line to `toSession` so the build stays green —
+the column does not exist yet, so this reads `null` until Task 3 adds it:
+
+```ts
+    level: (r.level as string | null) ?? null,
 ```
 
 - [ ] **Step 2: Write the failing test**
@@ -511,13 +518,13 @@ export function buildBoards(
 
 - [ ] **Step 5: Run the tests and the type check**
 
-Run: `npm test && npx tsc --noEmit`
-Expected: PASS, 15 tests. `tsc` will report errors in `lib/data.ts` because `toSession` does not yet supply `level` — that is Task 3. Do not fix it here.
+Run: `npm test && npx tsc --noEmit && npm run build`
+Expected: PASS, 15 tests, no type errors, build succeeds.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add lib/leaderboard.ts lib/leaderboard.test.ts lib/types.ts
+git add lib/leaderboard.ts lib/leaderboard.test.ts lib/types.ts lib/data.ts
 git commit -m "Rank leaderboard marks, one row per athlete
 
 Reads velocities through sBestG and the tracker's own groups rather
@@ -583,11 +590,6 @@ In `lib/data.ts`:
     level: (r.level as string | null) ?? null,
 ```
 
-`toSession` gains:
-```ts
-    level: (r.level as string | null) ?? null,
-```
-
 `updateAthlete`'s `patch` parameter gains `level?: string | null;` and `birthDate?: string | null;`, resolved like the existing fields:
 ```ts
   const level = patch.level === undefined ? cur.level : patch.level;
@@ -596,19 +598,30 @@ In `lib/data.ts`:
 ```
 and both `UPDATE athletes SET ...` statements gain `level = ${level}, birth_date = ${birthDate}`.
 
-After a successful update, stamp any unstamped sessions when a level is now set:
+Add this helper to `lib/data.ts` — Task 5 calls it too, so it lives in one place:
 
 ```ts
-  /*
-   * Backfill the stamp, once. Sessions that already carry a level are never
-   * rewritten, so moving an athlete from Youth to High School leaves his old
-   * marks where they were and only new sessions get the new level.
-   */
-  if (level)
-    await sql`
-      UPDATE training_sessions SET level = ${level}
-      WHERE athlete_id = ${id} AND level IS NULL
-    `;
+/*
+ * Backfill the stamp, once. Sessions that already carry a level are never
+ * rewritten, so moving an athlete from Youth to High School leaves his old
+ * marks where they were and only new sessions get the new level.
+ */
+export async function stampUnleveledSessions(
+  athleteId: string,
+  level: string | null,
+): Promise<void> {
+  if (!level) return;
+  await sql`
+    UPDATE training_sessions SET level = ${level}
+    WHERE athlete_id = ${athleteId} AND level IS NULL
+  `;
+}
+```
+
+and call it after a successful `updateAthlete`:
+
+```ts
+  await stampUnleveledSessions(id, level);
 ```
 
 `createSession` stamps the athlete's current level at save time. Add before the INSERT:
@@ -763,16 +776,20 @@ console.log("leaks a birth date?", /birthDate|birth_date/.test(body));
 const bad = await fetch(B+"/api/leaderboard?tracker=bogus",{headers:H});
 console.log("bad tracker ->", bad.status, await bad.text());
 
-// Archived athletes must keep their records.
-const before = JSON.parse(body)[0].rows.length;
-await fetch(B+"/api/athletes/seed-md",{method:"PATCH",headers:{...H,"content-type":"application/json"},body:JSON.stringify({archived:true})});
-const after = await (await fetch(B+"/api/leaderboard?tracker=pulldown&oz=5",{headers:H})).json();
-console.log("archived athlete still ranks?", after[0].rows.length === before);
-await fetch(B+"/api/athletes/seed-md",{method:"PATCH",headers:{...H,"content-type":"application/json"},body:JSON.stringify({archived:false})});
+// Archived athletes must keep their records. Use a throwaway athlete: the PATCH
+// route refuses any request against an archived athlete, so this is one-way.
+const J = {...H, "content-type":"application/json"};
+const tmp = await (await fetch(B+"/api/athletes",{method:"POST",headers:J,body:JSON.stringify({name:"Archive Test",inviteEmail:"arch@t.com",password:"pw123456"})})).json();
+await fetch(B+"/api/athletes/"+tmp.id+"/sessions",{method:"POST",headers:J,body:JSON.stringify({type:"pulldown",date:"2026-08-30",notes:"",throws:{p1:[80,120,null,null,null]}})});
+const on = await (await fetch(B+"/api/leaderboard?tracker=pulldown&oz=5",{headers:H})).json();
+console.log("ranks before archiving?", on[0].rows.some(r => r.name === "Archive Test"));
+await fetch(B+"/api/athletes/"+tmp.id,{method:"PATCH",headers:J,body:JSON.stringify({archived:true})});
+const off = await (await fetch(B+"/api/leaderboard?tracker=pulldown&oz=5",{headers:H})).json();
+console.log("still ranks after archiving?", off[0].rows.some(r => r.name === "Archive Test"));
 '
 ```
 
-Expected: `200` with a `facility` board containing the seeded Martin Duff pull-down; both leak checks `false`; the bad tracker returns `400`; the archived check prints `true`.
+Expected: `200` with a `facility` board containing the seeded Martin Duff pull-down; both leak checks `false`; the bad tracker returns `400`; both archived checks print `true`.
 
 - [ ] **Step 3: Commit**
 
@@ -815,14 +832,11 @@ export async function consumeInvite(
   birthDate: string | null,
 ): Promise<InviteTarget | null> {
 ```
-Add `level = ${level}, birth_date = ${birthDate}` to its `SET` clause. After the update succeeds and `level` is set, run the same one-time stamp used in Task 3:
+Add `level = ${level}, birth_date = ${birthDate}` to its `SET` clause. After the update
+succeeds, call the helper Task 3 added — do not re-write the SQL:
 
 ```ts
-  if (r && level)
-    await sql`
-      UPDATE training_sessions SET level = ${level}
-      WHERE athlete_id = ${String(r.id)} AND level IS NULL
-    `;
+  if (r) await stampUnleveledSessions(String(r.id), level);
 ```
 
 - [ ] **Step 2: Validate them at the route**
