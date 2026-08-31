@@ -81,20 +81,21 @@ export interface WellnessSection {
  * Pitched at a training athlete, not a general adult: 7-8h clears the adult
  * guideline but sits at the bottom of the useful range for someone throwing at
  * max intent, and 6-7h — where most of them actually live — is a deficit, not
- * a floor. Top of the scale is 9-10h, the window sleep-extension work pushes
- * toward. The bands shifted up a rung in Aug 2026 for this reason; a 4 now
- * means what a 5 used to.
+ * a floor. Top of the scale opens at 9h, the window sleep-extension work pushes
+ * toward — left open-ended rather than capped at 10 so an athlete who slept
+ * eleven hours has somewhere honest to put it. The bands shifted up a rung in
+ * Aug 2026 for this reason; a 4 now means what a 5 used to.
  */
 export const SLEEP_BAND_ANCHORS = [
   "Less than 6 hours",
   "6-7 hours",
   "7-8 hours",
   "8-9 hours",
-  "9-10 hours",
+  "9+ hours",
 ] as const;
 
 /** The same bands, short enough for a feed line. */
-export const SLEEP_BAND_SHORT = ["<6h", "6-7h", "7-8h", "8-9h", "9-10h"] as const;
+export const SLEEP_BAND_SHORT = ["<6h", "6-7h", "7-8h", "8-9h", "9h+"] as const;
 
 /** Label for a (possibly averaged) band value. */
 export function sleepBandLabel(band: number): string {
