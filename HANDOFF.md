@@ -170,7 +170,7 @@ full anchor text and feeds the score; `"numeric"` renders a typed input with a u
 **never** feeds the score.
 
 - **Section 1 — "How do you feel today?"**: Fatigue (stored as `energy`), Sleep duration
-  (derived), General muscle soreness, Stress, Diet. All 1-5.
+  (derived), Sleep quality, General muscle soreness, Stress, Diet. All 1-5.
 - **Section 3 — "Bodyweight"**: one numeric field, lb. Not scored — see below.
 - **Section 2 — "Arm readiness"**: one question, **1-5** — 1 pain limiting movement,
   2 pain/soreness not limiting, 3 no pain very sore, 4 no pain a little sore, 5 no pain
@@ -188,6 +188,19 @@ Each item is a **dropdown carrying the full anchor text** ("3 — So-so quality,
 under ate a bit") rather than 1-5 buttons — the anchors are sentences, and a bare "3"
 tells an athlete nothing. Sleep duration renders as a disabled dropdown filled in from
 the typed hours.
+
+**Sleep quality is a separate question from both duration and fatigue**, and it is not
+redundant with either: eight hours that were broken five times reads as duration 5,
+quality 2, fatigue 2. Without it there is no way to tell an athlete who is tired because
+he didn't really sleep from one who is tired because training beat him up — different
+problems, different fixes. It is a live question again after being retired in the
+questionnaire rebuild; moving an item between `RETIRED_FIELDS` and `WELLNESS_SECTIONS`
+is score-neutral by construction, since both paths contribute the raw 1-5.
+
+Note this makes **2 of the 7 scored components sleep** (duration + quality). That is a
+deliberate weighting, not an oversight — sleep is the biggest recovery lever a teenager
+has. Collapsing them into one averaged component is a small change to `recoveryScore`
+if it ever reads too heavy.
 
 **Sleep is answered once, used twice.** The athlete types real hours; the questionnaire
 band (`sleepBand`: <5/5-6/6-7/7-8/8+) is derived for display, and the correlation

@@ -107,6 +107,18 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
       },
       {
         kind: "rated",
+        key: "sleepQuality",
+        label: "Sleep quality",
+        anchors: [
+          "Unsatisfactory, or didn't sleep at all",
+          "Markedly unsatisfactory",
+          "Slightly unsatisfactory",
+          "Satisfactory",
+          "Extremely refreshed",
+        ],
+      },
+      {
+        kind: "rated",
         key: "soreness",
         label: "General muscle soreness",
         anchors: [
@@ -194,8 +206,14 @@ export function normalizeRating(value: number, max = 5): number {
   return 1 + ((value - 1) / (max - 1)) * 4;
 }
 
-/** Legacy 1-5 columns no longer asked for, still scored on old entries. */
-const RETIRED_FIELDS = ["sleepQuality", "mood"] as const;
+/**
+ * Legacy 1-5 columns no longer asked for, still scored on old entries.
+ *
+ * `sleepQuality` came back off this list — it is a live question again. Moving
+ * an item between here and the questionnaire is score-neutral by construction:
+ * both paths contribute the raw 1-5 value, so no historical entry re-scores.
+ */
+const RETIRED_FIELDS = ["mood"] as const;
 
 /** Which 1-5 band typed hours fall into, per the questionnaire anchors. */
 export function sleepBand(hours: number): number {
