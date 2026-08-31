@@ -6,7 +6,7 @@ import {
   reconcileSetbacks,
 } from "@/lib/data";
 import type { ArmStatus } from "@/lib/types";
-import { json, unauthorized, forbidden, badRequest } from "@/lib/http";
+import { json, unauthorized, forbidden, badRequest, guard } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +36,10 @@ export async function GET(
   const scope = await getScope();
   if (!scope) return unauthorized();
   if (!canSeeAthlete(scope, id)) return forbidden();
-  return json(await listRecovery(id));
+  return guard(
+    async () => json(await listRecovery(id)),
+    "Loading check-ins failed",
+  );
 }
 
 export async function POST(
@@ -91,10 +94,12 @@ export async function POST(
     entry.notes.trim() !== "";
   if (!anything) return badRequest("Fill in at least one field");
 
-  const saved = await upsertRecovery(id, entry, scope.email);
-  // Re-evaluate the setback branches against the new data.
-  await reconcileSetbacks(id);
-  return json(saved, 201);
+  return guard(async () => {
+    const saved = await upsertRecovery(id, entry, scope.email);
+    // Re-evaluate the setback branches against the new data.
+    await reconcileSetbacks(id);
+    return json(saved, 201);
+  }, "Saving the check-in failed");
 }
 
 export async function DELETE(
