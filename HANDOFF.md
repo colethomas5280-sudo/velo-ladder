@@ -168,6 +168,11 @@ Section 1, "How do you feel today?" — Fatigue (stored as `energy`), Sleep dura
 (derived), General muscle soreness, Stress, Diet. **Every scale runs bad → good**, which
 is what lets them average into one score.
 
+Each item is a **dropdown carrying the full anchor text** ("3 — So-so quality, over or
+under ate a bit") rather than 1-5 buttons — the anchors are sentences, and a bare "3"
+tells an athlete nothing. Sleep duration renders as a disabled dropdown filled in from
+the typed hours.
+
 **Sleep is answered once, used twice.** The athlete types real hours; the questionnaire
 band (`sleepBand`: <5/5-6/6-7/7-8/8+) is derived for display, and the correlation
 readout keeps the raw number so it can say "8.8h vs 5.3h". The **score** uses
