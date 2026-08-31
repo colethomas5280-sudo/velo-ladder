@@ -1947,3 +1947,47 @@ table.roster-table {
   color: var(--ink-faint);
   background: var(--panel-2);
 }
+
+.wl-row {
+  align-items: center;
+  gap: 10px;
+}
+.wl-row .ci-label {
+  min-width: 0;
+  flex: 0 0 auto;
+  width: 150px;
+}
+.wl-select {
+  flex: 1 1 220px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.wl-select:invalid,
+.wl-select option[value=""] {
+  color: var(--ink-faint);
+}
+.wl-select.derived {
+  background: var(--panel-2);
+  color: var(--chalk);
+  font-weight: 600;
+  opacity: 1;
+}
+@media (max-width: 560px) {
+  .wl-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .wl-row .ci-label {
+    width: auto;
+  }
+  .wl-select {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+}

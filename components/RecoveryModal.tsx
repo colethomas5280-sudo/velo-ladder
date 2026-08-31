@@ -209,38 +209,32 @@ export default function RecoveryModal({
                   <div className="ci-row wl-row" key={item.key}>
                     <div className="ci-label">
                       <b>{item.label}</b>
-                      <span>
-                        {value
-                          ? item.anchors[value - 1]
-                          : item.derived
-                            ? "From the hours you enter above"
-                            : `1 ${item.anchors[0]} \u2192 5 ${item.anchors[4]}`}
-                      </span>
+                      {item.derived && (
+                        <span>From the hours you enter above</span>
+                      )}
                     </div>
-                    <div
-                      className={`ci-scale${item.derived ? " derived" : ""}`}
-                      role="group"
+                    <select
+                      className={`wl-select${item.derived ? " derived" : ""}`}
                       aria-label={item.label}
+                      disabled={item.derived}
+                      value={value ?? ""}
+                      onChange={(e) =>
+                        setD((p) => ({
+                          ...p,
+                          [item.key]:
+                            e.target.value === "" ? null : Number(e.target.value),
+                        }))
+                      }
                     >
-                      {[1, 2, 3, 4, 5].map((v) => (
-                        <button
-                          key={v}
-                          className="ci-dot"
-                          aria-pressed={value === v}
-                          disabled={item.derived}
-                          title={item.anchors[v - 1]}
-                          onClick={() =>
-                            setD((p) => ({
-                              ...p,
-                              [item.key]:
-                                p[item.key as RatingKey] === v ? null : v,
-                            }))
-                          }
-                        >
-                          {v}
-                        </button>
+                      <option value="">
+                        {item.derived ? "—" : "Choose…"}
+                      </option>
+                      {item.anchors.map((a, i) => (
+                        <option key={i} value={i + 1}>
+                          {i + 1} — {a}
+                        </option>
                       ))}
-                    </div>
+                    </select>
                   </div>
                 );
               })}
