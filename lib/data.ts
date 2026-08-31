@@ -379,6 +379,7 @@ function toRecovery(r: Record<string, unknown>): RecoveryEntry {
     mood: n(r.mood),
     diet: n(r.diet),
     armReadiness: n(r.arm_readiness),
+    bodyWeight: n(r.body_weight),
     restingHr: n(r.resting_hr),
     hrv: n(r.hrv),
     armStatus: (r.arm_status as RecoveryEntry["armStatus"]) ?? null,
@@ -404,6 +405,7 @@ export interface RecoveryInput {
   mood?: number | null;
   diet?: number | null;
   armReadiness?: number | null;
+  bodyWeight?: number | null;
   restingHr?: number | null;
   hrv?: number | null;
   armStatus?: import("@/lib/types").ArmStatus | null;
@@ -423,13 +425,14 @@ export async function upsertRecovery(
   const rows = (await sql`
     INSERT INTO recovery_entries
       (id, athlete_id, date, sleep_hours, sleep_quality, soreness, energy,
-       stress, mood, diet, arm_readiness, resting_hr, hrv, arm_status,
-       notes, created_by)
+       stress, mood, diet, arm_readiness, body_weight, resting_hr, hrv,
+       arm_status, notes, created_by)
     VALUES
       (${id}, ${athleteId}, ${input.date}, ${input.sleepHours ?? null},
        ${input.sleepQuality ?? null}, ${input.soreness ?? null},
        ${input.energy ?? null}, ${input.stress ?? null}, ${input.mood ?? null},
        ${input.diet ?? null}, ${input.armReadiness ?? null},
+       ${input.bodyWeight ?? null},
        ${input.restingHr ?? null}, ${input.hrv ?? null},
        ${input.armStatus ?? null}, ${input.notes ?? ""}, ${createdBy})
     ON CONFLICT (athlete_id, date) DO UPDATE SET
@@ -441,6 +444,7 @@ export async function upsertRecovery(
       mood = EXCLUDED.mood,
       diet = EXCLUDED.diet,
       arm_readiness = EXCLUDED.arm_readiness,
+      body_weight = EXCLUDED.body_weight,
       resting_hr = EXCLUDED.resting_hr,
       hrv = EXCLUDED.hrv,
       arm_status = EXCLUDED.arm_status,

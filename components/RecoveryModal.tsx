@@ -24,8 +24,15 @@ type Draft = {
   restingHr: string;
   hrv: string;
   armReadiness: number | null;
+  bodyWeight: string;
   notes: string;
 };
+
+/** Strip anything that isn't a number, keeping at most one decimal point. */
+const clean = (s: string, decimal?: boolean) =>
+  decimal
+    ? s.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1")
+    : s.replace(/[^0-9]/g, "");
 
 function draftFrom(e: RecoveryEntry | null, date: string): Draft {
   return {
@@ -40,6 +47,7 @@ function draftFrom(e: RecoveryEntry | null, date: string): Draft {
     restingHr: e?.restingHr != null ? String(e.restingHr) : "",
     hrv: e?.hrv != null ? String(e.hrv) : "",
     armReadiness: e?.armReadiness ?? null,
+    bodyWeight: e?.bodyWeight != null ? String(e.bodyWeight) : "",
     notes: e?.notes ?? "",
   };
 }
@@ -101,6 +109,7 @@ export default function RecoveryModal({
         restingHr: num(d.restingHr),
         hrv: num(d.hrv),
         armReadiness: d.armReadiness,
+        bodyWeight: num(d.bodyWeight),
         notes: d.notes.trim(),
       });
       onSaved(existing ? "Check-in updated" : "Check-in saved");
@@ -153,9 +162,7 @@ export default function RecoveryModal({
                 onChange={(e) =>
                   setD((p) => ({
                     ...p,
-                    sleepHours: e.target.value
-                      .replace(/[^0-9.]/g, "")
-                      .replace(/(\..*)\./g, "$1"),
+                    sleepHours: clean(e.target.value, true),
                   }))
                 }
               />
@@ -171,6 +178,32 @@ export default function RecoveryModal({
               <div className="eyebrow">{section.title}</div>
 
               {section.items.map((item) => {
+                if (item.kind === "numeric")
+                  return (
+                    <div className="ci-row wl-row" key={item.key}>
+                      <div className="ci-label">
+                        <b>{item.label}</b>
+                        {item.help && <span className="wl-help">{item.help}</span>}
+                      </div>
+                      <div className="wl-num">
+                        <input
+                          className="tin"
+                          inputMode={item.decimal ? "decimal" : "numeric"}
+                          aria-label={`${item.label} in ${item.unit}`}
+                          placeholder={item.placeholder}
+                          value={d[item.key as keyof Draft] as string}
+                          onChange={(e) =>
+                            setD((p) => ({
+                              ...p,
+                              [item.key]: clean(e.target.value, item.decimal),
+                            }))
+                          }
+                        />
+                        <span className="wl-unit">{item.unit}</span>
+                      </div>
+                    </div>
+                  );
+
                 // Sleep is answered by typing hours above; show the band it lands in.
                 const derivedValue =
                   item.derived && d.sleepHours

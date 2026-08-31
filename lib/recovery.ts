@@ -25,20 +25,43 @@ export const RATING_FIELDS = [
 
 export type RatingKey = (typeof RATING_FIELDS)[number];
 
-/**
- * One question. `anchors[0]` is what 1 means, the last what `max` means.
- * Scales keep their native length — arm readiness is a 1-4 scale and stays
- * one, normalised only at scoring time.
- */
-export interface WellnessItem {
+interface BaseItem {
   key: string;
   label: string;
+  /** small print under the label */
+  help?: string;
+}
+
+/**
+ * A question answered on a scale. `anchors[0]` is what 1 means, the last what
+ * `max` means. Scales keep their native length and are normalised only at
+ * scoring time, so the stored column always holds what the athlete picked.
+ */
+export interface RatedItem extends BaseItem {
+  kind: "rated";
   anchors: string[];
   /** top of the scale; defaults to 5 */
   max?: number;
   /** derived from typed hours rather than chosen */
   derived?: boolean;
 }
+
+/**
+ * A measurement the athlete types in. Deliberately **never scored** — there is
+ * no good or bad bodyweight to average into a wellness number, the same reason
+ * resting HR and HRV stay out. It is tracked for its trend instead.
+ */
+export interface NumericItem extends BaseItem {
+  kind: "numeric";
+  unit: string;
+  min: number;
+  max: number;
+  placeholder: string;
+  /** allow one decimal place */
+  decimal?: boolean;
+}
+
+export type WellnessItem = RatedItem | NumericItem;
 
 export interface WellnessSection {
   id: string;
@@ -58,6 +81,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
     title: "How do you feel today?",
     items: [
       {
+        kind: "rated",
         key: "energy",
         label: "Fatigue",
         anchors: [
@@ -69,6 +93,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
         ],
       },
       {
+        kind: "rated",
         key: "sleepDuration",
         label: "Sleep duration",
         derived: true,
@@ -81,6 +106,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
         ],
       },
       {
+        kind: "rated",
         key: "soreness",
         label: "General muscle soreness",
         anchors: [
@@ -92,6 +118,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
         ],
       },
       {
+        kind: "rated",
         key: "stress",
         label: "Stress",
         anchors: [
@@ -103,6 +130,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
         ],
       },
       {
+        kind: "rated",
         key: "diet",
         label: "Diet",
         anchors: [
@@ -116,10 +144,28 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
     ],
   },
   {
+    id: "weight",
+    title: "Bodyweight",
+    items: [
+      {
+        kind: "numeric",
+        key: "bodyWeight",
+        label: "Weight today",
+        help: "Morning, before eating, same conditions each time",
+        unit: "lb",
+        min: 50,
+        max: 500,
+        placeholder: "185.0",
+        decimal: true,
+      },
+    ],
+  },
+  {
     id: "arm",
     title: "Arm readiness",
     items: [
       {
+        kind: "rated",
         key: "armReadiness",
         label: "How's the arm?",
         anchors: [
@@ -134,9 +180,9 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
   },
 ];
 
-/** Every question an athlete answers directly, across all sections. */
-export const ANSWERED_ITEMS = WELLNESS_SECTIONS.flatMap((s) =>
-  s.items.filter((i) => !i.derived),
+/** Every *scored* question, across all sections. Numeric items are excluded. */
+export const ANSWERED_ITEMS: RatedItem[] = WELLNESS_SECTIONS.flatMap((s) =>
+  s.items.filter((i): i is RatedItem => i.kind === "rated" && !i.derived),
 );
 
 /**
@@ -205,6 +251,78 @@ export function scoreBand(score: number): "low" | "mid" | "high" {
   if (score >= 75) return "high";
   if (score >= 50) return "mid";
   return "low";
+}
+
+/* ------------------------------------------------------------------ *
+ * Bodyweight
+ *
+ * Never scored, for the same reason resting HR isn't: there is no good or bad
+ * number to average into a wellness score, and pretending otherwise would put
+ * a value judgement on a teenager's weight. It is tracked for its trend.
+ *
+ * A single morning weight is mostly noise — hydration, food and timing move it
+ * two or three pounds day to day. The rolling 7-day mean is the number that
+ * actually says whether an athlete is gaining, so that is what gets shown.
+ * ------------------------------------------------------------------ */
+
+/** Weigh-ins needed in a week before its average means anything. */
+const MIN_WEIGH_INS = 3;
+
+export interface WeightTrend {
+  latest: number;
+  latestDate: string;
+  /** rolling mean of the last 7 days */
+  avg7: number | null;
+  /** rolling mean of the 7 days before those */
+  prev7: number | null;
+  /** avg7 − prev7: the week-over-week move */
+  change: number | null;
+  /** today against this week's own average — a swing here is fluid, not mass */
+  acute: number | null;
+  /** weigh-ins behind avg7 */
+  n7: number;
+}
+
+const dayDiff = (a: string, b: string) => {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
+  );
+};
+
+export function weightTrend(entries: RecoveryEntry[]): WeightTrend | null {
+  const weighed = entries
+    .filter((e) => typeof e.bodyWeight === "number" && e.bodyWeight > 0)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!weighed.length) return null;
+
+  const last = weighed[weighed.length - 1];
+  const window = (from: number, to: number) => {
+    const xs = weighed
+      .filter((e) => {
+        const age = dayDiff(e.date, last.date);
+        return age >= from && age < to;
+      })
+      .map((e) => e.bodyWeight as number);
+    return xs.length >= MIN_WEIGH_INS
+      ? xs.reduce((a, b) => a + b, 0) / xs.length
+      : null;
+  };
+
+  const n7 = weighed.filter((e) => dayDiff(e.date, last.date) < 7).length;
+  const avg7 = window(0, 7);
+  const prev7 = window(7, 14);
+
+  return {
+    latest: last.bodyWeight as number,
+    latestDate: last.date,
+    avg7,
+    prev7,
+    change: avg7 != null && prev7 != null ? avg7 - prev7 : null,
+    acute: avg7 != null ? (last.bodyWeight as number) - avg7 : null,
+    n7,
+  };
 }
 
 /* ------------------------------------------------------------------ *

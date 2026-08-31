@@ -66,6 +66,8 @@ export interface RecoveryEntry {
   stress: number | null;
   mood: number | null;
   diet: number | null;
+  /** Bodyweight in lb. Tracked and trended, never scored. */
+  bodyWeight: number | null;
   /** 1-5: 1 pain limiting, 2 pain, 3 very sore, 4 a little sore, 5 clear. */
   armReadiness: number | null;
   restingHr: number | null;
