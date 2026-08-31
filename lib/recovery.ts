@@ -130,12 +130,20 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
         kind: "rated",
         key: "sleepQuality",
         label: "Sleep quality",
+        help: "Falling asleep, waking, morning feel",
+        /*
+         * Behavioural, not evaluative. "Slightly unsatisfactory" asks a kid to
+         * grade his own night against a standard nobody gave him; "20-30 min,
+         * a couple of wake-ups, a bit groggy" is something he can actually
+         * recognise. The rating word leads so the collapsed dropdown still
+         * reads cleanly once an answer is picked.
+         */
         anchors: [
-          "Unsatisfactory, or didn't sleep at all",
-          "Markedly unsatisfactory",
-          "Slightly unsatisfactory",
-          "Satisfactory",
-          "Extremely refreshed",
+          "Very poor — long struggle to fall asleep, up repeatedly, exhausted",
+          "Poor — over 30 min and restless, several wake-ups, unrefreshed",
+          "Fair — 20-30 min to fall asleep, a couple of wake-ups, a bit groggy",
+          "Good — asleep under 20 min, woke once and resettled, rested",
+          "Excellent — asleep in 10-20 min, slept through, wake refreshed",
         ],
       },
       {

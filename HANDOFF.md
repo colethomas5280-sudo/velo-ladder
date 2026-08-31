@@ -222,8 +222,13 @@ under ate a bit") rather than 1-5 buttons — the anchors are sentences, and a b
 tells an athlete nothing.
 
 **Sleep quality is a separate question from both duration and fatigue**, and it is not
-redundant with either: eight hours that were broken five times reads as duration 5,
-quality 2, fatigue 2. Without it there is no way to tell an athlete who is tired because
+redundant with either: nine hours that were broken five times reads as duration 5,
+quality 2, fatigue 2. Its anchors are **behavioural, not evaluative** — "20-30 min to
+fall asleep, a couple of wake-ups, a bit groggy" rather than "slightly unsatisfactory",
+because grading your own night against an unstated standard is not something a
+seventeen-year-old can do consistently. Each anchor leads with its rating word so the
+collapsed dropdown still reads cleanly once an answer is picked; the native popup shows
+each option in full while choosing. Without it there is no way to tell an athlete who is tired because
 he didn't really sleep from one who is tired because training beat him up — different
 problems, different fixes. It is a live question again after being retired in the
 questionnaire rebuild; moving an item between `RETIRED_FIELDS` and `WELLNESS_SECTIONS`
