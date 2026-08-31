@@ -358,11 +358,12 @@ tunable per athlete from the guidance card. The athlete-facing explainer copy li
 
 ## Leaderboard (`lib/leaderboard.ts`)
 
-A facility record board for throwing velocity, one board per tracker and weight,
-broken out into level boards beneath the facility board. Coaches and athletes both
-read it — it is the app's first and only cross-athlete view. Pure functions in
-`lib/leaderboard.ts` (`ageOn`, `bandForSession`, `buildBoards`), served by
-`GET /api/leaderboard`, rendered by `components/Leaderboard.tsx` at `/leaderboard`.
+A facility record board for throwing velocity, one board set per tracker and ladder
+weight — the `?tracker=` and `?oz=` query params — broken out into level boards
+beneath the facility board. Coaches and athletes both read it; it is the app's first
+and only cross-athlete view. Pure functions in `lib/leaderboard.ts` (`ageOn`,
+`bandForSession`, `buildBoards`), served by `GET /api/leaderboard`, rendered by
+`components/Leaderboard.tsx` at `/leaderboard`.
 
 ### Which board a throw lands on
 
@@ -380,16 +381,20 @@ A stamped level always beats an age band — that is the coach's override for, s
 13-year-old who trains with the high schoolers and should be measured against them.
 
 **12U and 14U are never stored.** Only the four levels are. The age bands are derived
-every read, because a record has to keep the band it was set at: a 14U mark set at 14
-stays a 14U record after the kid ages up, and the youth boards empty out as a class
-grows rather than silently rewriting history.
+every read, but from the **session date**, so each record keeps the band it was set
+at: a mark thrown at 14 is a 14U record permanently, and the youth boards hold onto
+their history as a roster ages up. The rejected alternative was to re-band every
+record to the athlete's *current* age — that is what would have drained the youth
+boards a birthday at a time, and losing a 12-year-old's best throw the day he turns 13
+is not what a record board is for.
 
 ### Deriving age from the session date has a payoff
 
 Because age is measured against the session date, **entering a birth date makes that
 athlete's whole history correct at once**, with no backfill pass — every past session
-re-bands itself on the next read. A throw made at 12 stays a 12U record permanently,
-which is what a record board is for.
+re-bands itself on the next read, and every future read gives the same answer because
+the session date never moves. Fixing a missing birth date is a one-field edit, not a
+data migration.
 
 ### The stamp does need a backfill, and it has a limit
 
