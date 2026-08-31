@@ -38,6 +38,7 @@ function toSession(r: Record<string, unknown>): TrainingSession {
     type: r.type as TrackerId,
     date: isoDate(r.date),
     notes: String(r.notes ?? ""),
+    level: (r.level as string | null) ?? null,
     throws:
       typeof r.throws === "string"
         ? (JSON.parse(r.throws) as Throws)

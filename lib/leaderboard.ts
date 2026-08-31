@@ -1,3 +1,6 @@
+import type { TrainingSession, TrackerId } from "./types";
+import { TRACKERS, sBestG } from "./velo";
+
 /* ------------------------------------------------------------------ *
  * Leaderboard bands
  *
@@ -64,4 +67,130 @@ export function bandForSession(
   }
 
   return null;
+}
+
+/* ------------------------------------------------------------------ *
+ * Ranking
+ * ------------------------------------------------------------------ */
+
+export interface BoardRow {
+  rank: number;
+  name: string;
+  band: Band | null;
+  hand: string;
+  velocity: number;
+  date: string;
+  isYou: boolean;
+}
+
+export interface Board {
+  key: "facility" | Band;
+  title: string;
+  rows: BoardRow[];
+  /** the viewer's standing when they rank below the visible rows */
+  you: { rank: number; velocity: number } | null;
+}
+
+export const FACILITY_LIMIT = 10;
+export const BAND_LIMIT = 5;
+
+interface Mark {
+  athleteId: string;
+  name: string;
+  hand: string;
+  band: Band | null;
+  velocity: number;
+  date: string;
+}
+
+/**
+ * One row per athlete — their single best mark, not one row per session.
+ * Without this, one athlete having a big day takes four of the top five
+ * slots and it stops being a leaderboard. Ties go to whoever set it first.
+ */
+function rank(
+  marks: Mark[],
+  limit: number,
+  viewer: Set<string>,
+): Pick<Board, "rows" | "you"> {
+  const best = new Map<string, Mark>();
+  for (const m of marks) {
+    const cur = best.get(m.athleteId);
+    if (
+      !cur ||
+      m.velocity > cur.velocity ||
+      (m.velocity === cur.velocity && m.date < cur.date)
+    )
+      best.set(m.athleteId, m);
+  }
+
+  const ranked = [...best.values()].sort(
+    (a, b) => b.velocity - a.velocity || (a.date < b.date ? -1 : 1),
+  );
+
+  const rows: BoardRow[] = ranked.slice(0, limit).map((m, i) => ({
+    rank: i + 1,
+    name: m.name,
+    band: m.band,
+    hand: m.hand,
+    velocity: m.velocity,
+    date: m.date,
+    isYou: viewer.has(m.athleteId),
+  }));
+
+  const idx = ranked.findIndex((m) => viewer.has(m.athleteId));
+  const you =
+    idx >= limit ? { rank: idx + 1, velocity: ranked[idx].velocity } : null;
+
+  return { rows, you };
+}
+
+/**
+ * Boards for one tracker and weight. Reads velocities through `sBestG` and
+ * the tracker's own `groups`, which is what guarantees a board number can
+ * never disagree with the athlete's own PR tile: the primer rule and the
+ * combined-5oz rule live in exactly one place.
+ */
+export function buildBoards(
+  athletes: LeaderboardAthlete[],
+  sessions: TrainingSession[],
+  tracker: TrackerId,
+  oz: number,
+  viewerAthleteIds: string[],
+): Board[] {
+  const group = TRACKERS[tracker].groups.find((g) => g.oz === oz);
+  if (!group) return [];
+
+  const byId = new Map(athletes.map((a) => [a.id, a]));
+  const viewer = new Set(viewerAthleteIds);
+  const marks: Mark[] = [];
+
+  for (const s of sessions) {
+    if (s.type !== tracker) continue;
+    const a = byId.get(s.athleteId);
+    if (!a) continue;
+    const velocity = sBestG(s, group.keys);
+    if (velocity == null) continue;
+    marks.push({
+      athleteId: a.id,
+      name: a.name,
+      hand: a.hand,
+      band: bandForSession(a, s.level, s.date),
+      velocity,
+      date: s.date,
+    });
+  }
+
+  const boards: Board[] = [];
+  const facility = rank(marks, FACILITY_LIMIT, viewer);
+  if (facility.rows.length)
+    boards.push({ key: "facility", title: "Facility record", ...facility });
+
+  for (const band of BANDS) {
+    const inBand = marks.filter((m) => m.band === band);
+    if (!inBand.length) continue;
+    boards.push({ key: band, title: band, ...rank(inBand, BAND_LIMIT, viewer) });
+  }
+
+  return boards;
 }
