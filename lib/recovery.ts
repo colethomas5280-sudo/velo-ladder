@@ -25,12 +25,18 @@ export const RATING_FIELDS = [
 
 export type RatingKey = (typeof RATING_FIELDS)[number];
 
-/** A 1-5 question. `anchors[0]` is what 1 means, `anchors[4]` what 5 means. */
+/**
+ * One question. `anchors[0]` is what 1 means, the last what `max` means.
+ * Scales keep their native length — arm readiness is a 1-4 scale and stays
+ * one, normalised only at scoring time.
+ */
 export interface WellnessItem {
-  key: RatingKey | "sleepDuration";
+  key: string;
   label: string;
-  anchors: [string, string, string, string, string];
-  /** derived from typed hours rather than tapped */
+  anchors: string[];
+  /** top of the scale; defaults to 5 */
+  max?: number;
+  /** derived from typed hours rather than chosen */
   derived?: boolean;
 }
 
@@ -109,12 +115,41 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
       },
     ],
   },
+  {
+    id: "arm",
+    title: "Arm readiness",
+    items: [
+      {
+        key: "armReadiness",
+        label: "How's the arm?",
+        max: 4,
+        anchors: [
+          "Pain (limiting movement)",
+          "Pain/soreness (not limiting movement)",
+          "No pain (some soreness)",
+          "No pain (no soreness)",
+        ],
+      },
+    ],
+  },
 ];
 
-/** Items an athlete taps (sleep is derived from the hours they type). */
-export const TAPPED_ITEMS = WELLNESS_SECTIONS.flatMap((s) =>
+/** Every question an athlete answers directly, across all sections. */
+export const ANSWERED_ITEMS = WELLNESS_SECTIONS.flatMap((s) =>
   s.items.filter((i) => !i.derived),
-) as (WellnessItem & { key: RatingKey })[];
+);
+
+/**
+ * Put a value from a scale of any length onto the shared 1-5 range so the
+ * sections can be averaged together. A 1-4 answer becomes 1 / 2.33 / 3.67 / 5.
+ */
+export function normalizeRating(value: number, max = 5): number {
+  if (max === 5) return value;
+  return 1 + ((value - 1) / (max - 1)) * 4;
+}
+
+/** Legacy 1-5 columns no longer asked for, still scored on old entries. */
+const RETIRED_FIELDS = ["sleepQuality", "mood"] as const;
 
 /** Which 1-5 band typed hours fall into, per the questionnaire anchors. */
 export function sleepBand(hours: number): number {
@@ -140,15 +175,27 @@ export function sleepToRating(hours: number): number {
   return Math.max(3.5, 5 - (hours - 9) * 0.4);
 }
 
-/** Composite 0-100, or null when nothing scoreable was filled in. */
+/**
+ * Composite 0-100, or null when nothing scoreable was filled in.
+ * Averages only what is present, so a partial check-in still scores and
+ * changing the questionnaire never rewrites old entries.
+ */
 export function recoveryScore(e: RecoveryEntry): number | null {
   const parts: number[] = [];
-  for (const f of RATING_FIELDS) {
+
+  for (const item of ANSWERED_ITEMS) {
+    const v = (e as unknown as Record<string, unknown>)[item.key];
+    const max = item.max ?? 5;
+    if (typeof v === "number" && v >= 1 && v <= max)
+      parts.push(normalizeRating(v, max));
+  }
+  for (const f of RETIRED_FIELDS) {
     const v = e[f];
     if (typeof v === "number" && v >= 1 && v <= 5) parts.push(v);
   }
   if (typeof e.sleepHours === "number" && e.sleepHours > 0)
     parts.push(sleepToRating(e.sleepHours));
+
   if (!parts.length) return null;
   const mean = parts.reduce((a, b) => a + b, 0) / parts.length;
   return Math.round(mean * 20);

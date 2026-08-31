@@ -1,16 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { RecoveryEntry, ArmStatus } from "@/lib/types";
+import type { RecoveryEntry } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
 import {
   WELLNESS_SECTIONS,
   recoveryScore,
   scoreBand,
   sleepBand,
-  type RatingKey,
+
 } from "@/lib/recovery";
-import { ARM_STATUS_OPTIONS } from "@/lib/setback";
 import { todayISO, fmtDate } from "@/lib/velo";
 
 type Draft = {
@@ -24,7 +23,7 @@ type Draft = {
   diet: number | null;
   restingHr: string;
   hrv: string;
-  armStatus: ArmStatus | null;
+  armReadiness: number | null;
   notes: string;
 };
 
@@ -40,7 +39,7 @@ function draftFrom(e: RecoveryEntry | null, date: string): Draft {
     diet: e?.diet ?? null,
     restingHr: e?.restingHr != null ? String(e.restingHr) : "",
     hrv: e?.hrv != null ? String(e.hrv) : "",
-    armStatus: e?.armStatus ?? null,
+    armReadiness: e?.armReadiness ?? null,
     notes: e?.notes ?? "",
   };
 }
@@ -81,6 +80,7 @@ export default function RecoveryModal({
     stress: d.stress,
     mood: d.mood,
     diet: d.diet,
+    armReadiness: d.armReadiness,
   } as RecoveryEntry);
 
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -100,7 +100,7 @@ export default function RecoveryModal({
         diet: d.diet,
         restingHr: num(d.restingHr),
         hrv: num(d.hrv),
-        armStatus: d.armStatus,
+        armReadiness: d.armReadiness,
         notes: d.notes.trim(),
       });
       onSaved(existing ? "Check-in updated" : "Check-in saved");
@@ -166,31 +166,6 @@ export default function RecoveryModal({
             </div>
           </div>
 
-          <div className="arm-q">
-            <div className="ci-label">
-              <b>How&rsquo;s the arm?</b>
-              <span>Sore and hurt are not the same thing</span>
-            </div>
-            <div className="arm-opts">
-              {ARM_STATUS_OPTIONS.map((o) => (
-                <button
-                  key={o.value}
-                  className={`arm-opt ${o.value}`}
-                  aria-pressed={d.armStatus === o.value}
-                  onClick={() =>
-                    setD((p) => ({
-                      ...p,
-                      armStatus: p.armStatus === o.value ? null : o.value,
-                    }))
-                  }
-                >
-                  <b>{o.label}</b>
-                  <span>{o.hint}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           {WELLNESS_SECTIONS.map((section) => (
             <div className="wl-section" key={section.id}>
               <div className="eyebrow">{section.title}</div>
@@ -203,7 +178,7 @@ export default function RecoveryModal({
                     : null;
                 const value = item.derived
                   ? derivedValue
-                  : d[item.key as RatingKey];
+                  : (d[item.key as keyof Draft] as number | null);
 
                 return (
                   <div className="ci-row wl-row" key={item.key}>

@@ -127,7 +127,8 @@ athletes(id, name, hand, invite_email, password_hash,
 resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
 recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
-                 energy, stress, mood, resting_hr, hrv, arm_status, notes,
+                 energy, stress, mood, resting_hr, hrv, arm_status,
+                 arm_readiness, notes,
                  created_by, created_at, updated_at)  -- UNIQUE(athlete_id, date)
 setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
          resolved_on, resolved_by, detail, created_at)
@@ -159,14 +160,23 @@ Both trackers run the same ladder: **5, 6, 7, 5, 4, 3 oz**.
 ## Wellness questionnaire & scoring (`lib/recovery.ts`)
 
 The check-in is **defined as data** in `WELLNESS_SECTIONS` — a list of sections, each
-with 1-5 items carrying Cole's exact anchor wording. The modal renders whatever is in
-that array. **Adding section 2-5 is: append a section here + one `int` column per new
-item + wire it through `toRecovery`/`upsertRecovery` and the recovery route's
-validation.** Nothing in the UI needs touching.
+carrying Cole's exact anchor wording. The modal renders whatever is in that array.
+**Adding section 3-5 is: append a section here + one `int` column per new item + wire it
+through `toRecovery`/`upsertRecovery` and the recovery route's validation.** Nothing in
+the UI needs touching.
 
-Section 1, "How do you feel today?" — Fatigue (stored as `energy`), Sleep duration
-(derived), General muscle soreness, Stress, Diet. **Every scale runs bad → good**, which
-is what lets them average into one score.
+- **Section 1 — "How do you feel today?"**: Fatigue (stored as `energy`), Sleep duration
+  (derived), General muscle soreness, Stress, Diet. All 1-5.
+- **Section 2 — "Arm readiness"**: one question, **1-4** — 1 pain limiting movement,
+  2 pain/soreness not limiting, 3 no pain some soreness, 4 no pain no soreness. This
+  replaced the old three-button good/sore/pain question that sat above the form.
+
+**Every scale runs bad → good**, which is what lets them average into one score.
+
+**Scales keep their native length.** Arm readiness is a 1-4 question and is stored as
+1-4; `normalizeRating(v, max)` maps it onto the shared 1-5 range at scoring time only
+(1 → 1, 2 → 2.33, 3 → 3.67, 4 → 5). Storing a rescaled value would have made the raw
+column unreadable and locked the scale's length in forever.
 
 Each item is a **dropdown carrying the full anchor text** ("3 — So-so quality, over or
 under ate a bit") rather than 1-5 buttons — the anchors are sentences, and a bare "3"
@@ -180,11 +190,13 @@ readout keeps the raw number so it can say "8.8h vs 5.3h". The **score** uses
 through 9h — Cole's target window — then eases back (10h → 4.6, 11h → 4.2). Piling on
 sleep past 9h is not extra credit. Undersleeping is the steeper penalty.
 
-Score = mean of every 1-5 field present + the sleep rating, ×20. Because it averages
-only what's filled in, **old entries keep scoring off the fields they have**
-(`sleepQuality`, `mood`) while new ones use the current set — so changing the
-questionnaire never retroactively rewrites history. `RATING_FIELDS` therefore still
-lists the retired columns on purpose.
+Score = mean of every answered item (normalised to 1-5) + the sleep rating, ×20.
+`recoveryScore` walks `ANSWERED_ITEMS` — derived from `WELLNESS_SECTIONS` — so a new
+section starts counting the moment it is added, with no second list to update. Because
+it averages only what's filled in, **old entries keep scoring off the fields they have**
+while new ones use the current set, so changing the questionnaire never retroactively
+rewrites history. `RETIRED_FIELDS` (`sleepQuality`, `mood`) exists for exactly that:
+questions no longer asked, still scored on the entries that have them.
 
 **Resting HR and HRV are stored and charted but never scored** — personal baselines,
 meaningless to average across athletes.
@@ -204,15 +216,18 @@ Three branches off Cole's protocol. Pure functions — `evaluate`, `guidance`,
 
 | Branch | Trigger | Clears |
 |---|---|---|
-| `soreness` | athlete reports a **sore** arm. Day 1 → recovery day, day 2 → self-selected intensity, **day 3+ → full day off**. A missing check-in breaks the run. | automatically, when the arm comes back good |
+| `soreness` | arm readiness **3** (no pain, some soreness). Day 1 → recovery day, day 2 → self-selected intensity, **day 3+ → full day off**. A missing check-in breaks the run. | automatically, when readiness comes back 4 |
 | `cns` | latest session's best 5 oz lands ≥ threshold% under that athlete's own trailing 30-day average for the same tracker. Needs **3+ prior sessions**. | automatically, when velocity returns to band |
-| `injury` | athlete reports **pain** (not soreness) | **never automatically** — a coach must PATCH `/api/setbacks/[id]` |
+| `injury` | arm readiness **1 or 2** — any pain at all. Level 1 (limiting movement) reads "Stop throwing"; level 2 reads "Get it looked at". | **never automatically** — a coach must PATCH `/api/setbacks/[id]` |
 
 Serious injury is deliberately not modelled. That's medical, and the app should not
 own a return timeline.
 
-**The `arm_status` field (good/sore/pain) is what separates branch 1 from branch 3** —
-without it there's no way to tell "sore from throwing" from "something is wrong".
+**Arm readiness is what separates branch 1 from branch 3** — without it there's no way
+to tell "sore from throwing" from "something is wrong". Every branch reads it through
+`armState()`, which returns `clear | sore | pain | pain-limiting` and **falls back to the
+retired `arm_status` column** so check-ins logged before the 1-4 scale still route to the
+right branch. Nothing else in the file touches either column directly.
 
 Flags are reconciled by `reconcileSetbacks(athleteId)` in `lib/data.ts`, called after
 any session or check-in write. No cron: the inputs only change on those writes. An open
