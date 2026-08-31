@@ -69,6 +69,7 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
 | `/login` | Email + password. |
 | `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
+| `/leaderboard` | Facility + level velocity record boards. Coach and athlete both. See **## Leaderboard**. |
 | `/api/me` | `{ role, email, athleteId }` for the signed-in user. |
 | `/api/resources` | GET any signed-in user; POST coach-only. `/[id]` PATCH + DELETE (soft) coach-only. |
 | `/api/dashboard` | GET — everything the dashboard widgets need, in one call (coach only). |
@@ -82,11 +83,14 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/sessions/[id]` | PATCH / DELETE. |
 | `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); DELETE cancels one. |
 | `/api/join/[token]` | Public. GET reveals only the invited athlete's name/email; POST spends the invite. |
+| `/api/leaderboard?tracker=&oz=` | GET — the record boards. `coach` + `athlete`; `none` → 403. Never touches `canSeeAthlete`. |
 | `/api/setup?key=…&seed=1` | One-time (idempotent) schema + seed. `SETUP_KEY`-guarded. |
 | `/api/auth/*` | Auth.js. |
 
 Every API route calls `getScope()` (`lib/scope.ts`) and enforces: **coach** = all
-athletes; **athlete** = their own only; anyone else = 403.
+athletes; **athlete** = their own only; anyone else = 403. The one deliberate
+exception is `/api/leaderboard`, which serves an athlete a cross-athlete board — a
+separate narrow read that still never widens `canSeeAthlete`. See **## Leaderboard**.
 
 ### Key components
 
@@ -123,7 +127,8 @@ athletes; **athlete** = their own only; anyone else = 403.
 
 ```
 athletes(id, name, hand, invite_email, password_hash,
-         invite_token, invite_expires, archived, created_at)
+         invite_token, invite_expires, archived, created_at,
+         birth_date, level)
 resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
 recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
@@ -134,7 +139,10 @@ setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
          resolved_on, resolved_by, detail, severity, created_at)
 athletes.cns_threshold_pct  -- per-athlete CNS band; null = facility default
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
-                  throws jsonb, created_by, created_at, updated_at)
+                  throws jsonb, created_by, created_at, updated_at, level)
+-- schema v13, all three nullable: athletes.birth_date, athletes.level,
+-- training_sessions.level. Only Youth|High School|College|Pro are stored;
+-- 12U/14U are derived on read. See ## Leaderboard.
 ```
 
 `throws` shape: `{ "p1": [primer, t1, t2, t3, t4], ... }` — index 0 is the **80% primer
@@ -347,6 +355,88 @@ flag's `detail` is refreshed each pass, so a soreness flag opened on day 1 reads
 CNS threshold: `CNS_DEFAULT_PCT` (5) unless `athletes.cns_threshold_pct` is set —
 tunable per athlete from the guidance card. The athlete-facing explainer copy lives in
 `EXPLAINER` in the same file, beside the logic it describes.
+
+## Leaderboard (`lib/leaderboard.ts`)
+
+A facility record board for throwing velocity, one board per tracker and weight,
+broken out into level boards beneath the facility board. Coaches and athletes both
+read it — it is the app's first and only cross-athlete view. Pure functions in
+`lib/leaderboard.ts` (`ageOn`, `bandForSession`, `buildBoards`), served by
+`GET /api/leaderboard`, rendered by `components/Leaderboard.tsx` at `/leaderboard`.
+
+### Which board a throw lands on
+
+Two mechanisms decide it, each correct on its own terms.
+
+1. A **level stamped on the session** — `High School`, `College`, `Pro`. These are
+   program decisions, not facts that can be recomputed, so they are recorded on the
+   session when the throw happens and never change afterwards.
+2. Otherwise **`Youth` subdivides by age**, derived from the athlete's birth date
+   against the **session date**, never today's. Bands are exclusive: **12U is age ≤ 12,
+   14U is 13–14**. A Youth session with no birth date on file, or an athlete aged 15+
+   still marked Youth, gets no age band and counts toward the facility board only.
+
+A stamped level always beats an age band — that is the coach's override for, say, a
+13-year-old who trains with the high schoolers and should be measured against them.
+
+**12U and 14U are never stored.** Only the four levels are. The age bands are derived
+every read, because a record has to keep the band it was set at: a 14U mark set at 14
+stays a 14U record after the kid ages up, and the youth boards empty out as a class
+grows rather than silently rewriting history.
+
+### Deriving age from the session date has a payoff
+
+Because age is measured against the session date, **entering a birth date makes that
+athlete's whole history correct at once**, with no backfill pass — every past session
+re-bands itself on the next read. A throw made at 12 stays a 12U record permanently,
+which is what a record board is for.
+
+### The stamp does need a backfill, and it has a limit
+
+`stampUnleveledSessions(athleteId, level)` (in `lib/data.ts`, called after
+`updateAthlete` and after an athlete redeems an invite) stamps only sessions whose
+level is currently NULL. Already-stamped sessions are never rewritten, so moving an
+athlete from Youth to High School leaves his old marks on the youth boards where they
+belong. But the stamp cannot know a kid was Youth eighteen months ago and High School
+since — a first-time fill puts his **entire** history at whatever level is set that
+day. Correcting individual sessions after the fact is out of scope; there is no UI for
+it and the column would have to be edited by hand.
+
+### Computed on read, deliberately
+
+`buildBoards` reads each session's velocity through the app's own `sBestG` and
+`TRACKERS[...].groups`, the same helpers the athlete's PR tile uses. Those encode two
+facility rules — throw box 0 is an 80% primer that never scores, and the two 5 oz
+slots fold into one combined record. Reusing them is the whole point: a board number
+can never disagree with the number on an athlete's own profile, because there is only
+one code path that computes it. A materialized records table was rejected — it is a
+second copy of the truth that can drift out of sync with the sessions, and this
+codebase has already lost a week to exactly that failure mode (see the
+`CREATE TABLE IF NOT EXISTS` gotcha below).
+
+### What the leaderboard does and does not expose
+
+`canSeeAthlete` is **untouched**. The rule that an athlete may open only their own
+page still holds; the leaderboard is a separate, narrow read path, not a relaxation
+of it. The response carries **name, band, hand, velocity and date** — and nothing
+else. No athlete IDs, no birth dates, no invite emails, no session contents, no
+recovery data. **Birth date never leaves the server** on this path; it is pulled only
+so `bandForSession` can derive an age band, and is dropped before the response is
+built. `coach` and `athlete` can read the board; `role: "none"` gets a 403.
+
+### Ranking
+
+- **One row per athlete** — their single best mark across all their sessions, not one
+  row per session. Without this, one athlete having a big day takes four of the top
+  five slots and it stops being a leaderboard.
+- **Ties go to whoever set the mark first.**
+- **Archived athletes keep their records and still rank.** A departing athlete should
+  not wipe a facility record he set.
+- The **facility board shows 10**, level boards show 5. A board with no rows is
+  omitted entirely.
+- An athlete who ranks **below the visible rows still sees their own standing** printed
+  beneath the board, so the page means something to everyone reading it and not only
+  the top five.
 
 ## Local development
 

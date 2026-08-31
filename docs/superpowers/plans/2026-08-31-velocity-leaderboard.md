@@ -561,13 +561,26 @@ top five slots. Ties go to whoever set the mark first."
 
 - [ ] **Step 1: Add the columns**
 
-In `lib/schema.ts`, change `SCHEMA_VERSION` to `13`. Add after the existing `ALTER TABLE athletes` block:
+In `lib/schema.ts`, change `SCHEMA_VERSION` to `13`. Add the two athlete columns
+after the existing `ALTER TABLE athletes` block:
 
 ```sql
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS birth_date date;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS level text;
+```
+
+Add the session column immediately after `CREATE TABLE ... training_sessions`, not in
+the athletes block:
+
+```sql
 ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS level text;
 ```
+
+> **Corrected during execution.** This step originally put all three `ALTER`s in the
+> athletes block. The athletes block runs *before* `CREATE TABLE training_sessions` in
+> `lib/schema.ts`, so on a fresh database that ordering fails with
+> `relation "training_sessions" does not exist`. The session `ALTER` must sit after its
+> own `CREATE TABLE`.
 
 - [ ] **Step 2: Extend the types**
 
