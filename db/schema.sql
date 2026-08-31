@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 9). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 10). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -59,6 +59,7 @@ ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS diet int;
 -- Arm readiness is a 1-4 scale (Driveline's), not 1-5. Kept at its native
 -- range and normalised at scoring time rather than padded with a fake level.
 ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS arm_readiness int;
+ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS body_weight numeric(5,1);
 CREATE UNIQUE INDEX IF NOT EXISTS recovery_athlete_date_idx
   ON recovery_entries(athlete_id, date);
 

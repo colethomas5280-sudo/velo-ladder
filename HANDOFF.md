@@ -128,7 +128,7 @@ resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
 recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
                  energy, stress, mood, resting_hr, hrv, arm_status,
-                 arm_readiness, notes,
+                 arm_readiness, body_weight, notes,
                  created_by, created_at, updated_at)  -- UNIQUE(athlete_id, date)
 setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
          resolved_on, resolved_by, detail, created_at)
@@ -161,12 +161,17 @@ Both trackers run the same ladder: **5, 6, 7, 5, 4, 3 oz**.
 
 The check-in is **defined as data** in `WELLNESS_SECTIONS` — a list of sections, each
 carrying Cole's exact anchor wording. The modal renders whatever is in that array.
-**Adding section 3-5 is: append a section here + one `int` column per new item + wire it
-through `toRecovery`/`upsertRecovery` and the recovery route's validation.** Nothing in
-the UI needs touching.
+**Adding a section is: append it here + one column per new item + wire it through
+`toRecovery`/`upsertRecovery` and the recovery route's validation.** Nothing in the UI
+needs touching.
+
+Items are a discriminated union on `kind`. `"rated"` renders a dropdown carrying the
+full anchor text and feeds the score; `"numeric"` renders a typed input with a unit and
+**never** feeds the score.
 
 - **Section 1 — "How do you feel today?"**: Fatigue (stored as `energy`), Sleep duration
   (derived), General muscle soreness, Stress, Diet. All 1-5.
+- **Section 3 — "Bodyweight"**: one numeric field, lb. Not scored — see below.
 - **Section 2 — "Arm readiness"**: one question, **1-5** — 1 pain limiting movement,
   2 pain/soreness not limiting, 3 no pain very sore, 4 no pain a little sore, 5 no pain
   no soreness. Replaced the old three-button good/sore/pain question above the form.
@@ -199,8 +204,24 @@ while new ones use the current set, so changing the questionnaire never retroact
 rewrites history. `RETIRED_FIELDS` (`sleepQuality`, `mood`) exists for exactly that:
 questions no longer asked, still scored on the entries that have them.
 
-**Resting HR and HRV are stored and charted but never scored** — personal baselines,
-meaningless to average across athletes.
+**Resting HR, HRV and bodyweight are stored but never scored** — personal baselines,
+meaningless to average across athletes. For bodyweight there is a second reason: there
+is no good or bad number to score, and grading a teenager's weight is not something this
+app should do. `recoveryScore` reads `ANSWERED_ITEMS`, which filters to `kind: "rated"`,
+so a numeric item cannot reach the score even by accident.
+
+### Bodyweight is reported as a trend, not a number (`weightTrend`)
+
+A single morning weigh-in is mostly noise — hydration, food and timing move it two or
+three pounds day to day. So the headline is the **rolling 7-day mean**, with the
+week-over-week move beside it (`avg7 − prev7`). A week needs `MIN_WEIGH_INS` (3) before
+its average is claimed; below that the card shows the raw number and says how many
+weigh-ins it has.
+
+`acute` is today against that same week's mean. Past ±2 lb the card explains that a
+same-day swing is fluid and food rather than muscle. That copy is the point of the
+feature as much as the number is: an athlete watching a single morning reading bounce
+three pounds will otherwise read it as having gained or lost three pounds.
 
 `buildInsight` pairs each throwing day with that day's check-in and compares the top
 third of days by velocity against the bottom third. Needs **6+ paired days**, and only

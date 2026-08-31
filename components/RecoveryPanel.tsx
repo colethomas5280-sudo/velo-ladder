@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import type { RecoveryEntry, TrainingSession } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
-import { recoveryScore, scoreBand, buildInsight } from "@/lib/recovery";
+import {
+  recoveryScore,
+  scoreBand,
+  buildInsight,
+  weightTrend,
+} from "@/lib/recovery";
 import { fmt, fmtDate, todayISO } from "@/lib/velo";
 import RecoveryModal from "./RecoveryModal";
 
@@ -36,6 +41,7 @@ export default function RecoveryPanel({
     () => buildInsight(sessions, entries),
     [sessions, entries],
   );
+  const weight = useMemo(() => weightTrend(entries), [entries]);
 
   const last7 = entries
     .slice(-7)
@@ -84,6 +90,8 @@ export default function RecoveryPanel({
         </button>
       </div>
 
+      {weight && <WeightBlock w={weight} />}
+
       {insight && <InsightBlock insight={insight} />}
 
       {!isLoading && entries.length === 0 && (
@@ -110,6 +118,7 @@ export default function RecoveryPanel({
                       e.armReadiness != null
                         ? `arm ${e.armReadiness}/5`
                         : null,
+                      e.bodyWeight != null ? `${fmt(e.bodyWeight)} lb` : null,
                       e.energy != null ? `fatigue ${e.energy}/5` : null,
                       e.soreness != null ? `soreness ${e.soreness}/5` : null,
                       e.diet != null ? `diet ${e.diet}/5` : null,
@@ -149,6 +158,68 @@ export default function RecoveryPanel({
 
       {toast && <div className="toast">{toast}</div>}
     </section>
+  );
+}
+
+/**
+ * Bodyweight, reported as a trend rather than a number. The headline is the
+ * 7-day mean, not today's reading — and when today is well off that mean, the
+ * copy says why, because an athlete watching a single morning number bounce
+ * three pounds will otherwise read it as having gained or lost three pounds.
+ */
+function WeightBlock({ w }: { w: NonNullable<ReturnType<typeof weightTrend>> }) {
+  const dir =
+    w.change == null || Math.abs(w.change) < 0.3
+      ? "flat"
+      : w.change > 0
+        ? "up"
+        : "down";
+  const moved =
+    w.change == null
+      ? null
+      : dir === "flat"
+        ? "holding steady"
+        : `${w.change > 0 ? "+" : "−"}${fmt(Math.abs(w.change))} lb this week`;
+
+  // Only worth calling out once it's past ordinary daily fluctuation.
+  const swing = w.acute != null && Math.abs(w.acute) >= 2 ? w.acute : null;
+
+  return (
+    <div className="insight">
+      <div className="eyebrow">Bodyweight</div>
+      <p className="wt-line">
+        {w.avg7 != null ? (
+          <>
+            <b>{fmt(w.avg7)} lb</b>
+            <span className="cz-note">7-day average</span>
+            {moved && <span className={`wt-move ${dir}`}>{moved}</span>}
+          </>
+        ) : (
+          <>
+            <b>{fmt(w.latest)} lb</b>
+            <span className="cz-note">
+              {fmtDate(w.latestDate)} · {w.n7} weigh-in
+              {w.n7 === 1 ? "" : "s"} this week
+            </span>
+          </>
+        )}
+      </p>
+      {swing != null ? (
+        <span className="cz-note">
+          Today&apos;s {fmt(w.latest)} is {fmt(Math.abs(swing))} lb{" "}
+          {swing < 0 ? "under" : "over"} your own week. A swing that size in a
+          day is fluid and food, not muscle — weigh in the same way each morning
+          and watch the average, not the number.
+        </span>
+      ) : (
+        w.avg7 == null && (
+          <span className="cz-note">
+            Weigh in a few mornings running and this starts showing your trend
+            instead of a single number.
+          </span>
+        )
+      )}
+    </div>
   );
 }
 

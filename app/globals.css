@@ -1934,6 +1934,12 @@ table.roster-table {
   color: var(--accent);
   font-weight: 600;
 }
+/* Plain instructions, not a derived-value callout — don't shout them. */
+.wl-row .ci-label span.wl-help {
+  color: var(--ink-faint);
+  font-weight: 500;
+  line-height: 1.4;
+}
 .ci-scale.derived .ci-dot {
   opacity: 1;
   cursor: default;
@@ -1967,6 +1973,39 @@ table.roster-table {
   font-size: 13px;
   color: var(--ink);
 }
+.wl-num {
+  flex: 1 1 220px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.wl-num .tin {
+  width: 100px;
+  flex: 0 0 auto;
+}
+.wl-unit {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+}
+.wt-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin: 5px 0 0;
+  font-size: 13.5px;
+}
+.wt-line b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+}
+.wt-move.up { color: var(--good); }
+.wt-move.down { color: var(--accent); }
+.wt-move.flat { color: var(--ink-faint); }
+
 .wl-select:invalid,
 .wl-select option[value=""] {
   color: var(--ink-faint);

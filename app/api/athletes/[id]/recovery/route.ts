@@ -16,7 +16,7 @@ const rating = (v: unknown): number | null => {
   const n = Number(v);
   return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
 };
-/** Arm readiness runs 1-4, not 1-5. */
+/** For questions whose scale isn't 1-5. */
 const scaled = (v: unknown, max: number): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
@@ -63,6 +63,7 @@ export async function POST(
     mood: rating(b.mood),
     diet: rating(b.diet),
     armReadiness: scaled(b.armReadiness, 5),
+    bodyWeight: positive(b.bodyWeight, 600),
     restingHr: positive(b.restingHr, 200),
     armStatus: (["good", "sore", "pain"] as const).includes(
       b.armStatus as ArmStatus,
@@ -81,6 +82,7 @@ export async function POST(
     entry.mood != null ||
     entry.diet != null ||
     entry.armReadiness != null ||
+    entry.bodyWeight != null ||
     entry.restingHr != null ||
     entry.hrv != null ||
     entry.armStatus != null ||
