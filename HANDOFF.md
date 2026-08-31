@@ -186,11 +186,12 @@ whatever length their question wants.
 
 ### Sleep bands are pitched at athletes, not general adults
 
-`SLEEP_BAND_ANCHORS` runs **<6 / 6-7 / 7-8 / 8-9 / 9-10 hours**. Cole reset these in
+`SLEEP_BAND_ANCHORS` runs **<6 / 6-7 / 7-8 / 8-9 / 9+ hours**. Cole reset these in
 Aug 2026 against athlete sleep research: 7-8h clears the general-adult guideline but is
 the *bottom* of the useful range for someone throwing at max intent, 6-7h is the
-habitual-deficit zone most players actually live in, and the top of the scale is the
-9-10h window sleep-extension studies push toward.
+habitual-deficit zone most players actually live in, and the top of the scale opens at
+the 9h window sleep-extension studies push toward — open-ended, so an athlete who slept
+eleven hours has somewhere honest to put it.
 
 **Every band moved up one rung, so a 4 now means what a 5 used to.** The stored column
 is still a 1-5 int, so this needed no migration — but it does mean the same night scores
@@ -213,7 +214,7 @@ absent, so an old entry that gets edited picks up a band without scoring sleep t
 `entryBand(e)` is the one way to read sleep: the band if there is one, else `sleepBand()`
 of the typed hours. A typed 7.5 genuinely *is* the "7-8 hours" band, so nothing is lost
 converting. Everything downstream — the feed line, the correlation readout — goes through
-it, which is why the insight now reads "9-10 hours of sleep vs 6-7 hours" rather than
+it, which is why the insight now reads "9+ hours of sleep vs 6-7 hours" rather than
 quoting decimal hours nobody actually measured.
 
 Each item is a **dropdown carrying the full anchor text** ("3 — So-so quality, over or
