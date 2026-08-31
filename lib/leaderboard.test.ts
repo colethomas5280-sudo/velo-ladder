@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ageOn, bandForSession, buildBoards, type LeaderboardAthlete } from "@/lib/leaderboard";
+import {
+  ageOn,
+  bandForSession,
+  buildBoards,
+  isValidBirthDate,
+  type LeaderboardAthlete,
+} from "@/lib/leaderboard";
 import type { TrainingSession } from "@/lib/types";
 
 const athlete = (over: Partial<LeaderboardAthlete> = {}): LeaderboardAthlete => ({
@@ -67,6 +73,25 @@ test("Youth with no birth date, or aged out, is facility-only", () => {
   assert.equal(bandForSession(athlete(), "Youth", "2026-08-01"), null);
   const old = athlete({ birthDate: "2009-01-01" }); // 17
   assert.equal(bandForSession(old, "Youth", "2026-08-01"), null);
+});
+
+test("a future (mistyped) birth date is facility-only, never 12U", () => {
+  // one fat-fingered digit: 2013 -> 2103. Age on the session date is negative;
+  // without a floor `age <= 12` would file this throw as a 12U facility record.
+  const a = athlete({ birthDate: "2103-06-15" });
+  assert.equal(bandForSession(a, "Youth", "2026-06-15"), null);
+});
+
+test("isValidBirthDate rejects impossible and future dates, accepts real past ones", () => {
+  assert.equal(isValidBirthDate("2009-99-99"), false); // impossible month/day
+  assert.equal(isValidBirthDate("2009-02-30"), false); // Feb never has 30
+  assert.equal(isValidBirthDate("2009-13-01"), false); // no month 13
+  assert.equal(isValidBirthDate("2009-6-1"), false); // wrong shape
+  assert.equal(isValidBirthDate("not-a-date"), false);
+  assert.equal(isValidBirthDate(12345), false); // not a string
+  assert.equal(isValidBirthDate("2103-06-15"), false); // in the future
+  assert.equal(isValidBirthDate("2012-06-15"), true); // a real past day
+  assert.equal(isValidBirthDate("2008-02-29"), true); // 2008 was a leap year
 });
 
 test("no stamped level is facility-only", () => {
@@ -152,6 +177,20 @@ test("ties break toward whoever got there first", () => {
   ];
   const [facility] = buildBoards(athletes, sessions, "pulldown", 5, []);
   assert.deepEqual(facility.rows.map((r) => r.name), ["Ann", "Bo"]);
+});
+
+test("equal velocity AND equal date resolves by name, stably regardless of input order", () => {
+  const athletes = [
+    athlete({ id: "a", name: "Ann", level: "Pro" }),
+    athlete({ id: "z", name: "Zed", level: "Pro" }),
+  ];
+  const mk = (id: string) =>
+    session(id, "2026-08-01", "Pro", { p1: [80, 90, null, null, null] });
+
+  const [one] = buildBoards(athletes, [mk("a"), mk("z")], "pulldown", 5, []);
+  const [two] = buildBoards(athletes, [mk("z"), mk("a")], "pulldown", 5, []);
+  assert.deepEqual(one.rows.map((r) => r.name), ["Ann", "Zed"]);
+  assert.deepEqual(two.rows.map((r) => r.name), ["Ann", "Zed"]);
 });
 
 test("the viewer is marked, and gets a standing when off the board", () => {
