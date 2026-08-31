@@ -51,11 +51,18 @@ async function verify() {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const key = url.searchParams.get("key");
-  const expected = process.env.SETUP_KEY;
-
-  if (!expected) return json({ error: "SETUP_KEY is not configured" }, 500);
-
+  /*
+   * The key may arrive in the query string or as a header. The header exists
+   * because a query string silently mangles secrets: a raw & truncates it, #
+   * never leaves the browser, + becomes a space. Those failures are
+   * indistinguishable from a wrong key, so offer a channel where the value
+   * cannot be reinterpreted at all.
+   */
+  const provided = (
+    url.searchParams.get("key") ??
+    request.headers.get("x-setup-key") ??
+    ""
+  ).trim();
   /*
    * Compare trimmed. A SETUP_KEY pasted into the dashboard with a trailing
    * newline never matches anything typed by hand, and the resulting "Bad or
@@ -63,14 +70,29 @@ export async function GET(request: Request) {
    * which is how this database went unmigrated without anyone noticing.
    * Surrounding whitespace is a paste artifact, not part of the secret.
    */
-  if (key?.trim() !== expected.trim())
+  const expected = (process.env.SETUP_KEY ?? "").trim();
+
+  if (!expected) return json({ error: "SETUP_KEY is not configured" }, 500);
+
+  if (provided !== expected)
     return json(
       {
         error: "Bad or missing key",
+        /*
+         * Lengths only, never content. Telling the two apart is the whole
+         * problem: 0 means the key never arrived, short means the query string
+         * truncated it, equal-but-wrong means the value is stale or the
+         * deployment predates the last env change. A length is a negligible
+         * leak next to being unable to diagnose this at all.
+         */
+        received: provided.length,
+        expected: expected.length,
+        schemaVersion: SCHEMA_VERSION,
         hint:
-          "Copy SETUP_KEY from Vercel → Settings → Environment Variables. " +
-          "If it contains + & # % or a space, URL-encode it — a raw + in a " +
-          "query string is read as a space.",
+          "Lengths differing means the key was cut off in transit — send it as " +
+          "a header instead: curl -H 'x-setup-key: VALUE' <url>/api/setup. " +
+          "Equal lengths that still mismatch means the running deployment has " +
+          "an older value; redeploy after changing it in Vercel.",
       },
       403,
     );
