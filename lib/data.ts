@@ -241,11 +241,14 @@ export async function getInvite(token: string): Promise<InviteTarget | null> {
 export async function consumeInvite(
   token: string,
   password: string,
+  level: string | null,
+  birthDate: string | null,
 ): Promise<InviteTarget | null> {
   const hash = await hashPassword(password);
   const rows = (await sql`
     UPDATE athletes
-    SET password_hash = ${hash}, invite_token = NULL, invite_expires = NULL
+    SET password_hash = ${hash}, invite_token = NULL, invite_expires = NULL,
+        level = ${level}, birth_date = ${birthDate}
     WHERE invite_token = ${token}
       AND archived = false
       AND invite_expires IS NOT NULL
@@ -253,6 +256,7 @@ export async function consumeInvite(
     RETURNING id, name, invite_email
   `) as Record<string, unknown>[];
   const r = rows[0];
+  if (r) await stampUnleveledSessions(String(r.id), level);
   return r
     ? {
         id: String(r.id),

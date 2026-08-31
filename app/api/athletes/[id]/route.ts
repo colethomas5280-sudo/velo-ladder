@@ -1,6 +1,7 @@
 import { getScope, canSeeAthlete } from "@/lib/scope";
 import { getAthlete, updateAthlete } from "@/lib/data";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
+import { LEVELS, type Level } from "@/lib/leaderboard";
 import type { Hand } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -56,6 +57,19 @@ export async function PATCH(
                 Number(body.cnsThresholdPct) <= 50
               ? Number(body.cnsThresholdPct)
               : undefined,
+      level:
+        body.level === undefined
+          ? undefined
+          : LEVELS.includes(body.level as Level)
+            ? (body.level as Level)
+            : null,
+      birthDate:
+        body.birthDate === undefined
+          ? undefined
+          : typeof body.birthDate === "string" &&
+              /^\d{4}-\d{2}-\d{2}$/.test(body.birthDate)
+            ? body.birthDate
+            : null,
       password,
     });
     return json(updated);
