@@ -19,6 +19,7 @@ export default function AppHeader({ email }: { email?: string }) {
     ? [
         { href: "/", label: "Dashboard" },
         { href: "/athletes", label: "Athletes" },
+        { href: "/leaderboard", label: "Leaderboard" },
         { href: "/resources", label: "Resources" },
       ]
     : isAthlete
@@ -27,6 +28,7 @@ export default function AppHeader({ email }: { email?: string }) {
             href: data?.athleteId ? `/athletes/${data.athleteId}` : "/",
             label: "My tracker",
           },
+          { href: "/leaderboard", label: "Leaderboard" },
           { href: "/resources", label: "Resources" },
         ]
       : [];
