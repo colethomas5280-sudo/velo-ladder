@@ -26,6 +26,8 @@ export interface TrainingSession {
   type: TrackerId;
   date: string; // YYYY-MM-DD
   notes: string;
+  /** level stamped at save time; null for sessions logged before levels existed */
+  level: string | null;
   throws: Throws;
 }
 
