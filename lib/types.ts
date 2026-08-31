@@ -66,7 +66,7 @@ export interface RecoveryEntry {
   stress: number | null;
   mood: number | null;
   diet: number | null;
-  /** 1-4: 1 pain limiting, 2 pain not limiting, 3 sore, 4 clear. */
+  /** 1-5: 1 pain limiting, 2 pain, 3 very sore, 4 a little sore, 5 clear. */
   armReadiness: number | null;
   restingHr: number | null;
   hrv: number | null;
@@ -75,7 +75,7 @@ export interface RecoveryEntry {
 }
 
 /**
- * Retired: replaced by the 1-4 `armReadiness` question. Kept because check-ins
+ * Retired: replaced by the `armReadiness` question. Kept because check-ins
  * logged before that still carry it, and `armState()` falls back to it.
  */
 export type ArmStatus = "good" | "sore" | "pain";

@@ -29,33 +29,52 @@ export const CNS_DEFAULT_PCT = 5;
 /** Sessions needed before a CNS baseline means anything. */
 const CNS_MIN_HISTORY = 3;
 const CNS_WINDOW_DAYS = 30;
-/** Consecutive sore days before it stops being "expected". */
-const SORENESS_ESCALATE_DAY = 3;
+/** Consecutive VERY sore days before a full day off. */
+const HEAVY_ESCALATE_DAY = 3;
+/**
+ * Consecutive LIGHT sore days before backing off to a recovery day. Higher than
+ * the heavy threshold on purpose: a little sore for a couple of days running is
+ * an ordinary training week, not a signal.
+ */
+const LIGHT_ESCALATE_DAY = 4;
 
 /**
- * Arm readiness (1-4) is the branch discriminator. Entries logged before that
+ * Arm readiness (1-5) is the branch discriminator. Entries logged before that
  * question existed carry the older good/sore/pain field, so read both.
  *
- *   1 pain, limiting movement      -> injury (urgent)
- *   2 pain, not limiting movement  -> injury
- *   3 no pain, some soreness       -> soreness
- *   4 no pain, no soreness         -> clear
+ *   1 pain, limiting movement  -> injury (stop)
+ *   2 pain, not limiting       -> injury flag, recovery day
+ *   3 no pain, very sore       -> soreness (recovery day)
+ *   4 no pain, a little sore   -> soreness (hybrid day)
+ *   5 no pain, no soreness     -> clear
+ *
+ * The old good/sore/pain field had no light/heavy split, and "sore" then meant
+ * a recovery day — so it maps to `sore-heavy`. Reading those entries as merely
+ * a little sore would retroactively prescribe more work than they were given.
  */
-export type ArmState = "clear" | "sore" | "pain" | "pain-limiting";
+export type ArmState =
+  | "clear"
+  | "sore-light"
+  | "sore-heavy"
+  | "pain"
+  | "pain-limiting";
 
 export function armState(e: RecoveryEntry | undefined): ArmState | null {
   if (!e) return null;
   if (typeof e.armReadiness === "number") {
     if (e.armReadiness === 1) return "pain-limiting";
     if (e.armReadiness === 2) return "pain";
-    if (e.armReadiness === 3) return "sore";
+    if (e.armReadiness === 3) return "sore-heavy";
+    if (e.armReadiness === 4) return "sore-light";
     return "clear";
   }
   if (e.armStatus === "pain") return "pain";
-  if (e.armStatus === "sore") return "sore";
+  if (e.armStatus === "sore") return "sore-heavy";
   if (e.armStatus === "good") return "clear";
   return null;
 }
+
+const isSore = (s: ArmState | null) => s === "sore-light" || s === "sore-heavy";
 
 export interface Finding {
   kind: SetbackKind;
@@ -98,20 +117,45 @@ function sessionBenchmark(s: TrainingSession): number | null {
   return best;
 }
 
+export interface SorenessRun {
+  /** consecutive days ending at `asOf` with soreness of either severity */
+  days: number;
+  /** how sore they are on the most recent of those days */
+  severity: "light" | "heavy" | null;
+  /** any day in this run reported as very sore */
+  hadHeavy: boolean;
+  /** true once the run is long enough to stop being ordinary */
+  escalated: boolean;
+}
+
 /**
- * How many consecutive days up to `asOf` the athlete has reported a sore arm.
- * A missing day breaks the run — we can't assume anything about a day with
- * no check-in.
+ * How many consecutive days up to `asOf` the athlete has reported a sore arm,
+ * and how sore they are today. A missing day breaks the run — we can't assume
+ * anything about a day with no check-in.
+ *
+ * The run counts soreness of either severity, so a kid who is very sore for two
+ * days and a little sore on the third is on day 3, not day 1. Severity is read
+ * from the latest day only: that is what decides today's work.
  */
-export function sorenessRun(entries: RecoveryEntry[], asOf: string): number {
+export function sorenessRun(
+  entries: RecoveryEntry[],
+  asOf: string,
+): SorenessRun {
   const byDate = new Map(entries.map((e) => [e.date, e]));
-  let run = 0;
+  let days = 0;
+  let severity: "light" | "heavy" | null = null;
+  let hadHeavy = false;
+
   for (let i = 0; i < 14; i++) {
-    const e = byDate.get(shiftDate(asOf, -i));
-    if (armState(e) === "sore") run++;
-    else break;
+    const state = armState(byDate.get(shiftDate(asOf, -i)));
+    if (!isSore(state)) break;
+    if (i === 0) severity = state === "sore-heavy" ? "heavy" : "light";
+    if (state === "sore-heavy") hadHeavy = true;
+    days++;
   }
-  return run;
+
+  const limit = severity === "heavy" ? HEAVY_ESCALATE_DAY : LIGHT_ESCALATE_DAY;
+  return { days, severity, hadHeavy, escalated: days >= limit };
 }
 
 /**
@@ -172,15 +216,28 @@ export function evaluate(
         (latest!.notes ? ` — "${latest!.notes.slice(0, 140)}"` : ""),
     });
 
+  /*
+   * Being a little sore is the normal state of a kid in a throwing program, so
+   * on its own it raises no flag — it would bury the coach's list in noise and
+   * make the real ones easy to miss. It surfaces once it stops settling, or if
+   * the run ever included a very sore day.
+   *
+   * That last condition matters: without it, easing from "very sore" to "a
+   * little sore" would make an open flag vanish, which quietly rewards
+   * under-reporting on exactly the question that has to stay honest.
+   */
   const run = sorenessRun(entries, latest?.date ?? asOf);
-  if (run > 0)
+  if (run.escalated || run.hadHeavy) {
+    const label = run.severity === "heavy" ? "Very sore" : "A little sore";
+    const easing = run.hadHeavy && run.severity === "light" ? ", easing" : "";
+    const plural = `${run.days} day${run.days === 1 ? "" : "s"} running`;
     out.push({
       kind: "soreness",
       detail:
-        run >= SORENESS_ESCALATE_DAY
-          ? `Sore ${run} days running — past the point where it should be settling`
-          : `Sore ${run} day${run === 1 ? "" : "s"} running`,
+        `${label} ${plural}${easing}` +
+        (run.escalated ? " — past the point where it should be settling" : ""),
     });
+  }
 
   const cns = cnsCheck(sessions, thresholdPct);
   if (cns?.fired) out.push({ kind: "cns", detail: cns.detail });
@@ -202,15 +259,26 @@ export function guidance(
     .sort((a, b) => (a.date < b.date ? -1 : 1))
     .pop();
 
+  /*
+   * An open injury flag outranks everything and never clears itself, so this
+   * holds even on a day the athlete reports a clean arm — only the coach lifts
+   * it. Pain that limits movement stops throwing outright; pain that doesn't
+   * drops to recovery work rather than a shutdown, but the coach still has to
+   * clear it before the athlete goes back to chasing numbers.
+   */
   if (open.some((s) => s.kind === "injury")) {
-    const limiting = armState(latestEntry) === "pain-limiting";
+    if (armState(latestEntry) === "pain-limiting")
+      return {
+        level: "stop",
+        kind: "injury",
+        title: "Stop throwing",
+        body: "Pain that limits how you move isn't something to work around. No throwing until a trainer or doctor has looked at it — your coach clears this, not the app.",
+      };
     return {
-      level: "stop",
+      level: "caution",
       kind: "injury",
-      title: limiting ? "Stop throwing" : "Get it looked at",
-      body: limiting
-        ? "Pain that limits how you move isn't something to work around. No throwing until a trainer or doctor has looked at it — your coach clears this, not the app."
-        : "You flagged pain, not soreness. That doesn't get thrown through. Sit down with a trainer or doctor before your next throwing day — your coach can clear this once it's been checked.",
+      title: "Recovery day",
+      body: "You flagged pain, not soreness. That doesn't get thrown through, but it isn't a reason to panic either — recovery work today. Your coach has been told and is the one who clears this, so keep checking in until they do.",
     };
   }
 
@@ -222,26 +290,48 @@ export function guidance(
       body: "Your last max day came in well under your own normal. That's your nervous system, not your effort — usually training load, sleep debt, or a rough stretch of eating. Expect 3–7 days of lighter work before you chase a number again.",
     };
 
+  /*
+   * Soreness, graded. Being a little sore is not a reason to sit down — most
+   * athletes reporting it just don't have a reference for what post-throwing
+   * soreness feels like — so it buys a hybrid day, not a shutdown. Very sore
+   * follows Cole's original progression: recovery, then their call, then off.
+   */
   const run = sorenessRun(entries, latestEntry?.date ?? asOf);
 
-  if (run >= SORENESS_ESCALATE_DAY)
-    return {
-      level: "caution",
-      kind: "soreness",
-      title: "Take the day off",
-      body: `Day ${run} of a sore arm. Two is normal after a hard day; three means it isn't settling on its own. Full day off, and tell your coach.`,
-    };
-
-  if (run > 0)
+  if (run.severity === "heavy") {
+    if (run.escalated)
+      return {
+        level: "caution",
+        kind: "soreness",
+        title: "Take the day off",
+        body: `Day ${run.days} of a sore arm. Two is normal after a hard day; three means it isn't settling on its own. Full day off, and tell your coach.`,
+      };
     return {
       level: "recovery",
       kind: "soreness",
-      title: run === 1 ? "Recovery day" : "Your call on intensity",
+      title: run.days === 1 ? "Recovery day" : "Your call on intensity",
       body:
-        run === 1
+        run.days === 1
           ? "Sore after a hard day is exactly what's supposed to happen. Today is recovery work — don't chase a number."
           : "Second day sore. Throw, but pick your own comfortable effort rather than going after max.",
     };
+  }
+
+  if (run.severity === "light") {
+    if (run.escalated)
+      return {
+        level: "caution",
+        kind: "soreness",
+        title: "Recovery day",
+        body: `Day ${run.days} of a sore arm. It's only a little, but it should have settled by now — recovery work today instead of throwing, and tell your coach it's been hanging around.`,
+      };
+    return {
+      level: "recovery",
+      kind: "soreness",
+      title: "Hybrid day",
+      body: "A little sore after throwing is normal — it isn't a reason to shut down, and it isn't a reason to chase a number either. Plyos and catch play today, no ladder. Keep the arm moving without loading it.",
+    };
+  }
 
   // No flags: if they threw yesterday, today is still a recovery day.
   const threwYesterday = sessions.some(
