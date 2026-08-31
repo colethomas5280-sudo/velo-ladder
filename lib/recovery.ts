@@ -122,11 +122,11 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
       {
         key: "armReadiness",
         label: "How's the arm?",
-        max: 4,
         anchors: [
           "Pain (limiting movement)",
           "Pain/soreness (not limiting movement)",
-          "No pain (some soreness)",
+          "No pain (very sore)",
+          "No pain (a little sore)",
           "No pain (no soreness)",
         ],
       },

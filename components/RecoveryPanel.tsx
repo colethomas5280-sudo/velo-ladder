@@ -108,7 +108,7 @@ export default function RecoveryPanel({
                     {[
                       e.sleepHours != null ? `${fmt(e.sleepHours)}h sleep` : null,
                       e.armReadiness != null
-                        ? `arm ${e.armReadiness}/4`
+                        ? `arm ${e.armReadiness}/5`
                         : null,
                       e.energy != null ? `fatigue ${e.energy}/5` : null,
                       e.soreness != null ? `soreness ${e.soreness}/5` : null,

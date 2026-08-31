@@ -167,16 +167,17 @@ the UI needs touching.
 
 - **Section 1 — "How do you feel today?"**: Fatigue (stored as `energy`), Sleep duration
   (derived), General muscle soreness, Stress, Diet. All 1-5.
-- **Section 2 — "Arm readiness"**: one question, **1-4** — 1 pain limiting movement,
-  2 pain/soreness not limiting, 3 no pain some soreness, 4 no pain no soreness. This
-  replaced the old three-button good/sore/pain question that sat above the form.
+- **Section 2 — "Arm readiness"**: one question, **1-5** — 1 pain limiting movement,
+  2 pain/soreness not limiting, 3 no pain very sore, 4 no pain a little sore, 5 no pain
+  no soreness. Replaced the old three-button good/sore/pain question above the form.
 
 **Every scale runs bad → good**, which is what lets them average into one score.
 
-**Scales keep their native length.** Arm readiness is a 1-4 question and is stored as
-1-4; `normalizeRating(v, max)` maps it onto the shared 1-5 range at scoring time only
-(1 → 1, 2 → 2.33, 3 → 3.67, 4 → 5). Storing a rescaled value would have made the raw
-column unreadable and locked the scale's length in forever.
+**Scales keep their native length.** Arm readiness shipped as 1-4 and widened to 1-5
+before it ever reached production, so no stored value needed remapping. Had it not,
+`normalizeRating(v, max)` maps any scale onto the shared 1-5 range at scoring time only
+— the raw column always holds what the athlete actually picked. Sections 3-5 can use
+whatever length their question wants.
 
 Each item is a **dropdown carrying the full anchor text** ("3 — So-so quality, over or
 under ate a bit") rather than 1-5 buttons — the anchors are sentences, and a bare "3"
@@ -216,18 +217,52 @@ Three branches off Cole's protocol. Pure functions — `evaluate`, `guidance`,
 
 | Branch | Trigger | Clears |
 |---|---|---|
-| `soreness` | arm readiness **3** (no pain, some soreness). Day 1 → recovery day, day 2 → self-selected intensity, **day 3+ → full day off**. A missing check-in breaks the run. | automatically, when readiness comes back 4 |
+| `soreness` | arm readiness **3 or 4**, graded — see below. A missing check-in breaks the run. | automatically, when the arm comes back clear |
 | `cns` | latest session's best 5 oz lands ≥ threshold% under that athlete's own trailing 30-day average for the same tracker. Needs **3+ prior sessions**. | automatically, when velocity returns to band |
-| `injury` | arm readiness **1 or 2** — any pain at all. Level 1 (limiting movement) reads "Stop throwing"; level 2 reads "Get it looked at". | **never automatically** — a coach must PATCH `/api/setbacks/[id]` |
+| `injury` | arm readiness **1 or 2** — any pain at all. | **never automatically** — a coach must PATCH `/api/setbacks/[id]` |
 
 Serious injury is deliberately not modelled. That's medical, and the app should not
 own a return timeline.
 
 **Arm readiness is what separates branch 1 from branch 3** — without it there's no way
 to tell "sore from throwing" from "something is wrong". Every branch reads it through
-`armState()`, which returns `clear | sore | pain | pain-limiting` and **falls back to the
-retired `arm_status` column** so check-ins logged before the 1-4 scale still route to the
-right branch. Nothing else in the file touches either column directly.
+`armState()`, which returns `clear | sore-light | sore-heavy | pain | pain-limiting` and
+**falls back to the retired `arm_status` column**. Legacy `"sore"` maps to `sore-heavy`,
+because that is the prescription those entries were actually given — reading them as
+merely a little sore would retroactively hand out more work than the athlete did.
+Nothing else in the codebase touches either column directly.
+
+### Soreness is graded, and the grades prescribe different days
+
+Cole's call: **a little sore is not a reason to sit down.** Most athletes reporting it
+simply have no reference for what post-throwing soreness feels like, so it buys a
+**hybrid day** — plyos and catch play, no ladder — rather than a shutdown. Very sore
+follows his original progression.
+
+| Today | Day 1 | Day 2 | Escalates |
+|---|---|---|---|
+| **4** a little sore | hybrid day | hybrid day | **day 4** → recovery day |
+| **3** very sore | recovery day | their call on intensity | **day 3** → full day off |
+| **2** pain, not limiting | recovery day + injury flag | — | — |
+| **1** pain, limiting | stop throwing | — | — |
+
+Tunable as `LIGHT_ESCALATE_DAY` (4) and `HEAVY_ESCALATE_DAY` (3).
+
+The run counts consecutive days of **either** severity; **today's** answer picks the
+prescription. So very sore → very sore → a little sore is day 3 of a run, but earns a
+hybrid day, because the arm is settling.
+
+**Level 2 is pain, and pain always reaches the coach.** The prescription is only a
+recovery day, but it still opens an injury flag that never auto-clears — the guidance
+holds at `caution` / "Recovery day" even on a later day the athlete reports a clean arm,
+until a coach clears the flag. Softening what the athlete does is not the same as
+softening what the coach is told.
+
+**A little sore does not flag on its own** — it is the normal state of a kid in a
+throwing program, and flagging it would bury the real ones. It surfaces only once it
+escalates, **or if any day in the run was very sore**. That second condition is load-
+bearing: without it, easing from 3 to 4 would make an open flag vanish, quietly
+rewarding under-reporting on the one question that has to stay honest.
 
 Flags are reconciled by `reconcileSetbacks(athleteId)` in `lib/data.ts`, called after
 any session or check-in write. No cron: the inputs only change on those writes. An open

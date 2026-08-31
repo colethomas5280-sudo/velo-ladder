@@ -62,7 +62,7 @@ export async function POST(
     stress: rating(b.stress),
     mood: rating(b.mood),
     diet: rating(b.diet),
-    armReadiness: scaled(b.armReadiness, 4),
+    armReadiness: scaled(b.armReadiness, 5),
     restingHr: positive(b.restingHr, 200),
     armStatus: (["good", "sore", "pain"] as const).includes(
       b.armStatus as ArmStatus,
