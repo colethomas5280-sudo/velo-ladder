@@ -79,6 +79,8 @@ const isSore = (s: ArmState | null) => s === "sore-light" || s === "sore-heavy";
 export interface Finding {
   kind: SetbackKind;
   detail: string;
+  /** worst state this finding represents; stored on the flag it opens */
+  severity?: ArmState;
 }
 
 export interface Guidance {
@@ -209,6 +211,7 @@ export function evaluate(
   if (state === "pain" || state === "pain-limiting")
     out.push({
       kind: "injury",
+      severity: state,
       detail:
         (state === "pain-limiting"
           ? `Pain limiting movement on ${latest!.date}`
@@ -266,8 +269,21 @@ export function guidance(
    * drops to recovery work rather than a shutdown, but the coach still has to
    * clear it before the athlete goes back to chasing numbers.
    */
-  if (open.some((s) => s.kind === "injury")) {
-    if (armState(latestEntry) === "pain-limiting")
+  const injury = open.find((s) => s.kind === "injury");
+  if (injury) {
+    /*
+     * Read the severity off the flag, not off today's check-in. An athlete who
+     * reported pain that limits movement stays shut down until a coach clears
+     * it — feeling better two days later is not the same as having been looked
+     * at, and letting a milder answer soften the message would quietly teach
+     * exactly the under-reporting this question depends on not happening.
+     *
+     * Flags opened before severity was recorded fall back to the old reading.
+     */
+    const limiting =
+      injury.severity === "pain-limiting" ||
+      (injury.severity == null && armState(latestEntry) === "pain-limiting");
+    if (limiting)
       return {
         level: "stop",
         kind: "injury",
