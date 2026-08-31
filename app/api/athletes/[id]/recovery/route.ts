@@ -16,6 +16,12 @@ const rating = (v: unknown): number | null => {
   const n = Number(v);
   return Number.isInteger(n) && n >= 1 && n <= 5 ? n : null;
 };
+/** Arm readiness runs 1-4, not 1-5. */
+const scaled = (v: unknown, max: number): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= max ? n : null;
+};
 const positive = (v: unknown, max: number): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
@@ -56,6 +62,7 @@ export async function POST(
     stress: rating(b.stress),
     mood: rating(b.mood),
     diet: rating(b.diet),
+    armReadiness: scaled(b.armReadiness, 4),
     restingHr: positive(b.restingHr, 200),
     armStatus: (["good", "sore", "pain"] as const).includes(
       b.armStatus as ArmStatus,
@@ -73,6 +80,7 @@ export async function POST(
     entry.stress != null ||
     entry.mood != null ||
     entry.diet != null ||
+    entry.armReadiness != null ||
     entry.restingHr != null ||
     entry.hrv != null ||
     entry.armStatus != null ||

@@ -107,6 +107,9 @@ export default function RecoveryPanel({
                   <span className="feed-sub">
                     {[
                       e.sleepHours != null ? `${fmt(e.sleepHours)}h sleep` : null,
+                      e.armReadiness != null
+                        ? `arm ${e.armReadiness}/4`
+                        : null,
                       e.energy != null ? `fatigue ${e.energy}/5` : null,
                       e.soreness != null ? `soreness ${e.soreness}/5` : null,
                       e.diet != null ? `diet ${e.diet}/5` : null,

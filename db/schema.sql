@@ -1,4 +1,5 @@
--- Generated from lib/schema.ts — apply with GET /api/setup?key=SETUP_KEY
+-- Generated from lib/schema.ts (SCHEMA_VERSION 9). Do not edit by hand.
+-- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
   id            text PRIMARY KEY,
@@ -55,6 +56,9 @@ CREATE TABLE IF NOT EXISTS recovery_entries (
 );
 ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS arm_status text;
 ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS diet int;
+-- Arm readiness is a 1-4 scale (Driveline's), not 1-5. Kept at its native
+-- range and normalised at scoring time rather than padded with a fake level.
+ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS arm_readiness int;
 CREATE UNIQUE INDEX IF NOT EXISTS recovery_athlete_date_idx
   ON recovery_entries(athlete_id, date);
 
@@ -122,14 +126,3 @@ BEGIN
   END LOOP;
 END
 $mig$;
-
--- seed --
-
-INSERT INTO athletes (id, name, hand)
-VALUES ('seed-md', 'Martin Duff', '')
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO training_sessions (id, athlete_id, type, date, notes, throws)
-VALUES ('seed-md-s1', 'seed-md', 'pulldown', '2026-08-28', '',
-  '{"p1":[null,92.1,93.1,90.6],"p2":[null,89.4,88.8,89.4],"p4":[null,93.4,93.5,94.5],"p5":[null,97.1,94.4,97.1]}'::jsonb)
-ON CONFLICT (id) DO NOTHING;

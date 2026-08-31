@@ -1,5 +1,4 @@
 import type {
-  ArmStatus,
   RecoveryEntry,
   Setback,
   SetbackKind,
@@ -32,6 +31,31 @@ const CNS_MIN_HISTORY = 3;
 const CNS_WINDOW_DAYS = 30;
 /** Consecutive sore days before it stops being "expected". */
 const SORENESS_ESCALATE_DAY = 3;
+
+/**
+ * Arm readiness (1-4) is the branch discriminator. Entries logged before that
+ * question existed carry the older good/sore/pain field, so read both.
+ *
+ *   1 pain, limiting movement      -> injury (urgent)
+ *   2 pain, not limiting movement  -> injury
+ *   3 no pain, some soreness       -> soreness
+ *   4 no pain, no soreness         -> clear
+ */
+export type ArmState = "clear" | "sore" | "pain" | "pain-limiting";
+
+export function armState(e: RecoveryEntry | undefined): ArmState | null {
+  if (!e) return null;
+  if (typeof e.armReadiness === "number") {
+    if (e.armReadiness === 1) return "pain-limiting";
+    if (e.armReadiness === 2) return "pain";
+    if (e.armReadiness === 3) return "sore";
+    return "clear";
+  }
+  if (e.armStatus === "pain") return "pain";
+  if (e.armStatus === "sore") return "sore";
+  if (e.armStatus === "good") return "clear";
+  return null;
+}
 
 export interface Finding {
   kind: SetbackKind;
@@ -84,7 +108,7 @@ export function sorenessRun(entries: RecoveryEntry[], asOf: string): number {
   let run = 0;
   for (let i = 0; i < 14; i++) {
     const e = byDate.get(shiftDate(asOf, -i));
-    if (e?.armStatus === "sore") run++;
+    if (armState(e) === "sore") run++;
     else break;
   }
   return run;
@@ -137,10 +161,15 @@ export function evaluate(
   const sorted = [...entries].sort((a, b) => (a.date < b.date ? -1 : 1));
   const latest = sorted[sorted.length - 1];
 
-  if (latest?.armStatus === "pain")
+  const state = armState(latest);
+  if (state === "pain" || state === "pain-limiting")
     out.push({
       kind: "injury",
-      detail: `Reported pain on ${latest.date}${latest.notes ? ` — "${latest.notes.slice(0, 140)}"` : ""}`,
+      detail:
+        (state === "pain-limiting"
+          ? `Pain limiting movement on ${latest!.date}`
+          : `Pain reported ${latest!.date} (not limiting movement)`) +
+        (latest!.notes ? ` — "${latest!.notes.slice(0, 140)}"` : ""),
     });
 
   const run = sorenessRun(entries, latest?.date ?? asOf);
@@ -169,13 +198,21 @@ export function guidance(
   entries: RecoveryEntry[],
   asOf: string = todayISO(),
 ): Guidance {
-  if (open.some((s) => s.kind === "injury"))
+  const latestEntry = [...entries]
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .pop();
+
+  if (open.some((s) => s.kind === "injury")) {
+    const limiting = armState(latestEntry) === "pain-limiting";
     return {
       level: "stop",
       kind: "injury",
-      title: "Get it looked at",
-      body: "You flagged pain, not soreness. That doesn't get thrown through. Sit down with a trainer or doctor before your next throwing day — your coach can clear this once it's been checked.",
+      title: limiting ? "Stop throwing" : "Get it looked at",
+      body: limiting
+        ? "Pain that limits how you move isn't something to work around. No throwing until a trainer or doctor has looked at it — your coach clears this, not the app."
+        : "You flagged pain, not soreness. That doesn't get thrown through. Sit down with a trainer or doctor before your next throwing day — your coach can clear this once it's been checked.",
     };
+  }
 
   if (open.some((s) => s.kind === "cns"))
     return {
@@ -185,8 +222,7 @@ export function guidance(
       body: "Your last max day came in well under your own normal. That's your nervous system, not your effort — usually training load, sleep debt, or a rough stretch of eating. Expect 3–7 days of lighter work before you chase a number again.",
     };
 
-  const latest = [...entries].sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
-  const run = sorenessRun(entries, latest?.date ?? asOf);
+  const run = sorenessRun(entries, latestEntry?.date ?? asOf);
 
   if (run >= SORENESS_ESCALATE_DAY)
     return {
@@ -254,13 +290,3 @@ export const EXPLAINER = {
   kicker:
     "Your ceiling isn't built on the days you throw hard. It's built on whether you actually recover from them.",
 };
-
-export const ARM_STATUS_OPTIONS: {
-  value: ArmStatus;
-  label: string;
-  hint: string;
-}[] = [
-  { value: "good", label: "Good", hint: "Arm feels normal" },
-  { value: "sore", label: "Sore", hint: "Sore from throwing" },
-  { value: "pain", label: "Pain", hint: "Something feels wrong" },
-];

@@ -66,13 +66,18 @@ export interface RecoveryEntry {
   stress: number | null;
   mood: number | null;
   diet: number | null;
+  /** 1-4: 1 pain limiting, 2 pain not limiting, 3 sore, 4 clear. */
+  armReadiness: number | null;
   restingHr: number | null;
   hrv: number | null;
   armStatus: ArmStatus | null;
   notes: string;
 }
 
-/** What the athlete says the arm is doing — the discriminator the setback logic needs. */
+/**
+ * Retired: replaced by the 1-4 `armReadiness` question. Kept because check-ins
+ * logged before that still carry it, and `armState()` falls back to it.
+ */
 export type ArmStatus = "good" | "sore" | "pain";
 
 export type SetbackKind = "soreness" | "cns" | "injury";
