@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS recovery_entries (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS arm_status text;
+ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS diet int;
 CREATE UNIQUE INDEX IF NOT EXISTS recovery_athlete_date_idx
   ON recovery_entries(athlete_id, date);
 

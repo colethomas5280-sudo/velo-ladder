@@ -156,26 +156,41 @@ Both trackers run the same ladder: **5, 6, 7, 5, 4, 3 oz**.
 
 ---
 
-## Recovery scoring (`lib/recovery.ts`)
+## Wellness questionnaire & scoring (`lib/recovery.ts`)
 
-Daily check-in, one row per athlete per day (upserted, so re-saving a date edits it).
-**Every 1-5 rating points the same way — 5 is always the good end** ("Arm soreness:
-very sore → none"), which is what lets them be averaged directly. Sleep hours maps
-onto the same 1-5 range (4h → 1, 8.5h+ → 5). The score is the mean of whatever was
-filled in, ×20, so a partial check-in still scores.
+The check-in is **defined as data** in `WELLNESS_SECTIONS` — a list of sections, each
+with 1-5 items carrying Cole's exact anchor wording. The modal renders whatever is in
+that array. **Adding section 2-5 is: append a section here + one `int` column per new
+item + wire it through `toRecovery`/`upsertRecovery` and the recovery route's
+validation.** Nothing in the UI needs touching.
 
-**Resting HR and HRV are stored and shown but deliberately excluded from the score** —
-they're personal baselines and averaging one athlete's 48bpm against another's 62
-would be meaningless.
+Section 1, "How do you feel today?" — Fatigue (stored as `energy`), Sleep duration
+(derived), General muscle soreness, Stress, Diet. **Every scale runs bad → good**, which
+is what lets them average into one score.
 
-`buildInsight` pairs each throwing day with that day's check-in, then compares the top
-third of days by velocity against the bottom third. It needs **6+ paired days**, and
-the panel only makes a claim when the gap clears a threshold (5 score points or 0.5h
-sleep) — otherwise it says there's no clear pattern. It's association, and the UI says
-so.
+**Sleep is answered once, used twice.** The athlete types real hours; the questionnaire
+band (`sleepBand`: <5/5-6/6-7/7-8/8+) is derived for display, and the correlation
+readout keeps the raw number so it can say "8.8h vs 5.3h". The **score** uses
+`sleepToRating`, which is deliberately *not* the band: it climbs to 5.0 at 8h, holds
+through 9h — Cole's target window — then eases back (10h → 4.6, 11h → 4.2). Piling on
+sleep past 9h is not extra credit. Undersleeping is the steeper penalty.
 
-The progress chart draws recovery as a thick faint line on **its own 0-100 scale** with
-no axis labels, since the point is shape against velocity, not shared units.
+Score = mean of every 1-5 field present + the sleep rating, ×20. Because it averages
+only what's filled in, **old entries keep scoring off the fields they have**
+(`sleepQuality`, `mood`) while new ones use the current set — so changing the
+questionnaire never retroactively rewrites history. `RATING_FIELDS` therefore still
+lists the retired columns on purpose.
+
+**Resting HR and HRV are stored and charted but never scored** — personal baselines,
+meaningless to average across athletes.
+
+`buildInsight` pairs each throwing day with that day's check-in and compares the top
+third of days by velocity against the bottom third. Needs **6+ paired days**, and only
+makes a claim when the gap clears a threshold (5 score points or 0.5h sleep). It says
+"association, not proof" in the UI, because that's what it is.
+
+The progress chart overlays recovery on **its own 0-100 scale**, unlabelled — the point
+is shape against velocity, not shared units.
 
 ## Setback logic (`lib/setback.ts`)
 

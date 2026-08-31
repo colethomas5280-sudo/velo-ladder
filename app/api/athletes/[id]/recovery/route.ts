@@ -55,6 +55,7 @@ export async function POST(
     energy: rating(b.energy),
     stress: rating(b.stress),
     mood: rating(b.mood),
+    diet: rating(b.diet),
     restingHr: positive(b.restingHr, 200),
     armStatus: (["good", "sore", "pain"] as const).includes(
       b.armStatus as ArmStatus,
@@ -71,6 +72,7 @@ export async function POST(
     entry.energy != null ||
     entry.stress != null ||
     entry.mood != null ||
+    entry.diet != null ||
     entry.restingHr != null ||
     entry.hrv != null ||
     entry.armStatus != null ||

@@ -1914,3 +1914,36 @@ table.roster-table {
 .g-band b {
   color: var(--ink-dim);
 }
+
+/* ---------- wellness questionnaire ---------- */
+.wl-section {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.wl-section > .eyebrow {
+  margin-bottom: 1px;
+}
+.wl-row .ci-label {
+  min-width: 150px;
+  flex: 1;
+}
+.wl-row .ci-label span {
+  color: var(--accent);
+  font-weight: 600;
+}
+.ci-scale.derived .ci-dot {
+  opacity: 1;
+  cursor: default;
+}
+.ci-scale.derived .ci-dot[aria-pressed="true"] {
+  background: var(--chalk);
+  border-color: var(--chalk);
+  color: var(--on-accent);
+}
+.ci-scale.derived .ci-dot:not([aria-pressed="true"]) {
+  color: var(--ink-faint);
+  background: var(--panel-2);
+}
