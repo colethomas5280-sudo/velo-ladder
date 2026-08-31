@@ -264,9 +264,9 @@ export default function RecoveryModal({
             />
           </label>
 
-          {err && (
+          {err != null && (
             <p className="form-error" role="alert">
-              {err}
+              {err || "Couldn't save that."}
             </p>
           )}
 
