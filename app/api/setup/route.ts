@@ -55,7 +55,25 @@ export async function GET(request: Request) {
   const expected = process.env.SETUP_KEY;
 
   if (!expected) return json({ error: "SETUP_KEY is not configured" }, 500);
-  if (key !== expected) return json({ error: "Bad or missing key" }, 403);
+
+  /*
+   * Compare trimmed. A SETUP_KEY pasted into the dashboard with a trailing
+   * newline never matches anything typed by hand, and the resulting "Bad or
+   * missing key" reads as a wrong key rather than a malformed stored one —
+   * which is how this database went unmigrated without anyone noticing.
+   * Surrounding whitespace is a paste artifact, not part of the secret.
+   */
+  if (key?.trim() !== expected.trim())
+    return json(
+      {
+        error: "Bad or missing key",
+        hint:
+          "Copy SETUP_KEY from Vercel → Settings → Environment Variables. " +
+          "If it contains + & # % or a space, URL-encode it — a raw + in a " +
+          "query string is read as a space.",
+      },
+      403,
+    );
 
   try {
     assertDbConfigured();
