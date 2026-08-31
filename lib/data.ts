@@ -476,6 +476,7 @@ function toSetback(r: Record<string, unknown>): Setback {
     resolvedOn: r.resolved_on ? isoDate(r.resolved_on) : null,
     resolvedBy: (r.resolved_by as string | null) ?? null,
     detail: String(r.detail ?? ""),
+    severity: (r.severity as string | null) ?? null,
   };
 }
 
@@ -548,11 +549,19 @@ export async function reconcileSetbacks(athleteId: string): Promise<Setback[]> {
       // "3 days running" by day 3, not still say 1.
       if (already.detail !== f.detail)
         await sql`UPDATE setbacks SET detail = ${f.detail} WHERE id = ${already.id}`;
+      /*
+       * Severity only ever escalates. It records how bad this episode got at
+       * its worst, so a later, milder report can't walk a shutdown back — that
+       * is the coach's call, made by clearing the flag.
+       */
+      if (f.severity === "pain-limiting" && already.severity !== "pain-limiting")
+        await sql`UPDATE setbacks SET severity = ${f.severity} WHERE id = ${already.id}`;
       continue;
     }
     await sql`
-      INSERT INTO setbacks (id, athlete_id, kind, opened_on, detail)
-      VALUES (${crypto.randomUUID()}, ${athleteId}, ${f.kind}, CURRENT_DATE, ${f.detail})
+      INSERT INTO setbacks (id, athlete_id, kind, opened_on, detail, severity)
+      VALUES (${crypto.randomUUID()}, ${athleteId}, ${f.kind}, CURRENT_DATE,
+              ${f.detail}, ${f.severity ?? null})
     `;
   }
 

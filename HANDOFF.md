@@ -131,7 +131,7 @@ recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
                  arm_readiness, body_weight, sleep_duration, notes,
                  created_by, created_at, updated_at)  -- UNIQUE(athlete_id, date)
 setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
-         resolved_on, resolved_by, detail, created_at)
+         resolved_on, resolved_by, detail, severity, created_at)
 athletes.cns_threshold_pct  -- per-athlete CNS band; null = facility default
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
                   throws jsonb, created_by, created_at, updated_at)
@@ -295,6 +295,17 @@ Tunable as `LIGHT_ESCALATE_DAY` (4) and `HEAVY_ESCALATE_DAY` (3).
 The run counts consecutive days of **either** severity; **today's** answer picks the
 prescription. So very sore → very sore → a little sore is day 3 of a run, but earns a
 hybrid day, because the arm is settling.
+
+**Guidance severity lives on the flag, not on today's check-in.** `setbacks.severity`
+records how bad an episode got at its worst and only ever escalates. An athlete who
+reported pain limiting movement keeps reading "Stop throwing" until a coach clears the
+flag, however good he says he feels two days later — feeling better is not the same as
+having been looked at, and letting a milder answer soften the message would reward
+exactly the under-reporting this question depends on not happening. This is the same
+rule the soreness branch uses for `hadHeavy`; the injury branch originally missed it and
+read `armState(latestEntry)` instead. Flags opened before the column existed are
+backfilled from their `detail` line by the schema script, and any that don't match fall
+back to the old reading.
 
 **Level 2 is pain, and pain always reaches the coach.** The prescription is only a
 recovery day, but it still opens an injury flag that never auto-clears — the guidance

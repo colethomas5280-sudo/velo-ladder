@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -82,6 +82,18 @@ CREATE TABLE IF NOT EXISTS setbacks (
   detail      text NOT NULL DEFAULT '',
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE setbacks ADD COLUMN IF NOT EXISTS severity text;
+
+-- Backfill severity on injury flags opened before the column existed, reading
+-- it back out of the detail line those flags already carry. Without this an
+-- open flag from before the upgrade keeps the old, softer guidance forever.
+UPDATE setbacks SET severity = CASE
+    WHEN detail LIKE 'Pain limiting movement%' THEN 'pain-limiting'
+    WHEN detail LIKE 'Pain reported%'          THEN 'pain'
+  END
+  WHERE kind = 'injury' AND severity IS NULL
+    AND (detail LIKE 'Pain limiting movement%' OR detail LIKE 'Pain reported%');
+
 CREATE INDEX IF NOT EXISTS setbacks_open_idx
   ON setbacks(athlete_id, kind) WHERE resolved_on IS NULL;
 

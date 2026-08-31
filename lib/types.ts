@@ -94,4 +94,11 @@ export interface Setback {
   resolvedOn: string | null;
   resolvedBy: string | null;
   detail: string;
+  /**
+   * How bad it was at its worst during this episode. Recorded on the flag so
+   * guidance doesn't soften when the athlete later reports feeling better —
+   * only a coach clearing the flag changes that. Null on flags opened before
+   * this was tracked; those fall back to reading the latest check-in.
+   */
+  severity: string | null;
 }
