@@ -11,6 +11,7 @@ import type {
   Setback,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
+import type { LeaderboardAthlete } from "./leaderboard";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
   return {
@@ -21,6 +22,8 @@ function toAthlete(r: Record<string, unknown>): Athlete {
     hasPassword: !!r.password_hash,
     hasInvite: !!r.invite_token,
     cnsThresholdPct: r.cns_threshold_pct == null ? null : Number(r.cns_threshold_pct),
+    birthDate: r.birth_date ? isoDate(r.birth_date) : null,
+    level: (r.level as string | null) ?? null,
     archived: Boolean(r.archived),
   };
 }
@@ -111,6 +114,8 @@ export async function updateAthlete(
     archived?: boolean;
     password?: string;
     cnsThresholdPct?: number | null;
+    level?: string | null;
+    birthDate?: string | null;
   },
 ): Promise<Athlete | null> {
   const cur = await getAthlete(id);
@@ -126,25 +131,50 @@ export async function updateAthlete(
     patch.cnsThresholdPct === undefined
       ? cur.cnsThresholdPct
       : patch.cnsThresholdPct;
+  const level = patch.level === undefined ? cur.level : patch.level;
+  const birthDate =
+    patch.birthDate === undefined ? cur.birthDate : patch.birthDate || null;
 
   if (patch.password) {
     const hash = await hashPassword(patch.password);
     const rows = (await sql`
       UPDATE athletes
       SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
-          archived = ${archived}, cns_threshold_pct = ${cns}, password_hash = ${hash}
+          archived = ${archived}, cns_threshold_pct = ${cns},
+          level = ${level}, birth_date = ${birthDate}, password_hash = ${hash}
       WHERE id = ${id} RETURNING *
     `) as Record<string, unknown>[];
-    return rows[0] ? toAthlete(rows[0]) : null;
+    const updated = rows[0] ? toAthlete(rows[0]) : null;
+    if (updated) await stampUnleveledSessions(id, level);
+    return updated;
   }
 
   const rows = (await sql`
     UPDATE athletes
     SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
-        archived = ${archived}, cns_threshold_pct = ${cns}
+        archived = ${archived}, cns_threshold_pct = ${cns},
+        level = ${level}, birth_date = ${birthDate}
     WHERE id = ${id} RETURNING *
   `) as Record<string, unknown>[];
-  return rows[0] ? toAthlete(rows[0]) : null;
+  const updated = rows[0] ? toAthlete(rows[0]) : null;
+  if (updated) await stampUnleveledSessions(id, level);
+  return updated;
+}
+
+/*
+ * Backfill the stamp, once. Sessions that already carry a level are never
+ * rewritten, so moving an athlete from Youth to High School leaves his old
+ * marks where they were and only new sessions get the new level.
+ */
+export async function stampUnleveledSessions(
+  athleteId: string,
+  level: string | null,
+): Promise<void> {
+  if (!level) return;
+  await sql`
+    UPDATE training_sessions SET level = ${level}
+    WHERE athlete_id = ${athleteId} AND level IS NULL
+  `;
 }
 
 /* ---------------- invites ---------------- */
@@ -263,10 +293,12 @@ export async function createSession(input: {
   createdBy: string;
 }): Promise<TrainingSession> {
   const id = crypto.randomUUID();
+  const athlete = await getAthlete(input.athleteId);
+  const level = athlete?.level ?? null;
   const rows = (await sql`
-    INSERT INTO training_sessions (id, athlete_id, type, date, notes, throws, created_by)
+    INSERT INTO training_sessions (id, athlete_id, type, date, notes, throws, created_by, level)
     VALUES (${id}, ${input.athleteId}, ${input.type}, ${input.date}, ${input.notes},
-            ${JSON.stringify(input.throws)}::jsonb, ${input.createdBy})
+            ${JSON.stringify(input.throws)}::jsonb, ${input.createdBy}, ${level})
     RETURNING *
   `) as Record<string, unknown>[];
   return toSession(rows[0]);
@@ -576,4 +608,29 @@ export async function reconcileSetbacks(athleteId: string): Promise<Setback[]> {
   }
 
   return listSetbacks(athleteId, { openOnly: true });
+}
+
+/**
+ * Everything the leaderboard needs, and nothing else. Archived athletes are
+ * included on purpose: a departing athlete should not wipe a facility record
+ * he set.
+ */
+export async function listLeaderboardData(): Promise<{
+  athletes: LeaderboardAthlete[];
+  sessions: TrainingSession[];
+}> {
+  const [aRows, sRows] = await Promise.all([
+    sql`SELECT id, name, hand, birth_date, level FROM athletes`,
+    sql`SELECT * FROM training_sessions`,
+  ]);
+  return {
+    athletes: (aRows as Record<string, unknown>[]).map((r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      hand: (r.hand as string) || "",
+      birthDate: r.birth_date ? isoDate(r.birth_date) : null,
+      level: (r.level as LeaderboardAthlete["level"]) ?? null,
+    })),
+    sessions: (sRows as Record<string, unknown>[]).map(toSession),
+  };
 }

@@ -17,6 +17,10 @@ export interface Athlete {
   hasInvite: boolean;
   /** percent below the 30-day average that trips the CNS flag; null = facility default */
   cnsThresholdPct: number | null;
+  /** "YYYY-MM-DD"; coach-visible only, never sent to the leaderboard */
+  birthDate: string | null;
+  /** Youth | High School | College | Pro */
+  level: string | null;
   archived: boolean;
 }
 
