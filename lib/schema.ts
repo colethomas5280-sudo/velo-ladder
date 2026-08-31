@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -24,6 +24,8 @@ ALTER TABLE athletes ADD COLUMN IF NOT EXISTS invite_expires timestamptz;
 CREATE UNIQUE INDEX IF NOT EXISTS athletes_invite_token_idx
   ON athletes(invite_token) WHERE invite_token IS NOT NULL;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS cns_threshold_pct real;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS birth_date date;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS level text;
 CREATE INDEX IF NOT EXISTS athletes_email_idx ON athletes(lower(invite_email));
 
 CREATE TABLE IF NOT EXISTS training_sessions (
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS training_sessions (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS level text;
 CREATE INDEX IF NOT EXISTS ts_athlete_idx ON training_sessions(athlete_id, type, date);
 
 -- Daily recovery check-in. One row per athlete per day (upserted), logged
