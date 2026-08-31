@@ -74,20 +74,27 @@ export interface WellnessSection {
  * Every scale runs bad -> good so the answers can be averaged into one score.
  */
 /**
- * Sleep bands, in athlete language. These are the answer now — asking a
+ * Sleep bands, in athlete language. These are the answer — asking a
  * seventeen-year-old for the exact hours he slept invents precision he does
  * not have, and a band is what he can actually report honestly.
+ *
+ * Pitched at a training athlete, not a general adult: 7-8h clears the adult
+ * guideline but sits at the bottom of the useful range for someone throwing at
+ * max intent, and 6-7h — where most of them actually live — is a deficit, not
+ * a floor. Top of the scale is 9-10h, the window sleep-extension work pushes
+ * toward. The bands shifted up a rung in Aug 2026 for this reason; a 4 now
+ * means what a 5 used to.
  */
 export const SLEEP_BAND_ANCHORS = [
-  "Less than 5 hours",
-  "5-6 hours",
+  "Less than 6 hours",
   "6-7 hours",
   "7-8 hours",
-  "8+ hours",
+  "8-9 hours",
+  "9-10 hours",
 ] as const;
 
 /** The same bands, short enough for a feed line. */
-export const SLEEP_BAND_SHORT = ["<5h", "5-6h", "6-7h", "7-8h", "8h+"] as const;
+export const SLEEP_BAND_SHORT = ["<6h", "6-7h", "7-8h", "8-9h", "9-10h"] as const;
 
 /** Label for a (possibly averaged) band value. */
 export function sleepBandLabel(band: number): string {
@@ -233,10 +240,10 @@ const RETIRED_FIELDS = ["mood"] as const;
  * directly now. Kept to read entries logged before the hours box was removed.
  */
 export function sleepBand(hours: number): number {
-  if (hours < 5) return 1;
-  if (hours < 6) return 2;
-  if (hours < 7) return 3;
-  if (hours < 8) return 4;
+  if (hours < 6) return 1;
+  if (hours < 7) return 2;
+  if (hours < 8) return 3;
+  if (hours < 9) return 4;
   return 5;
 }
 
@@ -253,19 +260,20 @@ export function entryBand(e: RecoveryEntry): number | null {
 }
 
 /**
- * LEGACY sleep scoring, for entries that stored typed hours. Deliberately NOT
- * the raw band, so those entries keep the exact score they always had: 8-9h
- * is the target, and piling on past that is not extra credit, so the curve
- * plateaus through 9h and eases back after. Undersleeping is still the steeper
+ * LEGACY sleep scoring, for entries that stored typed hours rather than a band.
+ * No production entry has ever used this path — the hours box was removed
+ * before `recovery_entries` existed in production — but it is kept so a local
+ * or imported entry still scores. Tracks the same bands: 9-10h is the target,
+ * piling on past that is not extra credit, and undersleeping is the steeper
  * penalty.
  *
- *   4h -> 1.0    6h -> 3.0    8h -> 5.0    9h -> 5.0    11h -> 4.2
+ *   5h -> 1.0    7h -> 3.0    9h -> 5.0    10h -> 5.0    12h -> 4.2
  */
 export function sleepToRating(hours: number): number {
-  if (hours <= 4) return 1;
-  if (hours <= 8) return 1 + (hours - 4) * (4 / 4); // 4h..8h -> 1..5
-  if (hours <= 9) return 5; // the target window
-  return Math.max(3.5, 5 - (hours - 9) * 0.4);
+  if (hours <= 5) return 1;
+  if (hours <= 9) return 1 + (hours - 5); // 5h..9h -> 1..5
+  if (hours <= 10) return 5; // the target window
+  return Math.max(3.5, 5 - (hours - 10) * 0.4);
 }
 
 /**
