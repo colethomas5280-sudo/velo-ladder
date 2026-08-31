@@ -64,6 +64,7 @@ export async function POST(
     diet: rating(b.diet),
     armReadiness: scaled(b.armReadiness, 5),
     bodyWeight: positive(b.bodyWeight, 600),
+    sleepDuration: rating(b.sleepDuration),
     restingHr: positive(b.restingHr, 200),
     armStatus: (["good", "sore", "pain"] as const).includes(
       b.armStatus as ArmStatus,
@@ -83,6 +84,7 @@ export async function POST(
     entry.diet != null ||
     entry.armReadiness != null ||
     entry.bodyWeight != null ||
+    entry.sleepDuration != null ||
     entry.restingHr != null ||
     entry.hrv != null ||
     entry.armStatus != null ||

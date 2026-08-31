@@ -42,8 +42,6 @@ export interface RatedItem extends BaseItem {
   anchors: string[];
   /** top of the scale; defaults to 5 */
   max?: number;
-  /** derived from typed hours rather than chosen */
-  derived?: boolean;
 }
 
 /**
@@ -75,6 +73,28 @@ export interface WellnessSection {
  *
  * Every scale runs bad -> good so the answers can be averaged into one score.
  */
+/**
+ * Sleep bands, in athlete language. These are the answer now — asking a
+ * seventeen-year-old for the exact hours he slept invents precision he does
+ * not have, and a band is what he can actually report honestly.
+ */
+export const SLEEP_BAND_ANCHORS = [
+  "Less than 5 hours",
+  "5-6 hours",
+  "6-7 hours",
+  "7-8 hours",
+  "8+ hours",
+] as const;
+
+/** The same bands, short enough for a feed line. */
+export const SLEEP_BAND_SHORT = ["<5h", "5-6h", "6-7h", "7-8h", "8h+"] as const;
+
+/** Label for a (possibly averaged) band value. */
+export function sleepBandLabel(band: number): string {
+  const i = Math.min(5, Math.max(1, Math.round(band))) - 1;
+  return SLEEP_BAND_ANCHORS[i];
+}
+
 export const WELLNESS_SECTIONS: WellnessSection[] = [
   {
     id: "feel",
@@ -96,14 +116,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
         kind: "rated",
         key: "sleepDuration",
         label: "Sleep duration",
-        derived: true,
-        anchors: [
-          "Less than 5 hours",
-          "5-6 hours",
-          "6-7 hours",
-          "7-8 hours",
-          "8+ hours",
-        ],
+        anchors: [...SLEEP_BAND_ANCHORS],
       },
       {
         kind: "rated",
@@ -194,7 +207,7 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
 
 /** Every *scored* question, across all sections. Numeric items are excluded. */
 export const ANSWERED_ITEMS: RatedItem[] = WELLNESS_SECTIONS.flatMap((s) =>
-  s.items.filter((i): i is RatedItem => i.kind === "rated" && !i.derived),
+  s.items.filter((i): i is RatedItem => i.kind === "rated"),
 );
 
 /**
@@ -215,7 +228,10 @@ export function normalizeRating(value: number, max = 5): number {
  */
 const RETIRED_FIELDS = ["mood"] as const;
 
-/** Which 1-5 band typed hours fall into, per the questionnaire anchors. */
+/**
+ * Which band typed hours fall into. LEGACY ONLY — athletes pick the band
+ * directly now. Kept to read entries logged before the hours box was removed.
+ */
 export function sleepBand(hours: number): number {
   if (hours < 5) return 1;
   if (hours < 6) return 2;
@@ -225,7 +241,20 @@ export function sleepBand(hours: number): number {
 }
 
 /**
- * Sleep's contribution to the score. Deliberately NOT the raw band: 8-9 hours
+ * The band for an entry, however it was recorded — picked directly on new
+ * check-ins, derived from typed hours on ones logged before the box was
+ * removed. A typed 7.5 genuinely is the "7-8 hours" band, so nothing is lost.
+ */
+export function entryBand(e: RecoveryEntry): number | null {
+  if (typeof e.sleepDuration === "number") return e.sleepDuration;
+  if (typeof e.sleepHours === "number" && e.sleepHours > 0)
+    return sleepBand(e.sleepHours);
+  return null;
+}
+
+/**
+ * LEGACY sleep scoring, for entries that stored typed hours. Deliberately NOT
+ * the raw band, so those entries keep the exact score they always had: 8-9h
  * is the target, and piling on past that is not extra credit, so the curve
  * plateaus through 9h and eases back after. Undersleeping is still the steeper
  * penalty.
@@ -257,7 +286,16 @@ export function recoveryScore(e: RecoveryEntry): number | null {
     const v = e[f];
     if (typeof v === "number" && v >= 1 && v <= 5) parts.push(v);
   }
-  if (typeof e.sleepHours === "number" && e.sleepHours > 0)
+  /*
+   * Legacy sleep: entries from when hours were typed rather than banded.
+   * Guarded on `sleepDuration` being absent, so an old entry that gets edited —
+   * picking up a band while keeping its hours — doesn't score sleep twice.
+   */
+  if (
+    e.sleepDuration == null &&
+    typeof e.sleepHours === "number" &&
+    e.sleepHours > 0
+  )
     parts.push(sleepToRating(e.sleepHours));
 
   if (!parts.length) return null;
@@ -352,6 +390,7 @@ export interface Insight {
   n: number;
   topScore: number | null;
   bottomScore: number | null;
+  /** mean sleep *band* (1-5), not hours — bands are what gets recorded */
   topSleep: number | null;
   bottomSleep: number | null;
   topVelo: number;
@@ -392,7 +431,7 @@ export function buildInsight(
     paired.push({
       velo,
       score: recoveryScore(e),
-      sleep: typeof e.sleepHours === "number" ? e.sleepHours : null,
+      sleep: entryBand(e),
     });
   }
   if (paired.length < 6) return null;

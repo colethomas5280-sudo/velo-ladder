@@ -3,18 +3,12 @@
 import { useEffect, useState } from "react";
 import type { RecoveryEntry } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
-import {
-  WELLNESS_SECTIONS,
-  recoveryScore,
-  scoreBand,
-  sleepBand,
-
-} from "@/lib/recovery";
+import { WELLNESS_SECTIONS, recoveryScore, scoreBand } from "@/lib/recovery";
 import { todayISO, fmtDate } from "@/lib/velo";
 
 type Draft = {
   date: string;
-  sleepHours: string;
+  sleepDuration: number | null;
   sleepQuality: number | null;
   soreness: number | null;
   energy: number | null;
@@ -37,7 +31,7 @@ const clean = (s: string, decimal?: boolean) =>
 function draftFrom(e: RecoveryEntry | null, date: string): Draft {
   return {
     date: e?.date ?? date,
-    sleepHours: e?.sleepHours != null ? String(e.sleepHours) : "",
+    sleepDuration: e?.sleepDuration ?? null,
     sleepQuality: e?.sleepQuality ?? null,
     soreness: e?.soreness ?? null,
     energy: e?.energy ?? null,
@@ -81,7 +75,7 @@ export default function RecoveryModal({
 
   // Live score preview from whatever is filled in so far.
   const preview = recoveryScore({
-    sleepHours: d.sleepHours ? Number(d.sleepHours) : null,
+    sleepDuration: d.sleepDuration,
     sleepQuality: d.sleepQuality,
     soreness: d.soreness,
     energy: d.energy,
@@ -99,7 +93,7 @@ export default function RecoveryModal({
     try {
       await api(`/api/athletes/${athleteId}/recovery`, "POST", {
         date: d.date,
-        sleepHours: num(d.sleepHours),
+        sleepDuration: d.sleepDuration,
         sleepQuality: d.sleepQuality,
         soreness: d.soreness,
         energy: d.energy,
@@ -151,22 +145,6 @@ export default function RecoveryModal({
                 }
               />
             </label>
-            <label className="field">
-              <span>Hours slept</span>
-              <input
-                className="tin"
-                inputMode="decimal"
-                placeholder="7.5"
-                style={{ width: 92 }}
-                value={d.sleepHours}
-                onChange={(e) =>
-                  setD((p) => ({
-                    ...p,
-                    sleepHours: clean(e.target.value, true),
-                  }))
-                }
-              />
-            </label>
             <div className={`ci-score ${preview == null ? "" : scoreBand(preview)}`}>
               <span className="n">{preview ?? "–"}</span>
               <span className="l">Score</span>
@@ -204,28 +182,18 @@ export default function RecoveryModal({
                     </div>
                   );
 
-                // Sleep is answered by typing hours above; show the band it lands in.
-                const derivedValue =
-                  item.derived && d.sleepHours
-                    ? sleepBand(Number(d.sleepHours))
-                    : null;
-                const value = item.derived
-                  ? derivedValue
-                  : (d[item.key as keyof Draft] as number | null);
-
                 return (
                   <div className="ci-row wl-row" key={item.key}>
                     <div className="ci-label">
                       <b>{item.label}</b>
-                      {item.derived && (
-                        <span>From the hours you enter above</span>
+                      {item.help && (
+                        <span className="wl-help">{item.help}</span>
                       )}
                     </div>
                     <select
-                      className={`wl-select${item.derived ? " derived" : ""}`}
+                      className="wl-select"
                       aria-label={item.label}
-                      disabled={item.derived}
-                      value={value ?? ""}
+                      value={(d[item.key as keyof Draft] as number | null) ?? ""}
                       onChange={(e) =>
                         setD((p) => ({
                           ...p,
@@ -234,9 +202,7 @@ export default function RecoveryModal({
                         }))
                       }
                     >
-                      <option value="">
-                        {item.derived ? "—" : "Choose…"}
-                      </option>
+                      <option value="">Choose…</option>
                       {item.anchors.map((a, i) => (
                         <option key={i} value={i + 1}>
                           {i + 1} — {a}
