@@ -2034,7 +2034,10 @@ table.roster-table {
 /* ---------- leaderboard page ---------- */
 /* .lb / .lb-rank / .lb-velo are also used by the coach-dashboard "Best velos"
    widget (components/Dashboard.tsx), so the row-cell rules below are scoped to
-   .lb-table to override that widget's bare-class rules without disturbing it. */
+   .lb-table to override that widget's bare-class rules without disturbing it.
+   The global `th, td` rule sets `text-align: center` and `white-space: nowrap`,
+   so `.lb-table td` has to re-assert left / normal; `.lb-dim` and `.lb-velo`
+   put `nowrap` back where wrapping is unwanted. */
 .lb-board { margin-top: 14px; }
 .lb-scroll { overflow-x: auto; }
 .lb-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
@@ -2052,6 +2055,8 @@ table.roster-table {
 }
 .lb-table td {
   padding: 9px 12px 9px 0;
+  text-align: left;
+  white-space: normal;
   border-bottom: 1px solid var(--line-soft);
 }
 .lb-table .lb-rank {
@@ -2066,7 +2071,6 @@ table.roster-table {
   font-size: 22px;
   font-weight: 400;
   color: var(--ink);
-  text-align: left;
   min-width: 0;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
