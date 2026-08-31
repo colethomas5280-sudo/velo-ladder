@@ -20,27 +20,124 @@ export const RATING_FIELDS = [
   "energy",
   "stress",
   "mood",
+  "diet",
 ] as const;
 
-export interface RatingDef {
-  key: (typeof RATING_FIELDS)[number];
+export type RatingKey = (typeof RATING_FIELDS)[number];
+
+/** A 1-5 question. `anchors[0]` is what 1 means, `anchors[4]` what 5 means. */
+export interface WellnessItem {
+  key: RatingKey | "sleepDuration";
   label: string;
-  low: string;
-  high: string;
+  anchors: [string, string, string, string, string];
+  /** derived from typed hours rather than tapped */
+  derived?: boolean;
 }
 
-/** Wording is chosen so 1 is always the bad end and 5 always the good end. */
-export const RATINGS: RatingDef[] = [
-  { key: "sleepQuality", label: "Sleep quality", low: "Restless", high: "Great" },
-  { key: "soreness", label: "Arm soreness", low: "Very sore", high: "None" },
-  { key: "energy", label: "Energy", low: "Drained", high: "Fresh" },
-  { key: "stress", label: "Life stress", low: "Very high", high: "None" },
-  { key: "mood", label: "Mood", low: "Poor", high: "Great" },
+export interface WellnessSection {
+  id: string;
+  title: string;
+  items: WellnessItem[];
+}
+
+/**
+ * The questionnaire, as data. Adding a section is adding an entry here plus a
+ * column per new item — the check-in renders whatever this contains.
+ *
+ * Every scale runs bad -> good so the answers can be averaged into one score.
+ */
+export const WELLNESS_SECTIONS: WellnessSection[] = [
+  {
+    id: "feel",
+    title: "How do you feel today?",
+    items: [
+      {
+        key: "energy",
+        label: "Fatigue",
+        anchors: [
+          "Extremely tired",
+          "More tired than normal",
+          "Normal",
+          "Fresh",
+          "Very fresh",
+        ],
+      },
+      {
+        key: "sleepDuration",
+        label: "Sleep duration",
+        derived: true,
+        anchors: [
+          "Less than 5 hours",
+          "5-6 hours",
+          "6-7 hours",
+          "7-8 hours",
+          "8+ hours",
+        ],
+      },
+      {
+        key: "soreness",
+        label: "General muscle soreness",
+        anchors: [
+          "Extremely sore",
+          "Very sore",
+          "A little sore",
+          "Feeling good",
+          "Feeling great",
+        ],
+      },
+      {
+        key: "stress",
+        label: "Stress",
+        anchors: [
+          "Extremely stressed",
+          "Stressed",
+          "Normal",
+          "Relaxed",
+          "Very relaxed",
+        ],
+      },
+      {
+        key: "diet",
+        label: "Diet",
+        anchors: [
+          "Terrible quality, way over or under ate",
+          "Not good quality, over or under ate",
+          "So-so quality, over or under ate a bit",
+          "Decent quality, enough calories",
+          "Great quality, enough calories",
+        ],
+      },
+    ],
+  },
 ];
 
-/** 4h or less scores 1, 8.5h or more scores 5, linear in between. */
+/** Items an athlete taps (sleep is derived from the hours they type). */
+export const TAPPED_ITEMS = WELLNESS_SECTIONS.flatMap((s) =>
+  s.items.filter((i) => !i.derived),
+) as (WellnessItem & { key: RatingKey })[];
+
+/** Which 1-5 band typed hours fall into, per the questionnaire anchors. */
+export function sleepBand(hours: number): number {
+  if (hours < 5) return 1;
+  if (hours < 6) return 2;
+  if (hours < 7) return 3;
+  if (hours < 8) return 4;
+  return 5;
+}
+
+/**
+ * Sleep's contribution to the score. Deliberately NOT the raw band: 8-9 hours
+ * is the target, and piling on past that is not extra credit, so the curve
+ * plateaus through 9h and eases back after. Undersleeping is still the steeper
+ * penalty.
+ *
+ *   4h -> 1.0    6h -> 3.0    8h -> 5.0    9h -> 5.0    11h -> 4.2
+ */
 export function sleepToRating(hours: number): number {
-  return Math.min(5, Math.max(1, 1 + (hours - 4) * (4 / 4.5)));
+  if (hours <= 4) return 1;
+  if (hours <= 8) return 1 + (hours - 4) * (4 / 4); // 4h..8h -> 1..5
+  if (hours <= 9) return 5; // the target window
+  return Math.max(3.5, 5 - (hours - 9) * 0.4);
 }
 
 /** Composite 0-100, or null when nothing scoreable was filled in. */

@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS recovery_entries (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS arm_status text;
+ALTER TABLE recovery_entries ADD COLUMN IF NOT EXISTS diet int;
 CREATE UNIQUE INDEX IF NOT EXISTS recovery_athlete_date_idx
   ON recovery_entries(athlete_id, date);
 

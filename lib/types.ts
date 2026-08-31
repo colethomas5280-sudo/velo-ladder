@@ -65,6 +65,7 @@ export interface RecoveryEntry {
   energy: number | null;
   stress: number | null;
   mood: number | null;
+  diet: number | null;
   restingHr: number | null;
   hrv: number | null;
   armStatus: ArmStatus | null;

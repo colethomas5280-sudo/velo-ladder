@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import type { RecoveryEntry, ArmStatus } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
-import { RATINGS, recoveryScore, scoreBand } from "@/lib/recovery";
+import {
+  WELLNESS_SECTIONS,
+  recoveryScore,
+  scoreBand,
+  sleepBand,
+  type RatingKey,
+} from "@/lib/recovery";
 import { ARM_STATUS_OPTIONS } from "@/lib/setback";
 import { todayISO, fmtDate } from "@/lib/velo";
 
@@ -15,6 +21,7 @@ type Draft = {
   energy: number | null;
   stress: number | null;
   mood: number | null;
+  diet: number | null;
   restingHr: string;
   hrv: string;
   armStatus: ArmStatus | null;
@@ -30,6 +37,7 @@ function draftFrom(e: RecoveryEntry | null, date: string): Draft {
     energy: e?.energy ?? null,
     stress: e?.stress ?? null,
     mood: e?.mood ?? null,
+    diet: e?.diet ?? null,
     restingHr: e?.restingHr != null ? String(e.restingHr) : "",
     hrv: e?.hrv != null ? String(e.hrv) : "",
     armStatus: e?.armStatus ?? null,
@@ -72,6 +80,7 @@ export default function RecoveryModal({
     energy: d.energy,
     stress: d.stress,
     mood: d.mood,
+    diet: d.diet,
   } as RecoveryEntry);
 
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
@@ -88,6 +97,7 @@ export default function RecoveryModal({
         energy: d.energy,
         stress: d.stress,
         mood: d.mood,
+        diet: d.diet,
         restingHr: num(d.restingHr),
         hrv: num(d.hrv),
         armStatus: d.armStatus,
@@ -181,28 +191,59 @@ export default function RecoveryModal({
             </div>
           </div>
 
-          {RATINGS.map((r) => (
-            <div className="ci-row" key={r.key}>
-              <div className="ci-label">
-                <b>{r.label}</b>
-                <span>
-                  {r.low} → {r.high}
-                </span>
-              </div>
-              <div className="ci-scale" role="group" aria-label={r.label}>
-                {[1, 2, 3, 4, 5].map((v) => (
-                  <button
-                    key={v}
-                    className="ci-dot"
-                    aria-pressed={d[r.key] === v}
-                    onClick={() =>
-                      setD((p) => ({ ...p, [r.key]: p[r.key] === v ? null : v }))
-                    }
-                  >
-                    {v}
-                  </button>
-                ))}
-              </div>
+          {WELLNESS_SECTIONS.map((section) => (
+            <div className="wl-section" key={section.id}>
+              <div className="eyebrow">{section.title}</div>
+
+              {section.items.map((item) => {
+                // Sleep is answered by typing hours above; show the band it lands in.
+                const derivedValue =
+                  item.derived && d.sleepHours
+                    ? sleepBand(Number(d.sleepHours))
+                    : null;
+                const value = item.derived
+                  ? derivedValue
+                  : d[item.key as RatingKey];
+
+                return (
+                  <div className="ci-row wl-row" key={item.key}>
+                    <div className="ci-label">
+                      <b>{item.label}</b>
+                      <span>
+                        {value
+                          ? item.anchors[value - 1]
+                          : item.derived
+                            ? "From the hours you enter above"
+                            : `1 ${item.anchors[0]} \u2192 5 ${item.anchors[4]}`}
+                      </span>
+                    </div>
+                    <div
+                      className={`ci-scale${item.derived ? " derived" : ""}`}
+                      role="group"
+                      aria-label={item.label}
+                    >
+                      {[1, 2, 3, 4, 5].map((v) => (
+                        <button
+                          key={v}
+                          className="ci-dot"
+                          aria-pressed={value === v}
+                          disabled={item.derived}
+                          title={item.anchors[v - 1]}
+                          onClick={() =>
+                            setD((p) => ({
+                              ...p,
+                              [item.key]:
+                                p[item.key as RatingKey] === v ? null : v,
+                            }))
+                          }
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ))}
 
