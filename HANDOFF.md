@@ -128,7 +128,7 @@ resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
 recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
                  energy, stress, mood, resting_hr, hrv, arm_status,
-                 arm_readiness, body_weight, notes,
+                 arm_readiness, body_weight, sleep_duration, notes,
                  created_by, created_at, updated_at)  -- UNIQUE(athlete_id, date)
 setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
          resolved_on, resolved_by, detail, created_at)
@@ -169,8 +169,8 @@ Items are a discriminated union on `kind`. `"rated"` renders a dropdown carrying
 full anchor text and feeds the score; `"numeric"` renders a typed input with a unit and
 **never** feeds the score.
 
-- **Section 1 — "How do you feel today?"**: Fatigue (stored as `energy`), Sleep duration
-  (derived), Sleep quality, General muscle soreness, Stress, Diet. All 1-5.
+- **Section 1 — "How do you feel today?"**: Fatigue (stored as `energy`), Sleep
+  duration, Sleep quality, General muscle soreness, Stress, Diet. All 1-5.
 - **Section 3 — "Bodyweight"**: one numeric field, lb. Not scored — see below.
 - **Section 2 — "Arm readiness"**: one question, **1-5** — 1 pain limiting movement,
   2 pain/soreness not limiting, 3 no pain very sore, 4 no pain a little sore, 5 no pain
@@ -184,10 +184,27 @@ before it ever reached production, so no stored value needed remapping. Had it n
 — the raw column always holds what the athlete actually picked. Sections 3-5 can use
 whatever length their question wants.
 
+### Sleep is a band, not a number
+
+The check-in used to open with a "Hours slept" box, and the band was derived from it.
+Cole's call: **athletes don't know how long they slept.** Asking for a number invents
+precision a seventeen-year-old doesn't have, so the band is now the answer — picked
+straight from the dropdown, stored in its own `sleep_duration` column.
+
+`sleepHours` is legacy. Entries logged before the box came out keep their typed number
+and keep scoring through `sleepToRating` — the curve that peaks across Cole's 8-9h target
+window — so **no historical score moved**. That path is guarded on `sleep_duration` being
+absent, so an old entry that gets edited picks up a band without scoring sleep twice.
+
+`entryBand(e)` is the one way to read sleep: the band if there is one, else `sleepBand()`
+of the typed hours. A typed 7.5 genuinely *is* the "7-8 hours" band, so nothing is lost
+converting. Everything downstream — the feed line, the correlation readout — goes through
+it, which is why the insight now reads "8+ hours of sleep vs 5-6 hours" rather than
+quoting decimal hours nobody actually measured.
+
 Each item is a **dropdown carrying the full anchor text** ("3 — So-so quality, over or
 under ate a bit") rather than 1-5 buttons — the anchors are sentences, and a bare "3"
-tells an athlete nothing. Sleep duration renders as a disabled dropdown filled in from
-the typed hours.
+tells an athlete nothing.
 
 **Sleep quality is a separate question from both duration and fatigue**, and it is not
 redundant with either: eight hours that were broken five times reads as duration 5,
@@ -201,13 +218,6 @@ Note this makes **2 of the 7 scored components sleep** (duration + quality). Tha
 deliberate weighting, not an oversight — sleep is the biggest recovery lever a teenager
 has. Collapsing them into one averaged component is a small change to `recoveryScore`
 if it ever reads too heavy.
-
-**Sleep is answered once, used twice.** The athlete types real hours; the questionnaire
-band (`sleepBand`: <5/5-6/6-7/7-8/8+) is derived for display, and the correlation
-readout keeps the raw number so it can say "8.8h vs 5.3h". The **score** uses
-`sleepToRating`, which is deliberately *not* the band: it climbs to 5.0 at 8h, holds
-through 9h — Cole's target window — then eases back (10h → 4.6, 11h → 4.2). Piling on
-sleep past 9h is not extra credit. Undersleeping is the steeper penalty.
 
 Score = mean of every answered item (normalised to 1-5) + the sleep rating, ×20.
 `recoveryScore` walks `ANSWERED_ITEMS` — derived from `WELLNESS_SECTIONS` — so a new

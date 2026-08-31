@@ -9,6 +9,9 @@ import {
   scoreBand,
   buildInsight,
   weightTrend,
+  entryBand,
+  sleepBandLabel,
+  SLEEP_BAND_SHORT,
 } from "@/lib/recovery";
 import { fmt, fmtDate, todayISO } from "@/lib/velo";
 import RecoveryModal from "./RecoveryModal";
@@ -105,6 +108,7 @@ export default function RecoveryPanel({
         <ul className="rec-list">
           {recent.map((e) => {
             const sc = recoveryScore(e);
+            const band = entryBand(e);
             return (
               <li key={e.date}>
                 <span className={`chip-score ${sc == null ? "" : scoreBand(sc)}`}>
@@ -114,7 +118,7 @@ export default function RecoveryPanel({
                   <b>{fmtDate(e.date)}</b>
                   <span className="feed-sub">
                     {[
-                      e.sleepHours != null ? `${fmt(e.sleepHours)}h sleep` : null,
+                      band != null ? `${SLEEP_BAND_SHORT[band - 1]} sleep` : null,
                       e.armReadiness != null
                         ? `arm ${e.armReadiness}/5`
                         : null,
@@ -233,6 +237,8 @@ function InsightBlock({
     i.topScore != null && i.bottomScore != null
       ? Math.round(i.topScore - i.bottomScore)
       : null;
+  // In bands now, so the threshold is bands: less than three quarters of one
+  // is the same answer either side of a rounding boundary.
   const sleepGap =
     i.topSleep != null && i.bottomSleep != null
       ? i.topSleep - i.bottomSleep
@@ -241,7 +247,7 @@ function InsightBlock({
   // Nothing meaningful to claim if both gaps are inside the noise.
   const meaningful =
     (scoreGap != null && Math.abs(scoreGap) >= 5) ||
-    (sleepGap != null && Math.abs(sleepGap) >= 0.5);
+    (sleepGap != null && Math.abs(sleepGap) >= 0.75);
 
   return (
     <div className="insight">
@@ -251,8 +257,10 @@ function InsightBlock({
           Your <b>best throwing days</b> (avg {fmt(i.topVelo)}) came with{" "}
           {i.topSleep != null && (
             <>
-              <b>{fmt(i.topSleep)}h sleep</b>
-              {i.bottomSleep != null && <> vs {fmt(i.bottomSleep)}h</>}
+              <b>{sleepBandLabel(i.topSleep)} of sleep</b>
+              {i.bottomSleep != null && (
+                <> vs {sleepBandLabel(i.bottomSleep).toLowerCase()}</>
+              )}
             </>
           )}
           {i.topSleep != null && scoreGap != null && " and "}
