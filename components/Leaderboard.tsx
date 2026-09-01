@@ -18,7 +18,8 @@ function ordinal(n: number): string {
 export default function Leaderboard() {
   const [tracker, setTracker] = useState<TrackerId>("mound");
   const [oz, setOz] = useState(5);
-  const [group, setGroup] = useState("all");
+  // null = the athlete has not chosen yet, so their own group is used
+  const [group, setGroup] = useState<string | null>(null);
 
   const { data, error, isLoading } = useSWR<Board[]>(
     `/api/leaderboard?tracker=${tracker}&oz=${oz}`,
@@ -36,7 +37,22 @@ export default function Leaderboard() {
    * cascading render.
    */
   const boards = data ?? [];
-  const shownGroup = boards.some((b) => b.key === group) ? group : "all";
+
+  /*
+   * An athlete lands on his own group rather than the top of the building, so
+   * the first thing he sees is the board he is actually competing on. Derived
+   * rather than assigned in an effect: `group` stays null until he picks
+   * something, and any explicit choice — including "all" — wins from then on.
+   *
+   * `you` covers the athlete ranked below the visible rows: he is still in that
+   * band even with no row of his own. A coach matches nothing here and falls
+   * through to all boards, which is what a coach wants.
+   */
+  const ownGroup = boards.find(
+    (b) => b.key !== "facility" && (b.you != null || b.rows.some((r) => r.isYou)),
+  )?.key;
+  const chosen = group ?? ownGroup ?? "all";
+  const shownGroup = boards.some((b) => b.key === chosen) ? chosen : "all";
   const visible =
     shownGroup === "all" ? boards : boards.filter((b) => b.key === shownGroup);
 
