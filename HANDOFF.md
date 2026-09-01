@@ -486,11 +486,19 @@ levels:
 
 - **The athlete edits it** — most of the profile: his name, height, weight,
   throws/bats, school, grad years, phone, guardian and emergency contacts,
-  injury history.
-- **He sees it but can't change it** — `inviteEmail` (his login; a typo here locks him
-  out of his own account), `level` (it stamps his records, so it is a program
-  decision — see **## Leaderboard**), and `status` (On-Site / Remote, also a program
-  decision). These render read-only on his form.
+  injury history, and his own `level` and `status`. The last two were coach-only
+  at first. That bought a little leaderboard integrity and cost a round of
+  chasing per athlete, which is a bad trade at this facility's size — a
+  mis-declared level is obvious on the boards within a day, and the coach can
+  always overrule it. Both are still validated against their option lists, so
+  he picks from Youth/High School/College/Pro, not free text.
+- **He sees it but can't change it** — `inviteEmail` alone. It is his login, and a
+  typo locks him out of his own account. It renders read-only on his form.
+
+  Note what setting `level` costs him if he gets it wrong: a session is stamped
+  with his level at the moment it is logged and **never re-stamped**, so a
+  correction fixes future sessions and leaves the already-stamped ones where
+  they were. See **## Leaderboard**.
 - **He sets it once, then it's the coach's** — `birthDate`, flagged
   `athleteSetOnce`. He can fill it while it is blank, at signup or from his profile;
   once it holds a value he cannot change *or clear* it, and only a coach can. This

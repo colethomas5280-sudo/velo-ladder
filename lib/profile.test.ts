@@ -34,11 +34,13 @@ test("a coach receives every field", () => {
   assert.equal(visibleProfile(row, true).coachNotes, "shoulder concern");
 });
 
-test("an athlete can see but never edit email, level and status", () => {
-  // birthDate is deliberately NOT in this list — it is set-once, covered below.
+test("an athlete can see but never edit his login email", () => {
+  // The only permanently coach-only field: a typo locks him out of his account.
+  // birthDate is set-once (covered below); level and status are his to choose.
   const athleteKeys = editableKeys(false, { birthDate: null });
-  for (const k of ["inviteEmail", "level", "status"])
-    assert.equal(athleteKeys.includes(k), false, `${k} must not be athlete-editable`);
+  assert.equal(athleteKeys.includes("inviteEmail"), false);
+  for (const k of ["level", "status"])
+    assert.equal(athleteKeys.includes(k), true, `${k} should be athlete-editable`);
   assert.equal(
     PROFILE_FIELDS.find((f) => f.key === "birthDate")?.athleteCanSee,
     true,

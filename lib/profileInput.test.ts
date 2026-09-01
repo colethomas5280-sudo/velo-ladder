@@ -43,7 +43,7 @@ test("an athlete cannot write email, level or status even by sending them", () =
   // These are visible-but-read-only for an athlete: the "ask your coach"
   // message is fine because he can already see the field on his form.
   // birthDate is excluded here — it is set-once, covered by its own tests.
-  for (const key of ["inviteEmail", "level", "status"]) {
+  for (const key of ["inviteEmail"]) {
     const r = parseProfilePatch({ [key]: "2005-01-01" }, false, { birthDate: null });
     assert.equal(r.ok, false, `${key} must be refused for an athlete`);
     assert.match(r.ok === false ? r.error : "", /ask your coach/i);
@@ -207,4 +207,18 @@ test("without a current row, a set-once field reads as locked", () => {
   // Failing closed matters: a caller that forgets to pass the row must not
   // accidentally hand an athlete a field he cannot otherwise change.
   assert.equal(parseProfilePatch({ birthDate: "2012-06-15" }, false).ok, false);
+});
+
+test("an athlete sets his own level and training status", () => {
+  // These were coach-only. The hurdle cost more than the integrity it bought:
+  // a mis-declared level shows up on the leaderboard within a day, whereas
+  // chasing every athlete for two dropdowns is guaranteed work.
+  const cur = { birthDate: "2012-06-15" };
+  assert.equal(parseProfilePatch({ level: "High School" }, false, cur).ok, true);
+  assert.equal(parseProfilePatch({ status: "Remote" }, false, cur).ok, true);
+  // Still validated against their options, not free text.
+  assert.equal(parseProfilePatch({ level: "Semi-Pro" }, false, cur).ok, false);
+  assert.equal(parseProfilePatch({ status: "Hybrid" }, false, cur).ok, false);
+  // The login email stays the coach's — a typo there locks him out.
+  assert.equal(parseProfilePatch({ inviteEmail: "x@y.com" }, false, cur).ok, false);
 });

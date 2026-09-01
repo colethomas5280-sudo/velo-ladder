@@ -69,11 +69,21 @@ export const PROFILE_FIELDS: ProfileField[] = [
   // His login. Editable by the coach only: a typo here locks him out.
   { key: "inviteEmail", label: "Login email", kind: "text", section: "identity",
     athleteCanSee: true, athleteCanEdit: false, maxLength: 200 },
-  // Stamps his records, so it is a program decision rather than a preference.
+  /*
+   * Both are the athlete's to set. They were coach-only, which bought a little
+   * leaderboard integrity and cost the coach a round of chasing per athlete —
+   * a bad trade at this facility's size, where a mis-declared level is obvious
+   * on the boards within a day.
+   *
+   * Level still stamps a session at the moment it is logged and is never
+   * re-stamped, so correcting it fixes future sessions and leaves the already
+   * stamped ones where they were. That is the price of letting him choose, and
+   * it is why the coach can always overrule him.
+   */
   { key: "level", label: "Level", kind: "select", section: "identity",
-    athleteCanSee: true, athleteCanEdit: false, required: true, options: LEVELS },
+    athleteCanSee: true, athleteCanEdit: true, required: true, options: LEVELS },
   { key: "status", label: "Training", kind: "select", section: "identity",
-    athleteCanSee: true, athleteCanEdit: false, options: STATUSES },
+    athleteCanSee: true, athleteCanEdit: true, options: STATUSES },
 
   // physical
   { key: "heightIn", label: "Height", kind: "number", section: "physical",
