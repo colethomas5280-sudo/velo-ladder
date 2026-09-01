@@ -124,16 +124,29 @@ export async function execScript(script: string): Promise<void> {
 }
 
 /**
- * Split a SQL script on top-level semicolons, respecting dollar-quoted blocks
- * ($$ ... $$) so a DO block's internal semicolons don't tear it apart.
- * Comment-only lines are stripped from each statement.
+ * Split a SQL script on top-level semicolons.
+ *
+ * Only semicolons that actually end a statement count, so the scanner has to
+ * know the three places one can hide:
+ *
+ *   $$ ... $$   a dollar-quoted block, whose DO body has its own semicolons
+ *   '...'       a string literal ('' escapes a quote inside one)
+ *   -- ...      a line comment, whose text is prose and is dropped entirely
+ *
+ * The comment case is not hypothetical. A retirement note in the schema read
+ * "...keep the same shape; nothing reads it." — that semicolon split the
+ * statement, and the orphaned half of the sentence was handed to Postgres as
+ * SQL. It failed only in production, because local dev hands the whole script
+ * to PGlite and never splits it at all.
  */
 export function splitStatements(script: string): string[] {
   const out: string[] = [];
   let buf = "";
   let tag: string | null = null;
   let i = 0;
+
   while (i < script.length) {
+    // Inside a dollar-quoted block: copy verbatim until the closing tag.
     if (tag) {
       if (script.startsWith(tag, i)) {
         buf += tag;
@@ -144,6 +157,32 @@ export function splitStatements(script: string): string[] {
       }
       continue;
     }
+
+    // Line comment: skip its text, keep the newline so lines stay separate.
+    if (script.startsWith("--", i)) {
+      const nl = script.indexOf("\n", i);
+      i = nl === -1 ? script.length : nl;
+      continue;
+    }
+
+    // String literal: copy it whole, so nothing inside is read as syntax.
+    if (script[i] === "'") {
+      buf += script[i++];
+      while (i < script.length) {
+        if (script[i] === "'" && script[i + 1] === "'") {
+          buf += "''";
+          i += 2;
+          continue;
+        }
+        if (script[i] === "'") {
+          buf += script[i++];
+          break;
+        }
+        buf += script[i++];
+      }
+      continue;
+    }
+
     const open = /^\$[A-Za-z_]*\$/.exec(script.slice(i));
     if (open) {
       tag = open[0];
@@ -151,22 +190,17 @@ export function splitStatements(script: string): string[] {
       i += tag.length;
       continue;
     }
+
     if (script[i] === ";") {
       out.push(buf);
       buf = "";
       i++;
       continue;
     }
+
     buf += script[i++];
   }
+
   out.push(buf);
-  return out
-    .map((chunk) =>
-      chunk
-        .split("\n")
-        .filter((line) => !line.trim().startsWith("--"))
-        .join("\n")
-        .trim(),
-    )
-    .filter(Boolean);
+  return out.map((chunk) => chunk.trim()).filter(Boolean);
 }
