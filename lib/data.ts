@@ -591,6 +591,26 @@ export async function upsertRecovery(
       updated_at = now()
     RETURNING *
   `) as Record<string, unknown>[];
+
+  /*
+   * The profile weight follows the most recent reading rather than
+   * competing with it. A kid who checks in keeps it current without ever
+   * opening his profile; a kid who never checks in keeps the number he
+   * gave at signup. One value, one meaning, and the card shows which.
+   *
+   * Guarded on the date so back-filling an old check-in cannot overwrite
+   * a newer weight with a staler one.
+   */
+  if (input.bodyWeight != null)
+    await sql`
+      UPDATE athletes
+         SET weight_lb = ${input.bodyWeight},
+             weight_source = 'checkin',
+             weight_at = ${input.date}
+       WHERE id = ${athleteId}
+         AND (weight_at IS NULL OR weight_at <= ${input.date})
+    `;
+
   return toRecovery(rows[0]);
 }
 
