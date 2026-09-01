@@ -1255,7 +1255,25 @@ table.roster-table {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
   gap: 16px;
-  align-items: start;
+}
+
+/*
+ * Every widget is the same size, so the dashboard reads as one set rather than
+ * six boxes that happen to sit near each other. Cards stretch to fill their row
+ * (the grid default, which `align-items: start` used to defeat), and `1fr` rows
+ * make each row match the tallest card on the page.
+ *
+ * Only once there are at least two columns. In a single column every card is
+ * its own row, so equalising there pads the short ones out to the tallest and
+ * turns the dashboard into a long scroll of mostly empty boxes on a phone.
+ *
+ * Safe to equalise because the lists are capped server-side at 8 rows, so one
+ * busy widget cannot stretch the others without limit.
+ */
+@media (min-width: 720px) {
+  .dash-grid {
+    grid-auto-rows: 1fr;
+  }
 }
 .widget .sec-h {
   margin-bottom: 10px;
