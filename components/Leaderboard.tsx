@@ -18,11 +18,27 @@ function ordinal(n: number): string {
 export default function Leaderboard() {
   const [tracker, setTracker] = useState<TrackerId>("mound");
   const [oz, setOz] = useState(5);
+  const [group, setGroup] = useState("all");
 
   const { data, error, isLoading } = useSWR<Board[]>(
     `/api/leaderboard?tracker=${tracker}&oz=${oz}`,
     fetcher,
   );
+
+  /*
+   * Filter client-side: the response already carries every board, so changing
+   * group costs no round trip.
+   *
+   * The chosen group can vanish underneath you — filter to College, switch to a
+   * weight nobody at College has thrown, and that board is simply absent from
+   * the next response. Falling back to "all" here (rather than resetting state
+   * in an effect) keeps the picker honest about what is on screen without a
+   * cascading render.
+   */
+  const boards = data ?? [];
+  const shownGroup = boards.some((b) => b.key === group) ? group : "all";
+  const visible =
+    shownGroup === "all" ? boards : boards.filter((b) => b.key === shownGroup);
 
   return (
     <div className="lb">
@@ -35,6 +51,22 @@ export default function Leaderboard() {
             </button>
           ))}
         </div>
+
+        {boards.length > 1 && (
+          <select
+            className="lb-filter"
+            aria-label="Group"
+            value={shownGroup}
+            onChange={(e) => setGroup(e.target.value)}
+          >
+            <option value="all">All boards</option>
+            {boards.map((b) => (
+              <option key={b.key} value={b.key}>
+                {b.title}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="chips">
@@ -60,7 +92,7 @@ export default function Leaderboard() {
         </p>
       )}
 
-      {data?.map((board) => (
+      {visible.map((board) => (
         <section className="card pad lb-board" key={board.key}>
           <div className="sec-h">
             <h3>{board.title}</h3>
