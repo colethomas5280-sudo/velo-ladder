@@ -79,7 +79,7 @@ export async function listAthletes(
   return (rows as Record<string, unknown>[]).map(toAthlete);
 }
 
-export async function listAthleteOverview(): Promise<AthleteOverview[]> {
+export async function listAthleteOverview(): Promise<Omit<AthleteOverview, "missing">[]> {
   const rows = (await sql`
     SELECT a.*,
       COUNT(*) FILTER (WHERE s.type = 'mound')    AS mound_n,

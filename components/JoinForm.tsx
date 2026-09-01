@@ -66,7 +66,7 @@ export default function JoinForm({ token }: { token: string }) {
           redirect: false,
         });
         if (!r?.error) {
-          window.location.href = "/";
+          window.location.href = "/profile?welcome=1";
           return;
         }
       }

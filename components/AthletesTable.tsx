@@ -174,6 +174,11 @@ export default function AthletesTable() {
                     <Link href={`/athletes/${a.id}`} className="name-link">
                       {a.name}
                     </Link>
+                    {a.missing > 0 && (
+                      <span className="pf-missing" title="Profile fields still blank">
+                        {a.missing} missing
+                      </span>
+                    )}
                   </td>
                   <td className="cell-edit">
                     <input

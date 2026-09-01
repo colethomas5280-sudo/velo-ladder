@@ -2164,3 +2164,15 @@ table.roster-table {
 .pf-locked span { color: var(--ink-faint); font-size: 12px; margin-left: 8px; }
 .pf-unit { font-size: 12.5px; color: var(--ink-faint); }
 .pf-prov { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
+.pf-missing {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 8px;
+  white-space: nowrap;
+}
