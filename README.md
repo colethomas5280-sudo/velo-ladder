@@ -109,3 +109,28 @@ components/       React UI (Tracker, EntryForm, RecordsPanel, ProgressChart, …
 
 Every API route checks authorization: a coach can read/write all athletes; an
 athlete only their own; anyone else gets 403.
+
+## Dependencies
+
+`next`, `react`, `react-dom` and `next-auth` are pinned to exact versions with
+no `^`. The rest carry a caret, which is fine for packages that keep semver.
+
+**`next-auth` is pinned for a different reason and should stay that way.** It is
+a pre-1.0 prerelease (`5.0.0-beta.32`), and prerelease numbers carry no
+compatibility promise — `beta.33` is free to break `beta.32`. A caret would also
+have spanned into a stable `5.x`:
+
+```
+^5.0.0-beta.32  accepts  beta.33 … 5.9.9   (a breaking release is inside the range)
+ 5.0.0-beta.32  accepts  beta.32 only
+```
+
+Deploys were never at risk, because Vercel installs from the committed
+lockfile. The exposure was someone running `npm install` or `npm update`
+locally and picking up a new version by accident — and this package decides
+whether anyone can sign in, so a break there locks out the coach too.
+
+Upgrading it is fine, but do it deliberately: bump the pin on its own, then
+sign in as a coach *and* as an athlete before pushing. Athlete login is the
+better check, since it queries the database while the coach path only compares
+`COACH_PASSWORD` from the environment.
