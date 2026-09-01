@@ -5,18 +5,13 @@ import MyProfile from "@/components/MyProfile";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProfilePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ welcome?: string }>;
-}) {
+export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
-  const { welcome } = await searchParams;
   return (
     <div className="wrap">
       <AppHeader email={session.user.email} />
-      <MyProfile welcome={welcome === "1"} />
+      <MyProfile />
     </div>
   );
 }

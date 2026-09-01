@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
-import ProfileForm from "./ProfileForm";
+import ProfileSummary from "./ProfileSummary";
 
 type Me = {
   role: "coach" | "athlete" | "none";
@@ -16,7 +16,7 @@ type Me = {
  * through /api/me rather than querying the database from a server component,
  * and this one does the same.
  */
-export default function MyProfile({ welcome = false }: { welcome?: boolean }) {
+export default function MyProfile() {
   const { data, isLoading, error } = useSWR<Me>("/api/me", fetcher);
 
   if (isLoading) return <p className="widget-empty">Loading…</p>;
@@ -29,11 +29,7 @@ export default function MyProfile({ welcome = false }: { welcome?: boolean }) {
 
   if (data.athleteId)
     return (
-      <ProfileForm
-        athleteId={data.athleteId}
-        isCoach={false}
-        welcome={welcome}
-      />
+      <ProfileSummary athleteId={data.athleteId} isCoach={false} />
     );
 
   if (data.role === "coach")

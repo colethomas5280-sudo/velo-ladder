@@ -67,7 +67,7 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/athletes` | The roster/spreadsheet (coach only). |
 | `/resources` | Shared protocol/how-to library. Coaches write, athletes read. |
 | `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
-| `/profile` | The athlete's own profile form — "My profile" in the nav. Same `ProfileForm` component the coach sees as a section of `/athletes/[id]`, behind an `auth()`-only server component that resolves the athlete id client-side via `/api/me`. See **## Athlete profile**. |
+| `/profile` | The athlete's own profile — "My profile" in the nav. Same `ProfileSummary` the coach sees as a section of `/athletes/[id]`, behind an `auth()`-only server component that resolves the athlete id client-side via `/api/me`. The edit modal opens by itself while anything required is blank. See **## Athlete profile**. |
 | `/login` | Email + password. |
 | `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
 | `/leaderboard` | Facility + level velocity record boards. Coach and athlete both. See **## Leaderboard**. |
@@ -459,7 +459,7 @@ built. `coach` and `athlete` can read the board; `role: "none"` gets a 403.
 
 An intake profile per athlete — name, physical, school, contact, guardian, injury
 history. The athlete edits his own on `/profile`; the coach edits it as a section of
-the athlete's page. Both render the same `ProfileForm`.
+the athlete's page. Both render `ProfileSummary`, which opens `ProfileModal` to edit.
 
 ### One config array is the source of truth
 
@@ -565,7 +565,30 @@ which source the number has.
 
 One component behind two doors: `/profile` for the athlete (nav: "My profile"), and
 the same component as a section of `/athletes/[id]` for the coach, so the coach's view
-of the profile is never the neglected one. `/profile` follows the app's house pattern
+of the profile is never the neglected one.
+
+**At rest it is a summary, not a form** — `ProfileSummary` renders a two-column
+label/value panel, with **age derived from the birth date** and the weight's
+provenance beside it. Blank fields still show their label, so a gap is visible rather
+than absent, and a blank *required* one carries a small "needed" marker. The two
+free-text fields, `injuryNotes` and `coachNotes`, read as paragraphs rather than
+label/value pairs, so they sit underneath and only when they hold something.
+
+**Editing happens in `ProfileModal`**, on the same modal shell as the recovery
+check-in — a second modal implementation would be a second way of doing what the app
+already does one way. It mirrors `RecoveryPanel` / `RecoveryModal`, which is the house
+pattern for exactly this split.
+
+**The modal opens by itself for an athlete while any required field is blank**, and
+its button reads "Complete". It never auto-opens for a coach: a popup every time he
+opened a half-filled profile would be an interruption, not a prompt. Auto-open is
+derived from `missingProfileFields` rather than a stored "dismissed" flag, so the
+popup and the roster's "N missing" marker cannot disagree, and no column was needed.
+
+Dismissal is component state, deliberately. "Not now" closes it for this visit and it
+returns next sign-in — the nudge is the point. **The derivation is also why dismissal
+has to exist at all:** without it the modal would reopen the instant it closed, since
+the condition that opened it is still true. `/profile` follows the app's house pattern
 — a server component gating on `auth()` only, with the athlete id resolved
 client-side from `/api/me`. **No page in this app queries the database from a server
 component** (PGlite throws inside an RSC — see gotchas); an early attempt to do it
