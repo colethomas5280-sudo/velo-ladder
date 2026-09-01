@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { readLocal, subscribeLocal, writeLocal } from "@/lib/localStore";
 
 export type WidgetId =
   | "snapshot"
@@ -84,12 +85,43 @@ export function loadWidgets(): WidgetId[] {
   }
 }
 
-function saveWidgets(ids: WidgetId[]) {
-  try {
-    window.localStorage.setItem(KEY, JSON.stringify(ids));
-  } catch {
-    /* ignore */
+/**
+ * Storage is the single source of truth for which widgets are on. It used to
+ * be mirrored into React state as well, with both written on every toggle —
+ * two copies of one fact, kept in step by hand.
+ */
+export function setWidgets(ids: WidgetId[]) {
+  writeLocal(KEY, JSON.stringify(ids));
+}
+
+/*
+ * `getSnapshot` has to return the same array until the stored value actually
+ * changes; a fresh parse each call would re-render forever. Caching on the raw
+ * string is what makes that true.
+ */
+let cachedRaw: string | null = null;
+let cachedWidgets: WidgetId[] = DEFAULT_WIDGETS;
+
+function getWidgetsSnapshot(): WidgetId[] {
+  const raw = readLocal(KEY);
+  if (raw !== cachedRaw) {
+    cachedRaw = raw;
+    cachedWidgets = loadWidgets();
   }
+  return cachedWidgets;
+}
+
+/** The server has no saved layout, so it renders every widget. */
+function getWidgetsServerSnapshot(): WidgetId[] {
+  return DEFAULT_WIDGETS;
+}
+
+export function useWidgets(): WidgetId[] {
+  return useSyncExternalStore(
+    subscribeLocal,
+    getWidgetsSnapshot,
+    getWidgetsServerSnapshot,
+  );
 }
 
 export default function CustomizeDashboard({
@@ -118,7 +150,6 @@ export default function CustomizeDashboard({
           (w) => w.id,
         );
     onChange(next);
-    saveWidgets(next);
   };
 
   const groups = [...new Set(WIDGETS.map((w) => w.group))];

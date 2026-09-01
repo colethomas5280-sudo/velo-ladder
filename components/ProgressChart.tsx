@@ -94,7 +94,7 @@ export default function ProgressChart({
       const allVals = rows.flatMap((r) => [r.best, r.avg, r.min]);
       const mn = Math.min(...allVals);
       const mx = Math.max(...allVals);
-      let lo = Math.floor(mn - 1.5);
+      const lo = Math.floor(mn - 1.5);
       let hi = Math.ceil(mx + 1.5);
       if (hi - lo < 4) hi = lo + 4;
       const X = (i: number) =>

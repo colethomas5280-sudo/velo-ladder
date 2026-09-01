@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import type {
   Athlete,
@@ -25,6 +26,7 @@ import {
   saveDraft,
   clearDraft,
 } from "@/lib/draft";
+import { useTracker } from "./useTracker";
 import Masthead from "./Masthead";
 import EntryForm from "./EntryForm";
 import ProgressChart from "./ProgressChart";
@@ -34,7 +36,6 @@ import RecoveryPanel from "./RecoveryPanel";
 import GuidanceCard from "./GuidanceCard";
 import ProfileSummary from "./ProfileSummary";
 
-const TRACKER_KEY = "veloladder:tracker";
 
 type Me = { role: "coach" | "athlete" | "none"; athleteId: string | null };
 
@@ -59,19 +60,18 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   );
   const recovery = useMemo(() => recoveryData ?? [], [recoveryData]);
 
-  const [tracker, setTrackerState] = useState<TrackerId>("mound");
-  useEffect(() => {
-    const saved = window.localStorage.getItem(TRACKER_KEY);
-    if (saved === "mound" || saved === "pulldown") setTrackerState(saved);
-  }, []);
-  const setTracker = (t: TrackerId) => {
-    setTrackerState(t);
-    window.localStorage.setItem(TRACKER_KEY, t);
-  };
+  const [tracker, setTracker] = useTracker();
   const cfg = TRACKERS[tracker];
 
   const [draft, setDraftState] = useState<Draft>(emptyDraft());
+  /*
+   * Load the saved draft for whichever athlete + tracker is showing. This is
+   * a genuine effect rather than a `useSyncExternalStore` read: the draft is
+   * rewritten on every keystroke, and a snapshot function has to return a
+   * stable object identity, which a freshly parsed draft never can.
+   */
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     setDraftState(loadDraft(athleteId, tracker));
   }, [athleteId, tracker]);
   const setDraft = (next: Draft) => {
@@ -225,7 +225,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         <h3>Can&rsquo;t open this athlete</h3>
         <p>
           It may have been removed, or you don&rsquo;t have access.{" "}
-          <a href="/">Back to Athletes</a>
+          <Link href="/">Back to Athletes</Link>
         </p>
       </div>
     );
