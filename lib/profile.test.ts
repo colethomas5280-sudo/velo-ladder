@@ -34,11 +34,10 @@ test("a coach receives every field", () => {
   assert.equal(visibleProfile(row, true).coachNotes, "shoulder concern");
 });
 
-test("an athlete can see but not edit email, level, status and birth date", () => {
-  const athleteKeys = editableKeys(false);
-  // birthDate joins this tier: the youth age bands derive from it and those
-  // boards are visible to every athlete in the building (finding 6).
-  for (const k of ["inviteEmail", "level", "status", "birthDate"])
+test("an athlete can see but never edit email, level and status", () => {
+  // birthDate is deliberately NOT in this list — it is set-once, covered below.
+  const athleteKeys = editableKeys(false, { birthDate: null });
+  for (const k of ["inviteEmail", "level", "status"])
     assert.equal(athleteKeys.includes(k), false, `${k} must not be athlete-editable`);
   assert.equal(
     PROFILE_FIELDS.find((f) => f.key === "birthDate")?.athleteCanSee,
@@ -95,4 +94,20 @@ test("every field declares a section that exists, and keys are unique", () => {
     assert.ok(f.label.length > 0, `${f.key} needs a label`);
     assert.ok(validSections.has(f.section), `${f.key} section "${f.section}" must exist in PROFILE_SECTIONS`);
   }
+});
+
+test("birth date is set-once for an athlete: his while blank, the coach's after", () => {
+  // The youth age bands derive from it and those boards are visible to every
+  // athlete in the building, so he supplies it once and cannot then revise it.
+  assert.equal(editableKeys(false, { birthDate: null }).includes("birthDate"), true);
+  assert.equal(editableKeys(false, { birthDate: "" }).includes("birthDate"), true);
+  assert.equal(
+    editableKeys(false, { birthDate: "2012-06-15" }).includes("birthDate"),
+    false,
+  );
+  // A coach's answer never depends on what is stored.
+  for (const cur of [{ birthDate: null }, { birthDate: "2012-06-15" }])
+    assert.equal(editableKeys(true, cur).includes("birthDate"), true);
+  // Omitting the row fails closed.
+  assert.equal(editableKeys(false).includes("birthDate"), false);
 });

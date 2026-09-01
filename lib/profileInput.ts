@@ -82,8 +82,16 @@ function parseOne(
 export function parseProfilePatch(
   body: Record<string, unknown>,
   isCoach: boolean,
+  current?: Record<string, unknown> | null,
 ): Parsed {
-  const allowed = new Set(editableKeys(isCoach));
+  /*
+   * The allowlist is value-dependent for set-once fields: an athlete may fill
+   * a blank birth date but not revise one already stored. Passing `current` is
+   * what lets that be decided here rather than in the route, keeping every
+   * write rule in one place. Without it, set-once fields read as locked —
+   * which is the safe direction to fail.
+   */
+  const allowed = new Set(editableKeys(isCoach, current));
   const patch: Record<string, string | number | null> = {};
 
   for (const [key, raw] of Object.entries(body)) {
@@ -94,8 +102,15 @@ export function parseProfilePatch(
     // silently ignored. Answering "you can't change coach notes — ask your
     // coach" would confirm to the athlete that the field exists.
     if (!isCoach && !f.athleteCanSee) continue;
-    if (!allowed.has(key))
-      return { ok: false, error: `You can't change ${f.label.toLowerCase()} — ask your coach` };
+    if (!allowed.has(key)) {
+      const setOnce = f.athleteSetOnce && !isCoach;
+      return {
+        ok: false,
+        error: setOnce
+          ? `${f.label} is already set — ask your coach to change it`
+          : `You can't change ${f.label.toLowerCase()} — ask your coach`,
+      };
+    }
 
     // An emptied form field ("") is a clear, not a value.
     const value = raw === "" ? null : raw;

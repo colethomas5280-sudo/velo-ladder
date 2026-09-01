@@ -43,7 +43,13 @@ export async function PATCH(
   const isCoach = scope.role === "coach";
   if (!isCoach && !scope.athleteIds.includes(id)) return forbidden();
 
-  const parsed = parseProfilePatch(body, isCoach);
+  // `target` is the row fetched above; the parser needs it to decide whether a
+  // set-once field is still blank and therefore the athlete's to fill.
+  const parsed = parseProfilePatch(
+    body,
+    isCoach,
+    target as unknown as Record<string, unknown>,
+  );
   if (!parsed.ok) return badRequest(parsed.error);
 
   // Coach-only controls that are not profile fields, carried over unchanged

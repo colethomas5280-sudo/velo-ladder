@@ -7,6 +7,7 @@ import { fmtDate } from "@/lib/velo";
 import {
   PROFILE_FIELDS,
   PROFILE_SECTIONS,
+  isBlankValue,
   type ProfileField,
 } from "@/lib/profile";
 
@@ -39,7 +40,16 @@ export default function ProfileForm({
   if (!data) return <p className="widget-empty">Couldn&apos;t load this profile.</p>;
 
   const shown = (f: ProfileField) => f.key in data;
-  const editable = (f: ProfileField) => isCoach || f.athleteCanEdit;
+  /*
+   * Mirrors the API's rule rather than inventing a second one: a set-once
+   * field is the athlete's to fill while blank and the coach's to change
+   * afterwards. `edits` is consulted too, so a field he has just typed into
+   * doesn't lock under him mid-form.
+   */
+  const editable = (f: ProfileField) =>
+    isCoach ||
+    f.athleteCanEdit ||
+    (!!f.athleteSetOnce && isBlankValue(edits[f.key] ?? data[f.key]));
   const value = (f: ProfileField) =>
     edits[f.key] ?? (data[f.key] == null ? "" : String(data[f.key]));
 
@@ -101,7 +111,11 @@ export default function ProfileForm({
                 {!editable(f) ? (
                   <div className="pf-locked">
                     {value(f) || "—"}
-                    <span>your coach sets this</span>
+                    <span>
+                      {f.athleteSetOnce
+                        ? "ask your coach to change this"
+                        : "your coach sets this"}
+                    </span>
                   </div>
                 ) : f.kind === "select" ? (
                   <select
