@@ -2038,6 +2038,20 @@ table.roster-table {
    The global `th, td` rule sets `text-align: center` and `white-space: nowrap`,
    so `.lb-table td` has to re-assert left / normal; `.lb-dim` and `.lb-velo`
    put `nowrap` back where wrapping is unwanted. */
+/* Sits beside the tracker toggle. Same visual language as the check-in
+   form's selects, but auto-width so it doesn't stretch across the toolbar. */
+.lb-filter {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--ink);
+  max-width: 100%;
+}
+.lb-filter:hover { border-color: var(--accent); }
+.lb .view-switch { flex-wrap: wrap; }
+
 .lb-board { margin-top: 14px; }
 .lb-scroll { overflow-x: auto; }
 .lb-table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
