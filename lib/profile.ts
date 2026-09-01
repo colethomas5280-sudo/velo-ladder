@@ -1,4 +1,4 @@
-import { LEVELS } from "./leaderboard";
+import { LEVELS, ageOn } from "./leaderboard";
 
 /* ------------------------------------------------------------------ *
  * The athlete profile, as data.
@@ -145,18 +145,6 @@ export function editableKeys(isCoach: boolean): string[] {
 const isBlank = (v: unknown) =>
   v == null || (typeof v === "string" && v.trim() === "");
 
-/** Whole years old today, or null when there is no birth date. */
-function ageToday(birthDate: string | null | undefined): number | null {
-  if (!birthDate) return null;
-  const [by, bm, bd] = birthDate.split("-").map(Number);
-  const now = new Date();
-  let age = now.getUTCFullYear() - by;
-  const m = now.getUTCMonth() + 1;
-  const d = now.getUTCDate();
-  if (m < bm || (m === bm && d < bd)) age--;
-  return age;
-}
-
 /**
  * Which required fields are still blank. Only the ones a coach actually
  * chases count — marking every row for a missing "positions" would be
@@ -166,9 +154,11 @@ export function missingProfileFields(a: {
   [k: string]: unknown;
   birthDate?: string | null;
 }): string[] {
-  const age = ageToday(a.birthDate as string | null | undefined);
-  const isMinor = age != null && age < 18;
+  const birthDate = a.birthDate as string | null | undefined;
+  const today = new Date().toISOString().slice(0, 10);
+  const age = birthDate ? ageOn(birthDate, today) : null;
+  const isMinor = age != null && age >= 0 && age < 18;
   return PROFILE_FIELDS.filter(
-    (f) => (f.required || (f.requiredIfMinor && isMinor)) && f.key in a && isBlank(a[f.key]),
+    (f) => (f.required || (f.requiredIfMinor && isMinor)) && isBlank(a[f.key]),
   ).map((f) => f.key);
 }
