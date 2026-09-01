@@ -1,13 +1,11 @@
 import { getScope, canSeeAthlete } from "@/lib/scope";
 import { getAthlete, updateAthlete } from "@/lib/data";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
-import { LEVELS, type Level, isValidBirthDate } from "@/lib/leaderboard";
-import type { Hand } from "@/lib/types";
+import { visibleProfile } from "@/lib/profile";
+import { parseProfilePatch } from "@/lib/profileInput";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const isHand = (v: unknown): v is Hand => v === "R" || v === "L" || v === "";
 
 export async function GET(
   _request: Request,
@@ -19,7 +17,9 @@ export async function GET(
   if (!canSeeAthlete(scope, id)) return forbidden();
   const athlete = await getAthlete(id);
   if (!athlete || athlete.archived) return notFound();
-  return json(athlete);
+  // The line that keeps coachNotes off an athlete's wire — stripped by role
+  // server-side, not merely hidden in the UI.
+  return json(visibleProfile(athlete as unknown as Record<string, unknown>, scope.role === "coach"));
 }
 
 export async function PATCH(
@@ -39,50 +39,41 @@ export async function PATCH(
   if (password && password.length < 6)
     return badRequest("Password must be at least 6 characters");
 
-  if (scope.role === "coach") {
-    const updated = await updateAthlete(id, {
-      name: typeof body.name === "string" ? body.name : undefined,
-      hand: isHand(body.hand) ? body.hand : undefined,
-      inviteEmail:
-        body.inviteEmail === undefined
-          ? undefined
-          : String(body.inviteEmail || "") || null,
-      // null clears the override and falls back to the facility default
-      cnsThresholdPct:
-        body.cnsThresholdPct === undefined
-          ? undefined
-          : body.cnsThresholdPct === null || body.cnsThresholdPct === ""
-            ? null
-            : Number(body.cnsThresholdPct) > 0 &&
-                Number(body.cnsThresholdPct) <= 50
-              ? Number(body.cnsThresholdPct)
-              : undefined,
-      level:
-        body.level === undefined
-          ? undefined
-          : LEVELS.includes(body.level as Level)
-            ? (body.level as Level)
-            : null,
-      birthDate:
-        body.birthDate === undefined
-          ? undefined
-          : isValidBirthDate(body.birthDate)
-            ? body.birthDate
-            : null,
-      password,
-    });
-    return json(updated);
+  const isCoach = scope.role === "coach";
+  if (!isCoach && !scope.athleteIds.includes(id)) return forbidden();
+
+  const parsed = parseProfilePatch(body, isCoach);
+  if (!parsed.ok) return badRequest(parsed.error);
+
+  // Coach-only controls that are not profile fields, carried over unchanged
+  // from the branch this replaces.
+  const extra: { cnsThresholdPct?: number | null } = {};
+  if (isCoach && body.cnsThresholdPct !== undefined) {
+    const raw = body.cnsThresholdPct;
+    if (raw === null || raw === "") extra.cnsThresholdPct = null;
+    else {
+      const n = Number(raw);
+      if (!(n > 0 && n <= 50))
+        return badRequest("CNS band must be between 0 and 50 percent");
+      extra.cnsThresholdPct = n;
+    }
   }
 
-  // an athlete may change only their own hand and their own password
-  if (scope.athleteIds.includes(id)) {
-    const patch: { hand?: Hand; password?: string } = {};
-    if (isHand(body.hand)) patch.hand = body.hand;
-    if (password) patch.password = password;
-    if (!Object.keys(patch).length) return forbidden();
-    return json(await updateAthlete(id, patch));
-  }
-  return forbidden();
+  // Weight entered here is authored, not observed — record that, so the
+  // profile can say where the number came from. A later check-in overwrites
+  // both (Task 4).
+  const stamped =
+    parsed.patch.weightLb !== undefined
+      ? { weightSource: "entered", weightAt: new Date().toISOString().slice(0, 10) }
+      : {};
+
+  const updated = await updateAthlete(id, {
+    ...parsed.patch,
+    ...stamped,
+    ...extra,
+    password,
+  });
+  return json(visibleProfile(updated! as unknown as Record<string, unknown>, isCoach));
 }
 
 export async function DELETE(
