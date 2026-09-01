@@ -486,11 +486,20 @@ levels:
   contacts, injury history.
 - **He sees it but can't change it** — `inviteEmail` (his login; a typo here locks him
   out of his own account), `level` (it stamps his records, so it is a program
-  decision — see **## Leaderboard**), `status` (On-Site / Remote, also a program
-  decision), and `birthDate` (the youth age bands derive from it and those boards are
-  visible to every athlete in the building — same reasoning as `level`). He still
-  supplies `birthDate` once at signup: `consumeInvite` is a separate write path that
-  COALESCEs it in. These render read-only on his form.
+  decision — see **## Leaderboard**), and `status` (On-Site / Remote, also a program
+  decision). These render read-only on his form.
+- **He sets it once, then it's the coach's** — `birthDate`, flagged
+  `athleteSetOnce`. He can fill it while it is blank, at signup or from his profile;
+  once it holds a value he cannot change *or clear* it, and only a coach can. This
+  gets the birthday without the coach chasing it, while stopping an athlete quietly
+  moving himself between age bands on boards the whole facility reads. Clearing the
+  loophole matters as much as the rule: without refusing the clear, set-once would be
+  set-as-often-as-you-like. If a coach clears it, it becomes the athlete's to supply
+  again.
+
+  This is the one write rule that depends on a stored value rather than a role, which
+  is why `editableKeys` and `parseProfilePatch` take the current row. Omit it and a
+  set-once field reads as locked — failing closed, deliberately.
 - **He never receives it at all** — `coachNotes`. `visibleProfile` *deletes* the key
   server-side rather than sending `null`, because a `null` in the payload still tells
   him the field exists. Both athlete-reachable read paths run every row through

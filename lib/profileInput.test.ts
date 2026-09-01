@@ -39,11 +39,12 @@ test("select fields accept only their own options", () => {
   assert.equal(parseProfilePatch({ status: "Hybrid" }, true).ok, false);
 });
 
-test("an athlete cannot write email, level, status or birth date even by sending them", () => {
+test("an athlete cannot write email, level or status even by sending them", () => {
   // These are visible-but-read-only for an athlete: the "ask your coach"
   // message is fine because he can already see the field on his form.
-  for (const key of ["inviteEmail", "level", "status", "birthDate"]) {
-    const r = parseProfilePatch({ [key]: "2005-01-01" }, false);
+  // birthDate is excluded here — it is set-once, covered by its own tests.
+  for (const key of ["inviteEmail", "level", "status"]) {
+    const r = parseProfilePatch({ [key]: "2005-01-01" }, false, { birthDate: null });
     assert.equal(r.ok, false, `${key} must be refused for an athlete`);
     assert.match(r.ok === false ? r.error : "", /ask your coach/i);
   }
@@ -167,4 +168,43 @@ test("a coach may rename via `name`; an athlete may not; an explicit split alway
     { firstName: "Mara", lastName: "Vance-Okafor" },
     "name is dropped when the halves are sent explicitly",
   );
+});
+
+test("an athlete may fill a blank birth date, once", () => {
+  const blank = { birthDate: null };
+  const r = parseProfilePatch({ birthDate: "2012-06-15" }, false, blank);
+  assert.equal(r.ok, true, "his to supply while nothing is stored");
+  assert.deepEqual(r.ok && r.patch, { birthDate: "2012-06-15" });
+});
+
+test("an athlete may not change a birth date that is already set", () => {
+  const filled = { birthDate: "2012-06-15" };
+  const r = parseProfilePatch({ birthDate: "2010-01-01" }, false, filled);
+  assert.equal(r.ok, false);
+  assert.match(r.ok === false ? r.error : "", /already set/i);
+});
+
+test("an athlete may not clear a birth date to reopen it", () => {
+  // Otherwise set-once is set-as-often-as-you-like: clear, then re-set.
+  const filled = { birthDate: "2012-06-15" };
+  assert.equal(parseProfilePatch({ birthDate: null }, false, filled).ok, false);
+  assert.equal(parseProfilePatch({ birthDate: "" }, false, filled).ok, false);
+});
+
+test("a coach may change a birth date whatever is stored", () => {
+  const filled = { birthDate: "2012-06-15" };
+  assert.equal(parseProfilePatch({ birthDate: "2010-01-01" }, true, filled).ok, true);
+  assert.equal(parseProfilePatch({ birthDate: null }, true, filled).ok, true);
+});
+
+test("a blank birth date is still validated, not waved through", () => {
+  const blank = { birthDate: null };
+  assert.equal(parseProfilePatch({ birthDate: "2012-13-45" }, false, blank).ok, false);
+  assert.equal(parseProfilePatch({ birthDate: "2103-06-15" }, false, blank).ok, false);
+});
+
+test("without a current row, a set-once field reads as locked", () => {
+  // Failing closed matters: a caller that forgets to pass the row must not
+  // accidentally hand an athlete a field he cannot otherwise change.
+  assert.equal(parseProfilePatch({ birthDate: "2012-06-15" }, false).ok, false);
 });

@@ -20,6 +20,13 @@ export interface ProfileField {
   /** false = coach only, for reading as well as writing */
   athleteCanSee: boolean;
   athleteCanEdit: boolean;
+  /**
+   * The athlete may set this while it is blank, but not change it afterwards.
+   * Lets him supply a fact about himself once without being able to revise it
+   * later — birth date drives the leaderboard's age bands, so a quiet edit
+   * would move him between boards the whole facility reads.
+   */
+  athleteSetOnce?: boolean;
   /** counts toward the roster's "N missing" marker */
   required?: boolean;
   /** counts only when the athlete is under 18 */
@@ -53,10 +60,12 @@ export const PROFILE_FIELDS: ProfileField[] = [
     athleteCanSee: true, athleteCanEdit: true, required: true, maxLength: 80 },
   // Read-only for the athlete, like `level`: the youth age bands derive from
   // it and those boards are visible to everyone in the building, so it is a
-  // program record, not a preference. He still supplies it once at signup —
-  // `consumeInvite` is a separate path that COALESCEs it in.
+  // The athlete fills it in once — at signup or from his profile while it is
+  // still blank — and it is the coach's to correct after that. Age bands derive
+  // from it, and those boards are visible facility-wide.
   { key: "birthDate", label: "Date of birth", kind: "date", section: "identity",
-    athleteCanSee: true, athleteCanEdit: false, required: true },
+    athleteCanSee: true, athleteCanEdit: false, athleteSetOnce: true,
+    required: true },
   // His login. Editable by the coach only: a typo here locks him out.
   { key: "inviteEmail", label: "Login email", kind: "text", section: "identity",
     athleteCanSee: true, athleteCanEdit: false, maxLength: 200 },
@@ -144,9 +153,29 @@ export function visibleProfile<T extends Record<string, unknown>>(
   return out;
 }
 
-/** Keys this role may write. The API's allowlist, not a UI hint. */
-export function editableKeys(isCoach: boolean): string[] {
-  return PROFILE_FIELDS.filter((f) => isCoach || f.athleteCanEdit).map((f) => f.key);
+/** True when a stored value counts as "not filled in yet". */
+export function isBlankValue(v: unknown): boolean {
+  return v == null || (typeof v === "string" && v.trim() === "");
+}
+
+/**
+ * Keys this role may write. The API's allowlist, not a UI hint.
+ *
+ * `current` is the athlete's stored row, needed because one rule is
+ * value-dependent: a set-once field is writable by the athlete only while it
+ * is blank. A coach's answer never depends on it. Omit it and set-once fields
+ * are treated as locked, which is the safe direction to fail.
+ */
+export function editableKeys(
+  isCoach: boolean,
+  current?: Record<string, unknown> | null,
+): string[] {
+  return PROFILE_FIELDS.filter(
+    (f) =>
+      isCoach ||
+      f.athleteCanEdit ||
+      (f.athleteSetOnce && !!current && isBlankValue(current[f.key])),
+  ).map((f) => f.key);
 }
 
 const isBlank = (v: unknown) =>
