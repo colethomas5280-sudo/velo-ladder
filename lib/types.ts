@@ -59,6 +59,8 @@ export interface AthleteOverview extends Athlete {
   mound: number;
   pulldown: number;
   lastDate: string | null;
+  /** count of still-blank required profile fields, computed in the overview route */
+  missing: number;
 }
 
 export type Role = "coach" | "athlete" | "none";
