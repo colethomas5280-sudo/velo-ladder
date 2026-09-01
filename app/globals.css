@@ -2130,7 +2130,59 @@ table.roster-table {
   padding-top: 10px;
 }
 
-.pf { max-width: 720px; }
+.pf { max-width: 760px; }
+
+/* ---- the profile at rest: a scannable panel, not a form ---- */
+.pf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0 28px;
+  margin: 10px 0 0;
+}
+.pf-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
+}
+.pf-cell dt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  flex: 0 0 auto;
+}
+.pf-cell dd {
+  margin: 0;
+  font-size: 14px;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pf-blank { color: var(--ink-faint); font-style: italic; }
+/* Derived, never stored — age from a birthday, provenance from a check-in. */
+.pf-derived { font-size: 12px; color: var(--ink-faint); }
+.pf-needed {
+  font-family: var(--font-mono), monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.pf-block { margin-top: 18px; }
+.pf-block p {
+  margin: 5px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+/* The questionnaire's own rows keep the old label-left form layout. */
 .pf-section {
   border-top: 1px solid var(--line-soft);
   padding-top: 14px;
