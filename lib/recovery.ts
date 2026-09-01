@@ -338,22 +338,45 @@ export function scoreBand(score: number): "low" | "mid" | "high" {
  * actually says whether an athlete is gaining, so that is what gets shown.
  * ------------------------------------------------------------------ */
 
-/** Weigh-ins needed in a week before its average means anything. */
-const MIN_WEIGH_INS = 3;
+/** Check-ins needed inside a window before its average means anything. */
+const MIN_READINGS = 3;
 
-export interface WeightTrend {
+/** Windows the athlete can look back over, in days. */
+export const TREND_WINDOWS = [7, 14, 28] as const;
+export type TrendWindow = (typeof TREND_WINDOWS)[number];
+
+/** How a window reads as an adjective: "7-day", "2-week", "4-week". */
+export function windowLabel(days: number): string {
+  return days % 7 === 0 && days > 7 ? `${days / 7}-week` : `${days}-day`;
+}
+
+/** How a window reads as a noun phrase: "7 days", "2 weeks", "4 weeks". */
+export function windowPhrase(days: number): string {
+  if (days % 7 === 0 && days > 7) {
+    const w = days / 7;
+    return `${w} week${w === 1 ? "" : "s"}`;
+  }
+  return `${days} day${days === 1 ? "" : "s"}`;
+}
+
+export interface Trend {
+  /** rolling mean across the window */
+  avg: number | null;
+  /** rolling mean across the window before it */
+  prev: number | null;
+  /** avg − prev: the move between comparable periods */
+  change: number | null;
+  /** readings behind `avg` */
+  n: number;
+  /** the window this was computed over, so labels can't drift from the maths */
+  days: number;
+}
+
+export interface WeightTrend extends Trend {
   latest: number;
   latestDate: string;
-  /** rolling mean of the last 7 days */
-  avg7: number | null;
-  /** rolling mean of the 7 days before those */
-  prev7: number | null;
-  /** avg7 − prev7: the week-over-week move */
-  change: number | null;
-  /** today against this week's own average — a swing here is fluid, not mass */
+  /** the latest reading against its own window — a swing here is fluid, not mass */
   acute: number | null;
-  /** weigh-ins behind avg7 */
-  n7: number;
 }
 
 const dayDiff = (a: string, b: string) => {
@@ -364,37 +387,87 @@ const dayDiff = (a: string, b: string) => {
   );
 };
 
-export function weightTrend(entries: RecoveryEntry[]): WeightTrend | null {
+/**
+ * Mean of the readings whose age sits in [from, to) days behind `anchor`.
+ * Null below MIN_READINGS: three points is thin, but fewer is not a trend.
+ */
+function windowMean(
+  readings: { date: string; value: number }[],
+  anchor: string,
+  from: number,
+  to: number,
+): { mean: number | null; n: number } {
+  const xs = readings
+    .filter((r) => {
+      const age = dayDiff(r.date, anchor);
+      return age >= from && age < to;
+    })
+    .map((r) => r.value);
+  return {
+    mean: xs.length >= MIN_READINGS ? xs.reduce((a, b) => a + b, 0) / xs.length : null,
+    n: xs.length,
+  };
+}
+
+/*
+ * Both trends below window by DATE, not by "the last N readings". An athlete
+ * who checks in seven times across three weeks has a three-week average, and
+ * calling it a seven-day one would be a quiet lie — which is exactly what the
+ * recovery card used to do.
+ */
+
+/** Recovery score across a window, and how it compares with the window before. */
+export function scoreTrend(
+  entries: RecoveryEntry[],
+  days: number = 7,
+): Trend | null {
+  const scored = entries
+    .map((e) => ({ date: e.date, value: recoveryScore(e) }))
+    .filter((r): r is { date: string; value: number } => r.value != null)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  if (!scored.length) return null;
+
+  const anchor = scored[scored.length - 1].date;
+  const cur = windowMean(scored, anchor, 0, days);
+  const prev = windowMean(scored, anchor, days, days * 2);
+
+  return {
+    avg: cur.mean,
+    prev: prev.mean,
+    change: cur.mean != null && prev.mean != null ? cur.mean - prev.mean : null,
+    n: cur.n,
+    days,
+  };
+}
+
+/**
+ * Bodyweight across a window. A single morning weigh-in is mostly noise —
+ * hydration, food and timing move it two or three pounds day to day — so the
+ * headline is the rolling mean, never the latest reading.
+ */
+export function weightTrend(
+  entries: RecoveryEntry[],
+  days: number = 7,
+): WeightTrend | null {
   const weighed = entries
     .filter((e) => typeof e.bodyWeight === "number" && e.bodyWeight > 0)
+    .map((e) => ({ date: e.date, value: e.bodyWeight as number }))
     .sort((a, b) => (a.date < b.date ? -1 : 1));
   if (!weighed.length) return null;
 
   const last = weighed[weighed.length - 1];
-  const window = (from: number, to: number) => {
-    const xs = weighed
-      .filter((e) => {
-        const age = dayDiff(e.date, last.date);
-        return age >= from && age < to;
-      })
-      .map((e) => e.bodyWeight as number);
-    return xs.length >= MIN_WEIGH_INS
-      ? xs.reduce((a, b) => a + b, 0) / xs.length
-      : null;
-  };
-
-  const n7 = weighed.filter((e) => dayDiff(e.date, last.date) < 7).length;
-  const avg7 = window(0, 7);
-  const prev7 = window(7, 14);
+  const cur = windowMean(weighed, last.date, 0, days);
+  const prev = windowMean(weighed, last.date, days, days * 2);
 
   return {
-    latest: last.bodyWeight as number,
+    latest: last.value,
     latestDate: last.date,
-    avg7,
-    prev7,
-    change: avg7 != null && prev7 != null ? avg7 - prev7 : null,
-    acute: avg7 != null ? (last.bodyWeight as number) - avg7 : null,
-    n7,
+    avg: cur.mean,
+    prev: prev.mean,
+    change: cur.mean != null && prev.mean != null ? cur.mean - prev.mean : null,
+    acute: cur.mean != null ? last.value - cur.mean : null,
+    n: cur.n,
+    days,
   };
 }
 
