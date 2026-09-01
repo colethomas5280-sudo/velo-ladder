@@ -86,8 +86,6 @@ export const PROFILE_FIELDS: ProfileField[] = [
     athleteCanSee: true, athleteCanEdit: true, options: ["R", "L"] },
   { key: "bats", label: "Bats", kind: "select", section: "physical",
     athleteCanSee: true, athleteCanEdit: true, options: BATS },
-  { key: "positions", label: "Positions", kind: "text", section: "physical",
-    athleteCanSee: true, athleteCanEdit: true, maxLength: 60 },
 
   // school
   { key: "school", label: "School", kind: "text", section: "school",
@@ -183,7 +181,7 @@ const isBlank = (v: unknown) =>
 
 /**
  * Which required fields are still blank. Only the ones a coach actually
- * chases count — marking every row for a missing "positions" would be
+ * chases count — marking every row for a missing grad year would be
  * the same as marking none of them.
  */
 export function missingProfileFields(a: {

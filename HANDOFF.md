@@ -131,9 +131,12 @@ athletes(id, name, hand, invite_email, password_hash,
          invite_token, invite_expires, archived, created_at,
          birth_date, level,
          first_name, last_name, phone, height_in, weight_lb,
-         weight_source, weight_at, bats, positions, school,
+         weight_source, weight_at, bats, school,
          hs_grad_year, college_grad_year, status,
          guardian_name, guardian_phone, emergency_contact,
+         -- `positions` also exists but is retired: it only held RHP/LHP,
+         -- which `hand` already determines. Unread, kept so fresh and
+         -- existing databases match.
          injury_notes, coach_notes)
 resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
@@ -482,8 +485,8 @@ A unit test (`lib/profileColumns.test.ts`) fails if the two lists drift apart.
 levels:
 
 - **The athlete edits it** — most of the profile: his name, height, weight,
-  throws/bats, positions, school, grad years, phone, guardian and emergency
-  contacts, injury history.
+  throws/bats, school, grad years, phone, guardian and emergency contacts,
+  injury history.
 - **He sees it but can't change it** — `inviteEmail` (his login; a typo here locks him
   out of his own account), `level` (it stamps his records, so it is a program
   decision — see **## Leaderboard**), and `status` (On-Site / Remote, also a program
@@ -600,7 +603,7 @@ Each roster row shows a quiet "N missing" count of required profile fields still
 blank, computed server-side in `/api/athletes/overview` so the rule lives in one
 place. Required: `firstName`, `lastName`, `birthDate`, `level`, `heightIn`,
 `weightLb`, `school`, `phone` — plus `guardianName` and `guardianPhone` for anyone
-under 18. Optional fields never count: if `positions` or `bats` did, every row would
+under 18. Optional fields never count: if `bats` or a grad year did, every row would
 be marked forever, which is the same as marking none of them.
 
 ## Local development
