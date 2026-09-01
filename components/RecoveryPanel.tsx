@@ -9,6 +9,10 @@ import {
   scoreBand,
   buildInsight,
   weightTrend,
+  scoreTrend,
+  windowLabel,
+  windowPhrase,
+  TREND_WINDOWS,
   entryBand,
   sleepBandLabel,
   SLEEP_BAND_SHORT,
@@ -31,6 +35,7 @@ export default function RecoveryPanel({
   );
   const entries = useMemo(() => data ?? [], [data]);
   const [editing, setEditing] = useState<RecoveryEntry | "new" | null>(null);
+  const [days, setDays] = useState<number>(7);
   const [toast, setToast] = useState<string | null>(null);
   const show = (m: string) => {
     setToast(m);
@@ -44,15 +49,8 @@ export default function RecoveryPanel({
     () => buildInsight(sessions, entries),
     [sessions, entries],
   );
-  const weight = useMemo(() => weightTrend(entries), [entries]);
-
-  const last7 = entries
-    .slice(-7)
-    .map(recoveryScore)
-    .filter((s): s is number => s != null);
-  const avg7 = last7.length
-    ? Math.round(last7.reduce((a, b) => a + b, 0) / last7.length)
-    : null;
+  const weight = useMemo(() => weightTrend(entries, days), [entries, days]);
+  const score = useMemo(() => scoreTrend(entries, days), [entries, days]);
 
   async function remove(e: RecoveryEntry) {
     if (!confirm(`Delete the check-in for ${fmtDate(e.date)}?`)) return;
@@ -73,9 +71,18 @@ export default function RecoveryPanel({
     <section className="card pad recovery-card">
       <div className="sec-h">
         <h3>Recovery</h3>
-        <span className="sub">
-          {avg7 != null ? `7-day average ${avg7}` : "daily check-in"}
-        </span>
+        <div className="chips rec-windows" role="group" aria-label="Trend window">
+          {TREND_WINDOWS.map((w) => (
+            <button
+              key={w}
+              className="chip"
+              aria-pressed={w === days}
+              onClick={() => setDays(w)}
+            >
+              {w / 7}w
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="rec-top">
@@ -85,6 +92,9 @@ export default function RecoveryPanel({
           </span>
           <span className="l">Today</span>
         </div>
+
+        <ScoreAverage s={score} />
+
         <button
           className="btn primary"
           onClick={() => setEditing(todayEntry ?? "new")}
@@ -166,6 +176,32 @@ export default function RecoveryPanel({
 }
 
 /**
+ * The windowed recovery average, sitting beside today's score so the two read
+ * together: one number for how he is right now, one for how the stretch has
+ * gone. Renders nothing until there is enough behind it to mean something.
+ */
+function ScoreAverage({ s }: { s: ReturnType<typeof scoreTrend> }) {
+  if (!s || s.avg == null) return null;
+  const avg = Math.round(s.avg);
+  const move = s.change == null ? null : Math.round(s.change);
+
+  return (
+    <div className="rec-avg">
+      <div className={`ci-score big ${scoreBand(avg)}`}>
+        <span className="n">{avg}</span>
+        <span className="l">{windowLabel(s.days)} avg</span>
+      </div>
+      {move != null && move !== 0 && (
+        <span className={`wt-move ${move > 0 ? "up" : "down"}`}>
+          {move > 0 ? "+" : "−"}
+          {Math.abs(move)} vs the previous {windowPhrase(s.days)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
  * Bodyweight, reported as a trend rather than a number. The headline is the
  * 7-day mean, not today's reading — and when today is well off that mean, the
  * copy says why, because an athlete watching a single morning number bounce
@@ -183,27 +219,34 @@ function WeightBlock({ w }: { w: NonNullable<ReturnType<typeof weightTrend>> }) 
       ? null
       : dir === "flat"
         ? "holding steady"
-        : `${w.change > 0 ? "+" : "−"}${fmt(Math.abs(w.change))} lb this week`;
+        : `${w.change > 0 ? "+" : "−"}${fmt(Math.abs(w.change))} lb vs the previous ${windowPhrase(w.days)}`;
 
-  // Only worth calling out once it's past ordinary daily fluctuation.
-  const swing = w.acute != null && Math.abs(w.acute) >= 2 ? w.acute : null;
+  /*
+   * Only meaningful against a short baseline. Today sitting 3 lb above a
+   * FOUR-WEEK average is a month of real gain, not a swing — calling that
+   * fluid would talk an athlete out of progress he actually made. So the
+   * note is scoped to the weekly view, where "today vs recent normal" is
+   * genuinely a hydration-and-food question.
+   */
+  const swing =
+    w.days <= 7 && w.acute != null && Math.abs(w.acute) >= 2 ? w.acute : null;
 
   return (
     <div className="insight">
       <div className="eyebrow">Bodyweight</div>
       <p className="wt-line">
-        {w.avg7 != null ? (
+        {w.avg != null ? (
           <>
-            <b>{fmt(w.avg7)} lb</b>
-            <span className="cz-note">7-day average</span>
+            <b>{fmt(w.avg)} lb</b>
+            <span className="cz-note">{windowLabel(w.days)} average</span>
             {moved && <span className={`wt-move ${dir}`}>{moved}</span>}
           </>
         ) : (
           <>
             <b>{fmt(w.latest)} lb</b>
             <span className="cz-note">
-              {fmtDate(w.latestDate)} · {w.n7} weigh-in
-              {w.n7 === 1 ? "" : "s"} this week
+              {fmtDate(w.latestDate)} · {w.n} weigh-in
+              {w.n === 1 ? "" : "s"} in {windowPhrase(w.days)}
             </span>
           </>
         )}
@@ -216,7 +259,7 @@ function WeightBlock({ w }: { w: NonNullable<ReturnType<typeof weightTrend>> }) 
           and watch the average, not the number.
         </span>
       ) : (
-        w.avg7 == null && (
+        w.avg == null && (
           <span className="cz-note">
             Weigh in a few mornings running and this starts showing your trend
             instead of a single number.

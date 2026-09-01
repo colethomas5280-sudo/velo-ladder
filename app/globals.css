@@ -2040,6 +2040,28 @@ table.roster-table {
    put `nowrap` back where wrapping is unwanted. */
 /* Sits beside the tracker toggle. Same visual language as the check-in
    form's selects, but auto-width so it doesn't stretch across the toolbar. */
+/* Window chips live in the Recovery card header, so they sit tight against
+   the heading rather than carrying the standalone .chips bottom margin. */
+.rec-windows {
+  margin-bottom: 0;
+  gap: 4px;
+}
+.rec-windows .chip {
+  padding: 3px 9px;
+  font-size: 11.5px;
+}
+/* Today's score and the windowed average read as a pair. */
+.rec-avg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.rec-avg .wt-move {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
 .lb-filter {
   border: 1px solid var(--line);
   background: var(--panel);
