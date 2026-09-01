@@ -32,6 +32,7 @@ import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
 import GuidanceCard from "./GuidanceCard";
+import ProfileForm from "./ProfileForm";
 
 const TRACKER_KEY = "veloladder:tracker";
 
@@ -308,6 +309,12 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
           onExport={exportCsv}
           readOnly={false}
         />
+      )}
+
+      {canManage && (
+        <div style={{ marginTop: 18 }}>
+          <ProfileForm athleteId={athleteId} isCoach />
+        </div>
       )}
 
       {(isSelf || canManage) && (

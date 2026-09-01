@@ -2129,3 +2129,38 @@ table.roster-table {
   border-top: 1px solid var(--line-soft);
   padding-top: 10px;
 }
+
+.pf { max-width: 720px; }
+.pf-section {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 14px;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.pf-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pf-row .ci-label { width: 170px; flex: 0 0 auto; }
+.pf-row input,
+.pf-row select,
+.pf-row textarea {
+  flex: 1 1 220px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  color: var(--ink);
+  font-family: inherit;
+}
+.pf-row textarea { min-height: 74px; resize: vertical; }
+.pf-locked {
+  flex: 1 1 220px;
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  padding: 8px 0;
+}
+.pf-locked span { color: var(--ink-faint); font-size: 12px; margin-left: 8px; }
+.pf-unit { font-size: 12.5px; color: var(--ink-faint); }
+.pf-prov { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
