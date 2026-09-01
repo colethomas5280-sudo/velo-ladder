@@ -111,3 +111,21 @@ test("birth date is set-once for an athlete: his while blank, the coach's after"
   // Omitting the row fails closed.
   assert.equal(editableKeys(false).includes("birthDate"), false);
 });
+
+test("a set-once field stays editable while it is only being typed, not stored", () => {
+  // The bug this pins: the form once decided editability from the half-typed
+  // value as well as the stored one, so the field locked the instant you typed
+  // into it — a fat-fingered birthday couldn't be corrected in the same
+  // sitting. Editability depends on what is STORED, and nothing is stored
+  // until the athlete hits Complete.
+  const stored = { birthDate: null };
+  assert.equal(editableKeys(false, stored).includes("birthDate"), true);
+  // A typed-but-unsaved value never reaches this function, so there is no
+  // shape of `stored` that a half-filled form could produce which locks it.
+  assert.equal(editableKeys(false, { birthDate: "" }).includes("birthDate"), true);
+  assert.equal(
+    editableKeys(false, { birthDate: "2012-06-15" }).includes("birthDate"),
+    false,
+    "and it does lock once the value is actually stored",
+  );
+});

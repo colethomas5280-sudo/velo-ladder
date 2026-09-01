@@ -5,7 +5,7 @@ import { api, ApiError } from "@/lib/fetcher";
 import {
   PROFILE_FIELDS,
   PROFILE_SECTIONS,
-  isBlankValue,
+  editableKeys,
   missingProfileFields,
   type ProfileField,
 } from "@/lib/profile";
@@ -49,15 +49,17 @@ export default function ProfileModal({
 
   const shown = (f: ProfileField) => f.key in data;
   /*
-   * Mirrors the API's rule rather than inventing a second one: a set-once
-   * field is the athlete's to fill while blank and the coach's to change
-   * afterwards. `edits` is consulted too, so a field he has just typed into
-   * doesn't lock under him mid-form.
+   * The SAME function the API uses to decide what this role may write — not a
+   * copy of its logic. A hand-rolled copy is what produced the bug this
+   * replaces: it consulted the half-typed value as well as the stored one, so
+   * a set-once field locked the instant you typed into it and a fat-fingered
+   * birthday couldn't be corrected in the sitting that produced it.
+   *
+   * `data` is the stored row. Nothing is committed until Complete, so nothing
+   * locks until then.
    */
-  const editable = (f: ProfileField) =>
-    isCoach ||
-    f.athleteCanEdit ||
-    (!!f.athleteSetOnce && isBlankValue(edits[f.key] ?? data[f.key]));
+  const allowed = new Set(editableKeys(isCoach, data));
+  const editable = (f: ProfileField) => allowed.has(f.key);
   const value = (f: ProfileField) =>
     edits[f.key] ?? (data[f.key] == null ? "" : String(data[f.key]));
 
