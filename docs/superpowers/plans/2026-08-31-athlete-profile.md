@@ -483,6 +483,28 @@ const PROFILE_COLUMNS: Record<string, string> = {
 
 Resolution rule, applied to every profile key: **`undefined` leaves the stored value alone; anything else is written, including `null`.** Build the SET list from only the keys actually present in the patch.
 
+Two behaviours must survive this rewrite, or existing screens break:
+
+**`name` stays an accepted input.** The roster's inline rename PATCHes `name` directly.
+Accept it, split it, and let the derivation below rebuild it — otherwise renaming an
+athlete silently stops working:
+
+```ts
+  if (patch.name !== undefined && patch.firstName === undefined && patch.lastName === undefined) {
+    const s = splitName(String(patch.name ?? ""));
+    patch.firstName = s.first;
+    patch.lastName = s.last;
+  }
+```
+
+**`invite_email` keeps its normalisation.** Logins are matched on
+`lower(invite_email)`, so a raw write of "Bob@Example.COM " locks that athlete out:
+
+```ts
+  if (patch.inviteEmail !== undefined)
+    patch.inviteEmail = String(patch.inviteEmail ?? "").trim().toLowerCase() || null;
+```
+
 Then derive `name` whenever either half changes:
 
 ```ts
@@ -844,7 +866,6 @@ about which fields exist or who may edit them is written twice:
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import { fmtDate } from "@/lib/velo";
@@ -859,9 +880,16 @@ type Row = Record<string, unknown>;
 export default function ProfileForm({
   athleteId,
   isCoach,
+  welcome = false,
 }: {
   athleteId: string;
   isCoach: boolean;
+  /*
+   * Passed in rather than read from the URL here. This component renders in
+   * two places, and useSearchParams would drag a Suspense requirement onto
+   * the coach's athlete page — a build error, not a runtime one.
+   */
+  welcome?: boolean;
 }) {
   const { data, mutate, isLoading } = useSWR<Row>(
     `/api/athletes/${athleteId}`,
@@ -871,7 +899,6 @@ export default function ProfileForm({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const welcome = useSearchParams().get("welcome") === "1";
 
   if (isLoading) return <p className="widget-empty">Loading…</p>;
   if (!data) return <p className="widget-empty">Couldn&apos;t load this profile.</p>;
@@ -1026,12 +1053,23 @@ import ProfileForm from "@/components/ProfileForm";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
   const scope = await getScope();
   if (!scope) redirect("/login");
   // A coach has no profile of their own; send them to the roster.
   if (scope.role !== "athlete" || !scope.athleteIds.length) redirect("/athletes");
-  return <ProfileForm athleteId={scope.athleteIds[0]} isCoach={false} />;
+  const { welcome } = await searchParams;
+  return (
+    <ProfileForm
+      athleteId={scope.athleteIds[0]}
+      isCoach={false}
+      welcome={welcome === "1"}
+    />
+  );
 }
 ```
 
@@ -1163,7 +1201,12 @@ with:
 
 - [ ] **Step 3: Land a new athlete on their profile**
 
-In `components/JoinForm.tsx`, change the post-signin redirect from `window.location.href = "/"` to `window.location.href = "/profile?welcome=1"`, and have `ProfileForm` show a one-line banner when `welcome=1` is present: "Finish setting up your profile — your coach needs a few details." Read it with `useSearchParams`.
+In `components/JoinForm.tsx`, change the post-signin redirect from
+`window.location.href = "/"` to `window.location.href = "/profile?welcome=1"`.
+
+That is the whole change. **Do not add a banner** — Task 5's `ProfileForm` already
+renders one from its `welcome` prop, and `app/profile/page.tsx` already reads the query
+param and passes it down.
 
 - [ ] **Step 4: Verify**
 
