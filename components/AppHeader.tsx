@@ -28,6 +28,7 @@ export default function AppHeader({ email }: { email?: string }) {
             href: data?.athleteId ? `/athletes/${data.athleteId}` : "/",
             label: "My tracker",
           },
+          { href: "/profile", label: "My profile" },
           { href: "/leaderboard", label: "Leaderboard" },
           { href: "/resources", label: "Resources" },
         ]
