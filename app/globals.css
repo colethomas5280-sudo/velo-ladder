@@ -28,6 +28,7 @@ html {
   --chalk: #2c6b8f;
   --good: #2c8a52;
   --bad: #bd4526;
+  --chart-alt: #6f5091;
   --glow: rgba(189, 83, 16, 0);
   --shadow: 0 1px 2px rgba(40, 30, 15, 0.06), 0 8px 22px -14px rgba(40, 30, 15, 0.18);
   --r: 11px;
@@ -49,6 +50,7 @@ html {
     --chalk: #6fb2d8;
     --good: #49bd7b;
     --bad: #e5744d;
+    --chart-alt: #a68ccc;
     --glow: rgba(255, 125, 31, 0.38);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.32), 0 14px 34px -16px rgba(0, 0, 0, 0.62);
   }
@@ -68,6 +70,7 @@ html {
   --chalk: #6fb2d8;
   --good: #49bd7b;
   --bad: #e5744d;
+  --chart-alt: #a68ccc;
   --glow: rgba(255, 125, 31, 0.38);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.32), 0 14px 34px -16px rgba(0, 0, 0, 0.62);
 }
@@ -587,8 +590,61 @@ input[type="date"] {
   flex-wrap: wrap;
   margin-bottom: 4px;
 }
-.chart-range .chips {
-  margin-bottom: 0;
+.chart-selects {
+  display: flex;
+  gap: 10px;
+  /*
+   * Deliberately nowrap: a wrapping flex line wraps before it shrinks, so the
+   * two menus jumped onto separate rows rather than giving up the 13px that
+   * would have kept them side by side. min-width:0 on the labels lets them
+   * shrink instead.
+   */
+  flex-wrap: nowrap;
+}
+/*
+ * Both menus want 158px. On a phone they were wrapping onto separate rows and
+ * the controls ate 154px above a 264px chart — not because two menus don't fit
+ * a 375px screen, but because the pager was holding the same row and left them
+ * 207px. Below 560px the pager drops to its own line and the menus take the
+ * full width, where shrinking lets them sit side by side.
+ */
+.chart-selects label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 0 1 158px;
+  min-width: 0;
+}
+.chart-selects select {
+  width: 100%;
+  min-width: 0;
+}
+.chart-selects label > span {
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.chart-selects select {
+  padding: 6px 9px;
+  font-size: 13px;
+  font-weight: 600;
+}
+/* Series colours are chosen per view now, so the legend carries its own. */
+.chart-legend i.l-swatch {
+  border-top-width: 3px;
+  border-top-style: solid;
+}
+@media (max-width: 560px) {
+  .chart-range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .chart-selects {
+    width: 100%;
+  }
 }
 .pager {
   display: flex;

@@ -2,12 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { TrainingSession, RecoveryEntry } from "@/lib/types";
-import {
-  CHART_WINDOWS,
-  STEP_DAYS,
-  progressWindow,
-  type ProgressDay,
-} from "@/lib/progress";
+import { CHART_WINDOWS, STEP_DAYS, progressWindow } from "@/lib/progress";
 import {
   type TrackerConfig,
   groupById,
@@ -17,16 +12,36 @@ import {
   todayISO,
 } from "@/lib/velo";
 
+/** The weight menu's overview option: every ball at once, best only. */
+const ALL_WEIGHTS = "all";
+
+/**
+ * One colour per weight in `groups` order. `--bad` is deliberately absent:
+ * at #bd4526 it is the same orange as `--accent` in a 2px line, which is why
+ * `--chart-alt` exists.
+ */
+const WEIGHT_TOKENS = ["--accent", "--chalk", "--good", "--chart-alt", "--ink-dim"];
+
 /** "Aug 26 – Sep 1", the reader's anchor once the window can move. */
 function rangeLabel(from: string, to: string): string {
-  const fmtOne = (iso: string) => {
+  const one = (iso: string) => {
     const [y, m, d] = iso.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
     });
   };
-  return `${fmtOne(from)} – ${fmtOne(to)}`;
+  return `${one(from)} – ${one(to)}`;
+}
+
+const windowLabel = (days: number) =>
+  days === STEP_DAYS ? "1 week" : `${days / STEP_DAYS} weeks`;
+
+interface Line {
+  label: string;
+  token: string;
+  width: number;
+  values: (number | null)[];
 }
 
 export default function ProgressChart({
@@ -45,21 +60,44 @@ export default function ProgressChart({
   recovery?: RecoveryEntry[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const group = groupById(cfg, groupId);
-
   const [spanDays, setSpanDays] = useState<number>(CHART_WINDOWS[0]);
   /** 0 is the window ending today; each step is a week further back. */
   const [offsetWeeks, setOffsetWeeks] = useState(0);
 
-  const w = progressWindow({
-    sessions,
-    recovery,
-    keys: group.keys,
-    trackerId,
-    spanDays,
-    offsetWeeks,
-    asOf: todayISO(),
-  });
+  const showAll = groupId === ALL_WEIGHTS;
+  const shown = showAll ? cfg.groups : [groupById(cfg, groupId)];
+
+  /*
+   * One call per weight on show, all through the same tested function. The day
+   * skeleton, the recovery bars and the window bounds come out identical from
+   * each — only the velocity differs — so the first result speaks for all of
+   * them and "All weights" needs no second code path.
+   */
+  const wins = shown.map((g) =>
+    progressWindow({
+      sessions,
+      recovery,
+      keys: g.keys,
+      trackerId,
+      spanDays,
+      offsetWeeks,
+      asOf: todayISO(),
+    }),
+  );
+  const w = wins[0];
+
+  const lines: Line[] = showAll
+    ? shown.map((g, i) => ({
+        label: `${g.oz} oz`,
+        token: WEIGHT_TOKENS[i % WEIGHT_TOKENS.length],
+        width: 2,
+        values: wins[i].days.map((d) => d.best),
+      }))
+    : [
+        { label: "Floor", token: "--good", width: 1.6, values: w.days.map((d) => d.min) },
+        { label: "Average", token: "--chalk", width: 1.8, values: w.days.map((d) => d.avg) },
+        { label: "Best", token: "--accent", width: 2.4, values: w.days.map((d) => d.best) },
+      ];
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -79,19 +117,19 @@ export default function ProgressChart({
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const cs = getComputedStyle(document.documentElement);
-      const dim = cs.getPropertyValue("--ink-faint").trim();
-      const line = cs.getPropertyValue("--line").trim();
-      const acc = cs.getPropertyValue("--accent").trim();
-      const chalk = cs.getPropertyValue("--chalk").trim();
-      const good = cs.getPropertyValue("--good").trim();
-      const panel = cs.getPropertyValue("--panel").trim();
+      const token = (name: string) => cs.getPropertyValue(name).trim();
+      const dim = token("--ink-faint");
+      const grid = token("--line");
+      const chalk = token("--chalk");
+      const panel = token("--panel");
 
       g.clearRect(0, 0, W, H);
       g.font = "11px var(--font-mono), monospace";
       g.textBaseline = "alphabetic";
 
       const days = w.days;
-      if (!w.sessionDays && !w.recoveryDays) {
+      const anyVelo = lines.some((l) => l.values.some((v) => v != null));
+      if (!anyVelo && !w.recoveryDays) {
         g.fillStyle = dim;
         g.textAlign = "center";
         g.fillText("Nothing logged in this window.", W / 2, H / 2);
@@ -99,35 +137,29 @@ export default function ProgressChart({
       }
 
       /*
-       * Right padding carries two things: the velocity endpoint values, then
-       * the recovery axis outside them. On a phone that is 72px of a ~313px
-       * canvas, which squeezes the plot to a third of the card. The endpoint
-       * values give way there — the same numbers are on the records panel and
-       * in the header — while the recovery axis stays, since bars you cannot
-       * read a value off are the thing this chart was built to stop shipping.
+       * Right padding carries the velocity endpoint values and then the
+       * recovery axis outside them. On a phone that is 72px of a ~313px
+       * canvas. The endpoint values give way there — the same numbers are in
+       * the header and on the records panel — while the recovery axis stays,
+       * since bars you cannot read a value off are what this chart replaced.
        */
       const compact = W < 420;
       const P = { l: 34, r: compact ? 26 : 72, t: 14, b: 24 };
       const plotW = W - P.l - P.r;
       const plotH = H - P.t - P.b;
 
-      /* ---- velocity scale, from whatever the window actually holds ---- */
-      const vals = days.flatMap((d) =>
-        d.best != null ? [d.best, d.avg as number, d.min as number] : [],
-      );
-      const hasVelo = vals.length > 0;
-      const lo = hasVelo ? Math.floor(Math.min(...vals) - 1.5) : 0;
-      let hi = hasVelo ? Math.ceil(Math.max(...vals) + 1.5) : 4;
+      const vals = lines.flatMap((l) => l.values.filter((v): v is number => v != null));
+      const lo = vals.length ? Math.floor(Math.min(...vals) - 1.5) : 0;
+      let hi = vals.length ? Math.ceil(Math.max(...vals) + 1.5) : 4;
       if (hi - lo < 4) hi = lo + 4;
 
-      // One slot per day, so a bar and its session sit on the same centre.
       const slot = plotW / days.length;
       const X = (i: number) => P.l + slot * (i + 0.5);
       const Y = (v: number) => P.t + (1 - (v - lo) / (hi - lo)) * plotH;
       const RY = (v: number) => P.t + (1 - v / 100) * plotH;
 
       /* ---- grid + velocity axis ---- */
-      g.strokeStyle = line;
+      g.strokeStyle = grid;
       g.fillStyle = dim;
       g.lineWidth = 1;
       g.textAlign = "right";
@@ -138,7 +170,7 @@ export default function ProgressChart({
         g.moveTo(P.l, yy);
         g.lineTo(W - P.r, yy);
         g.stroke();
-        if (hasVelo) g.fillText(String(Math.round(v)), P.l - 6, yy + 3);
+        if (vals.length) g.fillText(String(Math.round(v)), P.l - 6, yy + 3);
       }
 
       /* ---- recovery bars, behind everything ---- */
@@ -153,8 +185,6 @@ export default function ProgressChart({
         });
         g.globalAlpha = 1;
 
-        // Its own axis, on the right. An unlabelled scale can be looked at but
-        // not read, which is what this chart used to offer.
         g.fillStyle = chalk;
         g.textAlign = "right";
         g.globalAlpha = 0.75;
@@ -162,11 +192,11 @@ export default function ProgressChart({
         g.globalAlpha = 1;
       }
 
-      /* ---- all-time PR ceiling for this weight ---- */
-      if (hasVelo) {
-        const pr = Math.max(...days.map((d) => d.best ?? -Infinity));
+      /* ---- all-time ceiling, only when one weight is on screen ---- */
+      if (!showAll && vals.length) {
+        const pr = Math.max(...vals);
         g.setLineDash([3, 4]);
-        g.strokeStyle = acc;
+        g.strokeStyle = token("--accent");
         g.globalAlpha = 0.35;
         g.beginPath();
         g.moveTo(P.l, Y(pr));
@@ -176,47 +206,37 @@ export default function ProgressChart({
         g.setLineDash([]);
       }
 
-      /* ---- velocity, drawn only where there was a session ---- */
-      const thrown = days
-        .map((d, i) => ({ d, i }))
-        .filter((x) => x.d.best != null);
+      /* ---- the lines, drawn only where there was a session ---- */
+      for (const l of lines) {
+        const color = token(l.token);
+        const pts = l.values
+          .map((v, i) => ({ v, i }))
+          .filter((x): x is { v: number; i: number } => x.v != null);
+        if (!pts.length) continue;
 
-      const series: [keyof ProgressDay, string, number][] = [
-        ["min", good, 1.6],
-        ["avg", chalk, 1.8],
-        ["best", acc, 2.4],
-      ];
-
-      for (const [key, color, width] of series) {
         // The line spans the gaps; the dots mark the days that are real.
         g.strokeStyle = color;
-        g.lineWidth = width;
+        g.lineWidth = l.width;
         g.beginPath();
-        thrown.forEach((x, n) => {
-          const px = X(x.i);
-          const py = Y(x.d[key] as number);
-          if (n) g.lineTo(px, py);
-          else g.moveTo(px, py);
-        });
-        if (thrown.length > 1) g.stroke();
+        pts.forEach((x, n) => (n ? g.lineTo(X(x.i), Y(x.v)) : g.moveTo(X(x.i), Y(x.v))));
+        if (pts.length > 1) g.stroke();
 
-        for (const x of thrown) {
+        for (const x of pts) {
           g.fillStyle = color;
           g.beginPath();
-          g.arc(X(x.i), Y(x.d[key] as number), 3, 0, 7);
+          g.arc(X(x.i), Y(x.v), 3, 0, 7);
           g.fill();
           g.strokeStyle = panel;
           g.lineWidth = 1.5;
           g.stroke();
         }
 
-        const last = thrown[thrown.length - 1];
-        if (last && !compact) {
-          const py = Y(last.d[key] as number);
+        if (!compact) {
+          const last = pts[pts.length - 1];
           g.fillStyle = color;
           g.textAlign = "left";
           g.font = "600 11px var(--font-mono), monospace";
-          g.fillText(fmt(last.d[key] as number), W - P.r + 6, py + 3.5);
+          g.fillText(fmt(last.v), W - P.r + 6, Y(last.v) + 3.5);
           g.font = "11px var(--font-mono), monospace";
         }
       }
@@ -241,7 +261,7 @@ export default function ProgressChart({
       ro.disconnect();
       mq.removeEventListener("change", draw);
     };
-  }, [w, trackerId]);
+  }, [w, lines, showAll, trackerId]);
 
   return (
     <div className="card pad chart-card">
@@ -250,35 +270,35 @@ export default function ProgressChart({
         <span className="sub">By day · 100% throws</span>
       </div>
 
-      <div className="chips">
-        {cfg.groups.map((gp) => {
-          const id = gid(gp);
-          return (
-            <button
-              key={id}
-              className="chip"
-              aria-pressed={id === groupId}
-              onClick={() => setGroupId(id)}
-            >
-              {gp.oz} oz
-            </button>
-          );
-        })}
-      </div>
-
       <div className="chart-range">
-        <div className="chips">
-          {CHART_WINDOWS.map((d) => (
-            <button
-              key={d}
-              className="chip"
-              aria-pressed={d === spanDays}
-              onClick={() => setSpanDays(d)}
+        <div className="chart-selects">
+          <label>
+            <span>Ball weight</span>
+            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+              {cfg.groups.map((gp) => (
+                <option key={gid(gp)} value={gid(gp)}>
+                  {gp.oz} oz
+                </option>
+              ))}
+              <option value={ALL_WEIGHTS}>All weights</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Recovery</span>
+            <select
+              value={spanDays}
+              onChange={(e) => setSpanDays(Number(e.target.value))}
             >
-              {d / STEP_DAYS}w
-            </button>
-          ))}
+              {CHART_WINDOWS.map((d) => (
+                <option key={d} value={d}>
+                  {windowLabel(d)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+
         <div className="pager">
           <button
             className="btn sm ghost"
@@ -317,18 +337,12 @@ export default function ProgressChart({
       </div>
 
       <div className="chart-legend">
-        <span>
-          <i className="l-best" />
-          Best
-        </span>
-        <span>
-          <i className="l-avg" />
-          Average
-        </span>
-        <span>
-          <i className="l-floor" />
-          Floor
-        </span>
+        {lines.map((l) => (
+          <span key={l.label}>
+            <i className="l-swatch" style={{ color: `var(${l.token})` }} />
+            {l.label}
+          </span>
+        ))}
         {w.recoveryDays > 0 && (
           <span>
             <i className="l-recovery" />
