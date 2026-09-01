@@ -49,6 +49,18 @@ export function ageOn(birthDate: string, onDate: string): number {
  * negative age that lands an adult on the 12U board. One home for the date
  * semantics that both write paths (`/api/join`, `/api/athletes/[id]`) share.
  */
+/**
+ * Earliest birth year we will accept. Nobody training here was born before
+ * this, and the bound is what stops a half-typed year being stored: a native
+ * date input reports a COMPLETE, valid date after the first digit of the year
+ * — type 11/03/1994 and it passes through 0001-11-03, 0019-11-03, 0199-11-03
+ * before landing on the real one. Year 1 is a real calendar date, so the
+ * round-trip check below waves it through; only a plausibility bound catches
+ * it. Getting it stored is worse than it sounds — it makes the athlete two
+ * thousand years old, which silently drops him out of every age band.
+ */
+const EARLIEST_BIRTH_YEAR = 1900;
+
 export function isValidBirthDate(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
@@ -56,6 +68,7 @@ export function isValidBirthDate(value: unknown): value is string {
   const y = Number(m[1]);
   const mo = Number(m[2]);
   const d = Number(m[3]);
+  if (y < EARLIEST_BIRTH_YEAR) return false;
   const dt = new Date(Date.UTC(y, mo - 1, d));
   // round-trips only if the day actually exists (rejects 2009-02-30, 2009-99-99)
   if (

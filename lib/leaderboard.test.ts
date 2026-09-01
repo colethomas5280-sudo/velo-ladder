@@ -207,3 +207,19 @@ test("the viewer is marked, and gets a standing when off the board", () => {
   assert.equal(top.rows[0].isYou, true);
   assert.equal(top.you, null);                       // already visible
 });
+
+test("a half-typed year is refused, not stored as year 0001", () => {
+  // A native date input reports a complete, valid date after the FIRST digit
+  // of the year: typing 11/03/1994 passes through each of these. Each is a
+  // real calendar date, so only a plausibility bound catches them — and one
+  // stored would make the athlete two thousand years old and drop him out of
+  // every age band.
+  for (const partial of ["0001-11-03", "0019-11-03", "0199-11-03"])
+    assert.equal(isValidBirthDate(partial), false, `${partial} must be refused`);
+  assert.equal(isValidBirthDate("1994-11-03"), true, "the finished date is fine");
+});
+
+test("the plausibility bound sits at 1900", () => {
+  assert.equal(isValidBirthDate("1899-12-31"), false);
+  assert.equal(isValidBirthDate("1900-01-01"), true);
+});

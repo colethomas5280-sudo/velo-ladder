@@ -54,7 +54,9 @@ function parseOne(
 
   if (f.kind === "date") {
     if (typeof raw !== "string" || !isValidBirthDate(raw))
-      return { error: `${f.label} must be a real date, and not in the future` };
+      return {
+        error: `${f.label} must be a real date after 1900, and not in the future`,
+      };
     return { value: raw };
   }
 
