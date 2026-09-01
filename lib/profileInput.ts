@@ -23,6 +23,13 @@ function parseOne(
   if (f.kind === "number") {
     const n = Number(raw);
     if (!Number.isFinite(n)) return { error: `${f.label} must be a number` };
+    // An integer-backed column rejects 74.5 with a parse error at write time,
+    // which would be a 500 — the invalid-means-400 rule has to catch it here.
+    // `f.decimals` (only weightLb, numeric(5,1)) opts a column into fractions.
+    if (!f.decimals && !Number.isInteger(n))
+      return { error: `${f.label} must be a whole number` };
+    if (f.decimals && !Number.isInteger(n * 10 ** f.decimals))
+      return { error: `${f.label} must have at most ${f.decimals} decimal place${f.decimals === 1 ? "" : "s"}` };
     if (f.min != null && n < f.min) return { error: `${f.label} must be at least ${f.min}` };
     if (f.max != null && n > f.max) return { error: `${f.label} must be at most ${f.max}` };
     return { value: n };
@@ -78,6 +85,19 @@ export function parseProfilePatch(
     const r = parseOne(f, value);
     if ("error" in r) return { ok: false, error: r.error };
     patch[key] = r.value;
+  }
+
+  // `name` is not a profile field — the roster's inline rename PATCHes it
+  // directly and the data layer splits it into first/last. A coach may send
+  // it; an athlete edits firstName/lastName instead. An explicit split in the
+  // same body always wins, so a derived name never overwrites a correction.
+  if (
+    isCoach &&
+    typeof body.name === "string" &&
+    body.firstName === undefined &&
+    body.lastName === undefined
+  ) {
+    patch.name = body.name;
   }
 
   return { ok: true, patch };

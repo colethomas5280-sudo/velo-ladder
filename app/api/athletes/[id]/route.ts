@@ -61,11 +61,14 @@ export async function PATCH(
 
   // Weight entered here is authored, not observed — record that, so the
   // profile can say where the number came from. A later check-in overwrites
-  // both (Task 4).
+  // both (Task 4). Clearing the weight clears its provenance too — a source
+  // and date for a value that no longer exists is worse than nothing.
   const stamped =
-    parsed.patch.weightLb !== undefined
-      ? { weightSource: "entered", weightAt: new Date().toISOString().slice(0, 10) }
-      : {};
+    parsed.patch.weightLb === undefined
+      ? {}
+      : parsed.patch.weightLb === null
+        ? { weightSource: null, weightAt: null }
+        : { weightSource: "entered", weightAt: new Date().toISOString().slice(0, 10) };
 
   const updated = await updateAthlete(id, {
     ...parsed.patch,

@@ -26,6 +26,8 @@ export interface ProfileField {
   options?: readonly string[];
   min?: number;
   max?: number;
+  /** decimal places the backing column allows; absent/0 = integer column */
+  decimals?: number;
   maxLength?: number;
   unit?: string;
   help?: string;
@@ -65,7 +67,7 @@ export const PROFILE_FIELDS: ProfileField[] = [
     min: 30, max: 90, unit: "in", help: "Inches — 6'0\" is 72" },
   { key: "weightLb", label: "Weight", kind: "number", section: "physical",
     athleteCanSee: true, athleteCanEdit: true, required: true,
-    min: 50, max: 500, unit: "lb" },
+    min: 50, max: 500, decimals: 1, unit: "lb" },
   { key: "hand", label: "Throws", kind: "select", section: "physical",
     athleteCanSee: true, athleteCanEdit: true, options: ["R", "L"] },
   { key: "bats", label: "Bats", kind: "select", section: "physical",
