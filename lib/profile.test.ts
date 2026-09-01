@@ -34,10 +34,17 @@ test("a coach receives every field", () => {
   assert.equal(visibleProfile(row, true).coachNotes, "shoulder concern");
 });
 
-test("an athlete can see but not edit email, level and status", () => {
+test("an athlete can see but not edit email, level, status and birth date", () => {
   const athleteKeys = editableKeys(false);
-  for (const k of ["inviteEmail", "level", "status"])
+  // birthDate joins this tier: the youth age bands derive from it and those
+  // boards are visible to every athlete in the building (finding 6).
+  for (const k of ["inviteEmail", "level", "status", "birthDate"])
     assert.equal(athleteKeys.includes(k), false, `${k} must not be athlete-editable`);
+  assert.equal(
+    PROFILE_FIELDS.find((f) => f.key === "birthDate")?.athleteCanSee,
+    true,
+    "birthDate stays visible — he supplies it once at signup and then reads it",
+  );
   for (const k of ["phone", "heightIn", "school", "injuryNotes"])
     assert.equal(athleteKeys.includes(k), true, `${k} should be athlete-editable`);
   assert.equal(editableKeys(false).includes("coachNotes"), false);

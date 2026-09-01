@@ -1,4 +1,5 @@
 import { LEVELS, ageOn } from "./leaderboard";
+import { todayISO } from "./velo";
 
 /* ------------------------------------------------------------------ *
  * The athlete profile, as data.
@@ -50,8 +51,12 @@ export const PROFILE_FIELDS: ProfileField[] = [
     athleteCanSee: true, athleteCanEdit: true, required: true, maxLength: 80 },
   { key: "lastName", label: "Last name", kind: "text", section: "identity",
     athleteCanSee: true, athleteCanEdit: true, required: true, maxLength: 80 },
+  // Read-only for the athlete, like `level`: the youth age bands derive from
+  // it and those boards are visible to everyone in the building, so it is a
+  // program record, not a preference. He still supplies it once at signup —
+  // `consumeInvite` is a separate path that COALESCEs it in.
   { key: "birthDate", label: "Date of birth", kind: "date", section: "identity",
-    athleteCanSee: true, athleteCanEdit: true, required: true },
+    athleteCanSee: true, athleteCanEdit: false, required: true },
   // His login. Editable by the coach only: a typo here locks him out.
   { key: "inviteEmail", label: "Login email", kind: "text", section: "identity",
     athleteCanSee: true, athleteCanEdit: false, maxLength: 200 },
@@ -157,7 +162,10 @@ export function missingProfileFields(a: {
   birthDate?: string | null;
 }): string[] {
   const birthDate = a.birthDate as string | null | undefined;
-  const today = new Date().toISOString().slice(0, 10);
+  // Local date, not UTC: `todayISO()` is the house helper every other date in
+  // this app uses. A UTC "today" flips the minor/adult cutoff up to seven
+  // hours early on a birthday, dropping the guardian requirement with it.
+  const today = todayISO();
   const age = birthDate ? ageOn(birthDate, today) : null;
   const isMinor = age != null && age >= 0 && age < 18;
   return PROFILE_FIELDS.filter(

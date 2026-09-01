@@ -1,4 +1,9 @@
-import { PROFILE_FIELDS, editableKeys, type ProfileField } from "./profile";
+import {
+  PROFILE_FIELDS,
+  editableKeys,
+  splitName,
+  type ProfileField,
+} from "./profile";
 import { isValidBirthDate } from "./leaderboard";
 
 export type Parsed =
@@ -13,6 +18,18 @@ export type Parsed =
  * An explicit null (or an emptied "") for these is a 400, not a clear.
  */
 const NON_NULLABLE = new Set(["firstName", "lastName"]);
+
+/**
+ * Columns that are `NOT NULL DEFAULT ''`: an emptied or explicit-null value
+ * stores `""`, not NULL, keeping the column's existing contract. `hand` is
+ * the one today — the roster's "–" option and the form's "Choose…" option
+ * both send an empty value, and `SET hand = NULL` is a not-null violation
+ * (an unhandled 500). Kept as data so the next such column is one entry here.
+ */
+const BLANK_NOT_NULL = new Set(["hand"]);
+
+/** A `name` sent by a coach may not exceed this once trimmed. */
+const NAME_MAX = 160;
 
 function parseOne(
   f: ProfileField,
@@ -73,11 +90,21 @@ export function parseProfilePatch(
     const f = PROFILE_FIELDS.find((x) => x.key === key);
     if (!f) continue; // not a profile field — password/archived/cnsThresholdPct handled elsewhere
     if (raw === undefined) continue;
+    // A field this role can't even see is treated exactly like an unknown key:
+    // silently ignored. Answering "you can't change coach notes — ask your
+    // coach" would confirm to the athlete that the field exists.
+    if (!isCoach && !f.athleteCanSee) continue;
     if (!allowed.has(key))
       return { ok: false, error: `You can't change ${f.label.toLowerCase()} — ask your coach` };
 
     // An emptied form field ("") is a clear, not a value.
     const value = raw === "" ? null : raw;
+
+    // A NOT NULL DEFAULT '' column stores "" for a clear, never NULL.
+    if (value === null && BLANK_NOT_NULL.has(key)) {
+      patch[key] = "";
+      continue;
+    }
 
     if (value === null && NON_NULLABLE.has(key))
       return { ok: false, error: `${f.label} can't be blank` };
@@ -97,6 +124,16 @@ export function parseProfilePatch(
     body.firstName === undefined &&
     body.lastName === undefined
   ) {
+    // `updateAthlete` does `name = joinName(splitName(name)) || cur.name`, so a
+    // blank or space-only name silently falls back to the old one while
+    // first/last are written empty — `name` drifts from its halves, and
+    // `first_name = ''` is unrecoverable by the setup backfill (it only
+    // touches NULL). Refuse it here instead.
+    const trimmed = body.name.trim();
+    if (trimmed.length > NAME_MAX)
+      return { ok: false, error: `Name must be ${NAME_MAX} characters or fewer` };
+    if (!splitName(trimmed).first)
+      return { ok: false, error: "Name can't be blank" };
     patch.name = body.name;
   }
 

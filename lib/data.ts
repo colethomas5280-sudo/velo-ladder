@@ -133,7 +133,7 @@ export async function createAthlete(input: {
  * than seventeen hand-written ternaries, is what keeps a field from being
  * silently forgotten on the way to the database.
  */
-const PROFILE_COLUMNS = {
+export const PROFILE_COLUMNS = {
   firstName: "first_name",
   lastName: "last_name",
   phone: "phone",
