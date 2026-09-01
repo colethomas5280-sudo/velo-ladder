@@ -149,9 +149,32 @@ route would be a second place for that authorization decision to drift.
 `GET /api/athletes/[id]` gains a role filter for the same reason.
 
 Validation: `height_in` 30–90, `weight_lb` 50–500, grad years 1900–2100, `bats` one of
-R/L/S, `status` one of the two values. Free-text fields are length-capped. An invalid
-value is rejected rather than silently nulled — the existing birth-date behaviour, where
-a bad entry clears the stored value, is a known wart and this should not copy it.
+R/L/S, `status` one of the two values. Free-text fields are length-capped.
+
+**Three states, not two.** Every field distinguishes *absent*, *set* and *explicitly
+cleared*, and an invalid value is none of them:
+
+| Request contains | Result |
+|---|---|
+| the field absent | unchanged |
+| a valid value | set |
+| an explicit `null` | cleared — a deliberate act |
+| an invalid value | **400, nothing written** |
+
+### Fixing the birth-date wart
+
+This also repairs an existing defect, carried over from the leaderboard review where it
+was parked rather than fixed. Today `PATCH /api/athletes/[id]` maps an invalid birth
+date to `null` and `updateAthlete` writes it, so a coach fat-fingering a date **clears
+the stored value** — and because age bands derive from birth date, that athlete quietly
+drops off the 12U/14U boards until someone notices the blank cell and retypes it.
+
+Under the table above, a malformed date is refused with a 400 and the stored value
+stands. Clearing a birth date stays possible, but only by sending an explicit `null` —
+which is a thing you meant to do rather than a thing that happened to you.
+
+`level` gets the same treatment, for the same reason: it stamps records, and losing it
+to a typo is worse than being told the entry was wrong.
 
 ## Testing
 
