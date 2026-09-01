@@ -1,5 +1,6 @@
 import { getScope } from "@/lib/scope";
 import { listAthletes, createAthlete } from "@/lib/data";
+import { visibleProfile } from "@/lib/profile";
 import { json, unauthorized, forbidden, badRequest } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -8,10 +9,21 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const scope = await getScope();
   if (!scope) return unauthorized();
-  if (scope.role === "coach") return json(await listAthletes());
-  if (scope.role === "athlete")
-    return json(await listAthletes({ ids: scope.athleteIds }));
-  return json([]);
+  if (scope.role === "none") return json([]);
+
+  // The list route serves athletes their own row too. Without this it shipped
+  // `coachNotes` verbatim — the [id] route got the role filter, this one did
+  // not. Run every row through `visibleProfile`, coach branch included, so
+  // there is one response shape rather than two.
+  const isCoach = scope.role === "coach";
+  const rows = isCoach
+    ? await listAthletes()
+    : await listAthletes({ ids: scope.athleteIds });
+  return json(
+    rows.map((a) =>
+      visibleProfile(a as unknown as Record<string, unknown>, isCoach),
+    ),
+  );
 }
 
 export async function POST(request: Request) {

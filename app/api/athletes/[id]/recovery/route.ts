@@ -6,7 +6,16 @@ import {
   reconcileSetbacks,
 } from "@/lib/data";
 import type { ArmStatus } from "@/lib/types";
+import { PROFILE_FIELDS } from "@/lib/profile";
+import { todayISO } from "@/lib/velo";
 import { json, unauthorized, forbidden, badRequest, guard } from "@/lib/http";
+
+// The profile and the check-in both write `athletes.weight_lb`; they must
+// agree on what a valid weight is, or a check-in stores a number the profile
+// form would refuse.
+const WEIGHT = PROFILE_FIELDS.find((f) => f.key === "weightLb")!;
+const WEIGHT_MIN = WEIGHT.min ?? 0;
+const WEIGHT_MAX = WEIGHT.max ?? Number.POSITIVE_INFINITY;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,6 +35,11 @@ const positive = (v: unknown, max: number): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return isFinite(n) && n > 0 && n <= max ? n : null;
+};
+const inRange = (v: unknown, min: number, max: number): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return isFinite(n) && n >= min && n <= max ? n : null;
 };
 
 export async function GET(
@@ -55,6 +69,10 @@ export async function POST(
   const date = String(b.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
     return badRequest("date must be YYYY-MM-DD");
+  // A future date is a typo. Left in, one mistyped year sets `weight_at` far
+  // ahead and the `weight_at <= date` guard then blocks every real check-in
+  // after it.
+  if (date > todayISO()) return badRequest("date can't be in the future");
 
   const entry = {
     date,
@@ -66,7 +84,7 @@ export async function POST(
     mood: rating(b.mood),
     diet: rating(b.diet),
     armReadiness: scaled(b.armReadiness, 5),
-    bodyWeight: positive(b.bodyWeight, 600),
+    bodyWeight: inRange(b.bodyWeight, WEIGHT_MIN, WEIGHT_MAX),
     sleepDuration: rating(b.sleepDuration),
     restingHr: positive(b.restingHr, 200),
     armStatus: (["good", "sore", "pain"] as const).includes(

@@ -3,6 +3,7 @@ import { getAthlete, updateAthlete } from "@/lib/data";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
 import { visibleProfile } from "@/lib/profile";
 import { parseProfilePatch } from "@/lib/profileInput";
+import { todayISO } from "@/lib/velo";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +69,7 @@ export async function PATCH(
       ? {}
       : parsed.patch.weightLb === null
         ? { weightSource: null, weightAt: null }
-        : { weightSource: "entered", weightAt: new Date().toISOString().slice(0, 10) };
+        : { weightSource: "entered", weightAt: todayISO() };
 
   const updated = await updateAthlete(id, {
     ...parsed.patch,

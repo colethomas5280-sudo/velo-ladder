@@ -469,25 +469,35 @@ form, the API's write-allowlist (`editableKeys`), per-field validation
 straight off it), the read filter that decides which fields an athlete is sent
 (`visibleProfile`), and the roster's "N missing" count (`missingProfileFields`). These
 can't disagree about which fields exist or who may see them, because there is one list
-to disagree with. Adding a field later is one entry here plus one
-`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — no form, route, or validation edit.
+to disagree with. Adding a field later is a `PROFILE_FIELDS` entry, a matching
+`PROFILE_COLUMNS` entry in `lib/data.ts` (the camelCase-to-column map the write loop
+runs off — omit it and the field validates, reaches the patch, and is then silently
+skipped on the way to the database), and one
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`. No form, route, or validation edit.
+A unit test (`lib/profileColumns.test.ts`) fails if the two lists drift apart.
 
 ### Three tiers of access, not two
 
 `athleteCanSee` and `athleteCanEdit` are separate flags because access here has three
 levels:
 
-- **The athlete edits it** — most of the profile: his name, birth date, height,
-  weight, throws/bats, positions, school, grad years, phone, guardian and emergency
+- **The athlete edits it** — most of the profile: his name, height, weight,
+  throws/bats, positions, school, grad years, phone, guardian and emergency
   contacts, injury history.
 - **He sees it but can't change it** — `inviteEmail` (his login; a typo here locks him
   out of his own account), `level` (it stamps his records, so it is a program
-  decision — see **## Leaderboard**), and `status` (On-Site / Remote, also a program
-  decision). These render read-only on his form.
+  decision — see **## Leaderboard**), `status` (On-Site / Remote, also a program
+  decision), and `birthDate` (the youth age bands derive from it and those boards are
+  visible to every athlete in the building — same reasoning as `level`). He still
+  supplies `birthDate` once at signup: `consumeInvite` is a separate write path that
+  COALESCEs it in. These render read-only on his form.
 - **He never receives it at all** — `coachNotes`. `visibleProfile` *deletes* the key
   server-side rather than sending `null`, because a `null` in the payload still tells
-  him the field exists. Verified on the wire: an athlete's raw `GET /api/athletes/[id]`
-  response contains neither the key nor the note's text.
+  him the field exists. Both athlete-reachable read paths run every row through
+  `visibleProfile` — `GET /api/athletes/[id]` *and* the list route `GET /api/athletes`
+  (which serves an athlete his own row). Verified on the wire: neither response
+  contains the key or the note's text. `lib/athleteWire.test.ts` fails if a route
+  hands a raw athlete row to `json()`.
 
 **No new cross-athlete visibility.** `canSeeAthlete` is untouched — an athlete opens
 only his own profile. The leaderboard is still the only thing one athlete sees about

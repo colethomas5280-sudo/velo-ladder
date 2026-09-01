@@ -39,13 +39,60 @@ test("select fields accept only their own options", () => {
   assert.equal(parseProfilePatch({ status: "Hybrid" }, true).ok, false);
 });
 
-test("an athlete cannot write email, level or status even by sending them", () => {
-  for (const key of ["inviteEmail", "level", "status", "coachNotes"]) {
-    const r = parseProfilePatch({ [key]: "anything" }, false);
+test("an athlete cannot write email, level, status or birth date even by sending them", () => {
+  // These are visible-but-read-only for an athlete: the "ask your coach"
+  // message is fine because he can already see the field on his form.
+  for (const key of ["inviteEmail", "level", "status", "birthDate"]) {
+    const r = parseProfilePatch({ [key]: "2005-01-01" }, false);
     assert.equal(r.ok, false, `${key} must be refused for an athlete`);
+    assert.match(r.ok === false ? r.error : "", /ask your coach/i);
   }
   const coach = parseProfilePatch({ level: "College" }, true);
   assert.equal(coach.ok, true, "but a coach may set it");
+});
+
+test("a field an athlete can't see is ignored, not refused — no message confirming it exists (finding 7)", () => {
+  // `coachNotes` has athleteCanSee: false. Telling him "you can't change coach
+  // notes — ask your coach" confirms the field is there. Treat it like an
+  // unknown key: skipped, 200, nothing written.
+  const r = parseProfilePatch({ coachNotes: "let me in", phone: "555-0100" }, false);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.ok && r.patch, { phone: "555-0100" }, "coachNotes dropped silently");
+  // A coach still writes it normally.
+  assert.equal(parseProfilePatch({ coachNotes: "shoulder" }, true).ok, true);
+});
+
+test('clearing "hand" stores "" not null — the column is NOT NULL DEFAULT \'\' (finding 2)', () => {
+  // The roster's "–" option and the form's "Choose…" option both send an
+  // empty value. `SET hand = NULL` is a not-null violation → unhandled 500.
+  for (const empty of ["", null] as const) {
+    const r = parseProfilePatch({ hand: empty }, true);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.ok && r.patch, { hand: "" }, `hand: ${JSON.stringify(empty)} → ""`);
+  }
+  // An athlete may do it too (hand is athlete-editable).
+  const asAthlete = parseProfilePatch({ hand: "" }, false);
+  assert.equal(asAthlete.ok, true);
+  assert.deepEqual(asAthlete.ok && asAthlete.patch, { hand: "" });
+  // A real value still validates against the options.
+  assert.equal(parseProfilePatch({ hand: "R" }, true).ok, true);
+  assert.equal(parseProfilePatch({ hand: "X" }, true).ok, false);
+});
+
+test('a coach\'s `name` that splits to an empty first name is refused (finding 4)', () => {
+  // updateAthlete falls back to the old `name` while writing first/last empty,
+  // and first_name = '' is unrecoverable by the setup backfill.
+  for (const bad of ["", "   ", "\t"]) {
+    const r = parseProfilePatch({ name: bad }, true);
+    assert.equal(r.ok, false, `name ${JSON.stringify(bad)} must be refused`);
+  }
+  assert.equal(
+    parseProfilePatch({ name: "x".repeat(161) }, true).ok,
+    false,
+    "an over-long name is capped",
+  );
+  assert.equal(parseProfilePatch({ name: "Mara Vance" }, true).ok, true);
+  assert.equal(parseProfilePatch({ name: "Prince" }, true).ok, true, "a single name is fine");
 });
 
 test("over-long free text is refused rather than truncated", () => {
