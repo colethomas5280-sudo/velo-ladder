@@ -89,3 +89,35 @@ test('an emptied form field ("") clears a date/number rather than reaching Postg
   assert.equal(n.ok, true);
   assert.deepEqual(n.ok && n.patch, { heightIn: null });
 });
+
+test("integer-backed number fields reject a fractional value (400, not a 500 at write)", () => {
+  assert.equal(parseProfilePatch({ heightIn: 74.5 }, true).ok, false, "height_in is an int column");
+  assert.equal(parseProfilePatch({ hsGradYear: 2028.5 }, true).ok, false);
+  assert.equal(parseProfilePatch({ heightIn: 74 }, true).ok, true);
+  // weightLb is numeric(5,1) — one decimal place is fine, two is not
+  assert.equal(parseProfilePatch({ weightLb: 190.5 }, true).ok, true);
+  assert.equal(parseProfilePatch({ weightLb: 190.55 }, true).ok, false);
+});
+
+test("a coach may rename via `name`; an athlete may not; an explicit split always wins", () => {
+  const coach = parseProfilePatch({ name: "Mara Vance" }, true);
+  assert.equal(coach.ok, true);
+  assert.deepEqual(coach.ok && coach.patch, { name: "Mara Vance" });
+
+  const athlete = parseProfilePatch({ name: "Mara Vance" }, false);
+  assert.deepEqual(
+    athlete.ok && athlete.patch,
+    {},
+    "an athlete edits firstName/lastName, never the derived name",
+  );
+
+  const split = parseProfilePatch(
+    { name: "Mara Vance", firstName: "Mara", lastName: "Vance-Okafor" },
+    true,
+  );
+  assert.deepEqual(
+    split.ok && split.patch,
+    { firstName: "Mara", lastName: "Vance-Okafor" },
+    "name is dropped when the halves are sent explicitly",
+  );
+});
