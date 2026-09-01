@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type { DashboardData } from "@/lib/dashboard";
@@ -9,16 +9,14 @@ import { fmt, fmtDate, TRACKERS } from "@/lib/velo";
 import CustomizeDashboard, {
   WIDGETS,
   type WidgetId,
-  DEFAULT_WIDGETS,
-  loadWidgets,
+  setWidgets,
+  useWidgets,
 } from "./CustomizeDashboard";
 
 export default function Dashboard() {
   const { data, isLoading } = useSWR<DashboardData>("/api/dashboard", fetcher);
-  const [on, setOn] = useState<WidgetId[]>(DEFAULT_WIDGETS);
+  const on = useWidgets();
   const [customizing, setCustomizing] = useState(false);
-
-  useEffect(() => setOn(loadWidgets()), []);
   const shown = (id: WidgetId) => on.includes(id);
 
   return (
@@ -66,7 +64,7 @@ export default function Dashboard() {
       {customizing && (
         <CustomizeDashboard
           value={on}
-          onChange={setOn}
+          onChange={setWidgets}
           onClose={() => setCustomizing(false)}
         />
       )}

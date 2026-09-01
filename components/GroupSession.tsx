@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
-import type { TrainingSession, TrackerId } from "@/lib/types";
+import type { TrainingSession } from "@/lib/types";
 import {
   TRACKERS,
   num,
@@ -18,10 +18,10 @@ import {
   saveDraft,
   clearDraft,
 } from "@/lib/draft";
+import { useTracker } from "./useTracker";
 import EntryForm from "./EntryForm";
 import GroupEntryModal from "./GroupEntryModal";
 
-const TRACKER_KEY = "veloladder:tracker";
 
 export default function GroupSession({
   people,
@@ -42,25 +42,29 @@ export default function GroupSession({
     [ids, people],
   );
 
-  const [activeId, setActiveId] = useState<string>(members[0]?.id ?? "");
-  useEffect(() => {
-    if (members.length && !members.some((m) => m.id === activeId))
-      setActiveId(members[0].id);
-  }, [members, activeId]);
+  /*
+   * Who the coach picked, and who is actually showing. Kept apart on purpose:
+   * an athlete can leave the group while selected, and correcting that in an
+   * effect renders one frame pointing at someone who is no longer there.
+   * Deriving it instead means that frame never exists.
+   */
+  const [picked, setActiveId] = useState<string>("");
+  const activeId = members.some((m) => m.id === picked)
+    ? picked
+    : (members[0]?.id ?? "");
 
-  const [tracker, setTrackerState] = useState<TrackerId>("mound");
-  useEffect(() => {
-    const saved = window.localStorage.getItem(TRACKER_KEY);
-    if (saved === "mound" || saved === "pulldown") setTrackerState(saved);
-  }, []);
-  const setTracker = (t: TrackerId) => {
-    setTrackerState(t);
-    window.localStorage.setItem(TRACKER_KEY, t);
-  };
+  const [tracker, setTracker] = useTracker();
   const cfg = TRACKERS[tracker];
 
   const [draft, setDraftState] = useState<Draft>(emptyDraft());
+  /*
+   * Load the saved draft for whichever athlete + tracker is showing. A real
+   * effect rather than a `useSyncExternalStore` read: the draft is rewritten
+   * on every keystroke, and a snapshot function has to return a stable object
+   * identity, which a freshly parsed draft never can.
+   */
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     if (activeId) setDraftState(loadDraft(activeId, tracker));
   }, [activeId, tracker]);
   const setDraft = (next: Draft) => {
