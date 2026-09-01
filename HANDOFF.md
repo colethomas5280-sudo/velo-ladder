@@ -67,6 +67,7 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/athletes` | The roster/spreadsheet (coach only). |
 | `/resources` | Shared protocol/how-to library. Coaches write, athletes read. |
 | `/athletes/[id]` | One athlete's profile — **progress first**: name, "+ Track a new session", Mound/Pull-Down view toggle, progress chart, session history. Data entry lives only in the pop-up. |
+| `/profile` | The athlete's own profile form — "My profile" in the nav. Same `ProfileForm` component the coach sees as a section of `/athletes/[id]`, behind an `auth()`-only server component that resolves the athlete id client-side via `/api/me`. See **## Athlete profile**. |
 | `/login` | Email + password. |
 | `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
 | `/leaderboard` | Facility + level velocity record boards. Coach and athlete both. See **## Leaderboard**. |
@@ -75,7 +76,7 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/dashboard` | GET — everything the dashboard widgets need, in one call (coach only). |
 | `/api/athletes` | GET (scoped list), POST (coach: create). |
 | `/api/athletes/overview` | GET — roster + session counts + last date (coach only). Powers the home table. |
-| `/api/athletes/[id]` | GET / PATCH (name, email, hand, password, archive) / DELETE (soft). |
+| `/api/athletes/[id]` | GET (role-filtered through `visibleProfile` — the `coachNotes` key is stripped for an athlete, not blanked) / PATCH (profile fields via `parseProfilePatch`, plus name, email, hand, password, archive, CNS band) / DELETE (soft). See **## Athlete profile**. |
 | `/api/athletes/[id]/sessions` | GET / POST. |
 | `/api/athletes/[id]/status` | GET — today's guidance, open flags, flag history, CNS band. |
 | `/api/setbacks/[id]` | PATCH marks a flag reviewed. **Coach-only** — the human checkpoint. |
@@ -128,7 +129,12 @@ separate narrow read that still never widens `canSeeAthlete`. See **## Leaderboa
 ```
 athletes(id, name, hand, invite_email, password_hash,
          invite_token, invite_expires, archived, created_at,
-         birth_date, level)
+         birth_date, level,
+         first_name, last_name, phone, height_in, weight_lb,
+         weight_source, weight_at, bats, positions, school,
+         hs_grad_year, college_grad_year, status,
+         guardian_name, guardian_phone, emergency_contact,
+         injury_notes, coach_notes)
 resources(id, title, category, body, link, position, archived,
           created_at, updated_at)
 recovery_entries(id, athlete_id, date, sleep_hours, sleep_quality, soreness,
@@ -140,9 +146,12 @@ setbacks(id, athlete_id, kind['soreness'|'cns'|'injury'], opened_on,
 athletes.cns_threshold_pct  -- per-athlete CNS band; null = facility default
 training_sessions(id, athlete_id, type['mound'|'pulldown'], date, notes,
                   throws jsonb, created_by, created_at, updated_at, level)
--- schema v13, all three nullable: athletes.birth_date, athletes.level,
--- training_sessions.level. Only Youth|High School|College|Pro are stored;
--- 12U/14U are derived on read. See ## Leaderboard.
+-- schema v14. birth_date, level and training_sessions.level are all nullable;
+-- only Youth|High School|College|Pro are stored, 12U/14U are derived on read
+-- (see ## Leaderboard). The profile columns first_name..coach_notes are added
+-- by ALTER ... ADD COLUMN IF NOT EXISTS. first_name/last_name backfill once
+-- from name, splitting on the LAST space, keyed WHERE first_name IS NULL.
+-- weight_source is 'checkin' | 'entered'. See ## Athlete profile.
 ```
 
 `throws` shape: `{ "p1": [primer, t1, t2, t3, t4], ... }` — index 0 is the **80% primer
@@ -445,6 +454,112 @@ built. `coach` and `athlete` can read the board; `role: "none"` gets a 403.
 - An athlete who ranks **below the visible rows still sees their own standing** printed
   beneath the board, so the page means something to everyone reading it and not only
   the top five.
+
+## Athlete profile (`lib/profile.ts`, `lib/profileInput.ts`)
+
+An intake profile per athlete — name, physical, school, contact, guardian, injury
+history. The athlete edits his own on `/profile`; the coach edits it as a section of
+the athlete's page. Both render the same `ProfileForm`.
+
+### One config array is the source of truth
+
+`PROFILE_FIELDS` is the whole schema of the form. The same array drives the rendered
+form, the API's write-allowlist (`editableKeys`), per-field validation
+(`lib/profileInput.ts` reads `kind`, `min`/`max`, `options`, `maxLength`, `decimals`
+straight off it), the read filter that decides which fields an athlete is sent
+(`visibleProfile`), and the roster's "N missing" count (`missingProfileFields`). These
+can't disagree about which fields exist or who may see them, because there is one list
+to disagree with. Adding a field later is one entry here plus one
+`ALTER TABLE ... ADD COLUMN IF NOT EXISTS` — no form, route, or validation edit.
+
+### Three tiers of access, not two
+
+`athleteCanSee` and `athleteCanEdit` are separate flags because access here has three
+levels:
+
+- **The athlete edits it** — most of the profile: his name, birth date, height,
+  weight, throws/bats, positions, school, grad years, phone, guardian and emergency
+  contacts, injury history.
+- **He sees it but can't change it** — `inviteEmail` (his login; a typo here locks him
+  out of his own account), `level` (it stamps his records, so it is a program
+  decision — see **## Leaderboard**), and `status` (On-Site / Remote, also a program
+  decision). These render read-only on his form.
+- **He never receives it at all** — `coachNotes`. `visibleProfile` *deletes* the key
+  server-side rather than sending `null`, because a `null` in the payload still tells
+  him the field exists. Verified on the wire: an athlete's raw `GET /api/athletes/[id]`
+  response contains neither the key nor the note's text.
+
+**No new cross-athlete visibility.** `canSeeAthlete` is untouched — an athlete opens
+only his own profile. The leaderboard is still the only thing one athlete sees about
+another.
+
+### The name split
+
+Schema v14 adds `first_name` / `last_name`, backfilled once from the existing `name`
+by splitting on the **last** space ("Mary Jo Smith" → "Mary Jo" / "Smith"). `name`
+stays the display string every existing view already uses — roster, leaderboard,
+dashboard, CSV, invites — and none of them changed, because `name` is now only ever
+written as `first + " " + last` from one function (`joinName`), off the columns the
+profile edits.
+
+A compound surname backfills wrong: "Juan de la Cruz" becomes "Juan de la" / "Cruz".
+The coach corrects it on the roster, and that correction has to survive a re-run of
+`/api/setup`. It does, because the backfill is `WHERE first_name IS NULL` — it runs
+once per athlete, ever. That NULL is the "never been split" marker, which is why the
+API **refuses** an explicit `null` or empty string for `firstName` / `lastName` with a
+400: letting a name go back to NULL would let the next setup run silently re-split it
+out of `name` and undo the fix.
+
+### Three states per field, and the birth-date repair
+
+A PATCH carries each field in one of three states, and an invalid value is none of
+them:
+
+- **absent** — leave the stored value alone.
+- **a valid value** — set it.
+- **an explicit `null`** (or `""` from an emptied form field) — clear it.
+- **an invalid value** — a 400 that writes nothing.
+
+That last rule repairs a real defect. Previously a mistyped birth date was coerced to
+`null` and stored, which silently dropped that athlete off the 12U / 14U age boards
+with nothing to announce it. Now a bad value can never overwrite — or clear — a good
+one. Validation is **all-or-nothing**: a body with one valid field and one invalid
+field writes neither.
+
+### Weight has one meaning
+
+`weight_lb` is set at signup or in the profile, and is **also refreshed every time a
+check-in records a bodyweight**, with `weight_source` (`checkin` | `entered`) and
+`weight_at` recording where the current number came from and when. So it never goes
+stale, and it never becomes a second, competing answer to what an athlete weighs. A
+date guard (`weight_at IS NULL OR weight_at <= <check-in date>`) stops a back-filled
+older check-in from overwriting a newer weight; re-editing today's check-in still
+updates, because the guard is `<=`. Clearing the weight clears `weight_source` and
+`weight_at` with it — a source and date for a value that no longer exists is worse
+than nothing.
+
+The rolling 7-day average stays on the recovery card (**## Bodyweight is reported as a
+trend**): that is the trend, this is the current single number, and the card says
+which source the number has.
+
+### The page
+
+One component behind two doors: `/profile` for the athlete (nav: "My profile"), and
+the same component as a section of `/athletes/[id]` for the coach, so the coach's view
+of the profile is never the neglected one. `/profile` follows the app's house pattern
+— a server component gating on `auth()` only, with the athlete id resolved
+client-side from `/api/me`. **No page in this app queries the database from a server
+component** (PGlite throws inside an RSC — see gotchas); an early attempt to do it
+here returned a 500, worth recording so the next person doesn't retry it.
+
+### Roster completeness
+
+Each roster row shows a quiet "N missing" count of required profile fields still
+blank, computed server-side in `/api/athletes/overview` so the rule lives in one
+place. Required: `firstName`, `lastName`, `birthDate`, `level`, `heightIn`,
+`weightLb`, `school`, `phone` — plus `guardianName` and `guardianPhone` for anyone
+under 18. Optional fields never count: if `positions` or `bats` did, every row would
+be marked forever, which is the same as marking none of them.
 
 ## Local development
 
