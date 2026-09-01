@@ -579,6 +579,44 @@ input[type="date"] {
   border-color: var(--accent);
   color: var(--on-accent);
 }
+.chart-range {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.chart-range .chips {
+  margin-bottom: 0;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+/*
+ * The window can move now, so the dates on screen are the reader's only way of
+ * knowing where they are. Tabular figures stop the label jittering as it steps.
+ */
+.pager .range {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 104px;
+  text-align: center;
+}
+.pager .btn {
+  min-width: 26px;
+  padding-inline: 8px;
+}
+.pager .btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .chart-wrap {
   position: relative;
   width: 100%;
@@ -1541,9 +1579,13 @@ table.roster-table {
 }
 
 /* ---------- recovery ---------- */
+/* A bar now, not a line — the swatch should look like what it labels. */
 .chart-legend .l-recovery {
-  border-top-width: 5px;
-  color: color-mix(in srgb, var(--chalk) 40%, transparent);
+  border-top: 0;
+  width: 9px;
+  height: 11px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--chalk) 34%, transparent);
 }
 .recovery-card {
   margin-top: 16px;

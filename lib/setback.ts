@@ -5,7 +5,7 @@ import type {
   TrainingSession,
   TrackerId,
 } from "./types";
-import { TRACKERS, sBestG, todayISO } from "./velo";
+import { TRACKERS, daysBetween, sBestG, shiftDate, todayISO } from "./velo";
 
 /* ------------------------------------------------------------------ *
  * Setback logic
@@ -91,19 +91,6 @@ export interface Guidance {
   /** which branch produced this, for the coach view */
   kind: SetbackKind | null;
 }
-
-const daysBetween = (a: string, b: string) => {
-  const [ay, am, ad] = a.split("-").map(Number);
-  const [by, bm, bd] = b.split("-").map(Number);
-  return Math.round(
-    (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
-  );
-};
-const shiftDate = (iso: string, delta: number) => {
-  const [y, m, d] = iso.split("-").map(Number);
-  const t = new Date(Date.UTC(y, m - 1, d + delta));
-  return t.toISOString().slice(0, 10);
-};
 
 /** Best 5 oz of a session — the like-for-like number to trend. */
 function sessionBenchmark(s: TrainingSession): number | null {

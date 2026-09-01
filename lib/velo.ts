@@ -115,6 +115,24 @@ export function fmtDateShort(iso: string): string {
   if (p.length !== 3) return iso || "";
   return `${+p[1]}/${+p[2]}`;
 }
+/**
+ * Whole days from `a` to `b`, both YYYY-MM-DD. Negative when `b` is earlier.
+ * Built in UTC so a daylight-saving boundary can't produce a 23-hour "day".
+ */
+export function daysBetween(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000,
+  );
+}
+
+/** `iso` moved by `delta` days, still YYYY-MM-DD. */
+export function shiftDate(iso: string, delta: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
+}
+
 export function todayISO(): string {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
