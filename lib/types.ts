@@ -21,6 +21,26 @@ export interface Athlete {
   birthDate: string | null;
   /** Youth | High School | College | Pro */
   level: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  heightIn: number | null;
+  weightLb: number | null;
+  /** "checkin" | "entered" — where weightLb came from */
+  weightSource: string | null;
+  weightAt: string | null;
+  bats: string | null;
+  positions: string | null;
+  school: string | null;
+  hsGradYear: number | null;
+  collegeGradYear: number | null;
+  status: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  emergencyContact: string | null;
+  injuryNotes: string | null;
+  /** coach only — stripped from an athlete's response by visibleProfile */
+  coachNotes: string | null;
   archived: boolean;
 }
 

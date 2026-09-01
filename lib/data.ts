@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { sql } from "@/lib/db";
+import { sql, pgPool } from "@/lib/db";
 import type {
   Athlete,
   AthleteOverview,
@@ -11,6 +11,7 @@ import type {
   Setback,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
+import { joinName, splitName } from "./profile";
 import type { LeaderboardAthlete } from "./leaderboard";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
@@ -24,6 +25,24 @@ function toAthlete(r: Record<string, unknown>): Athlete {
     cnsThresholdPct: r.cns_threshold_pct == null ? null : Number(r.cns_threshold_pct),
     birthDate: r.birth_date ? isoDate(r.birth_date) : null,
     level: (r.level as string | null) ?? null,
+    firstName: (r.first_name as string | null) ?? null,
+    lastName: (r.last_name as string | null) ?? null,
+    phone: (r.phone as string | null) ?? null,
+    heightIn: r.height_in == null ? null : Number(r.height_in),
+    weightLb: r.weight_lb == null ? null : Number(r.weight_lb),
+    weightSource: (r.weight_source as string | null) ?? null,
+    weightAt: r.weight_at ? isoDate(r.weight_at) : null,
+    bats: (r.bats as string | null) ?? null,
+    positions: (r.positions as string | null) ?? null,
+    school: (r.school as string | null) ?? null,
+    hsGradYear: r.hs_grad_year == null ? null : Number(r.hs_grad_year),
+    collegeGradYear: r.college_grad_year == null ? null : Number(r.college_grad_year),
+    status: (r.status as string | null) ?? null,
+    guardianName: (r.guardian_name as string | null) ?? null,
+    guardianPhone: (r.guardian_phone as string | null) ?? null,
+    emergencyContact: (r.emergency_contact as string | null) ?? null,
+    injuryNotes: (r.injury_notes as string | null) ?? null,
+    coachNotes: (r.coach_notes as string | null) ?? null,
     archived: Boolean(r.archived),
   };
 }
@@ -97,66 +116,136 @@ export async function createAthlete(input: {
   const id = crypto.randomUUID();
   const email = input.inviteEmail?.trim().toLowerCase() || null;
   const hash = input.password ? await hashPassword(input.password) : null;
+  // Split on insert so a new athlete is never stored unsplit, and derive `name`
+  // from the halves so it can only ever be first + " " + last.
+  const { first, last } = splitName(input.name);
+  const name = joinName(first, last) || input.name.trim();
   const rows = (await sql`
-    INSERT INTO athletes (id, name, hand, invite_email, password_hash)
-    VALUES (${id}, ${input.name.trim()}, ${input.hand || ""}, ${email}, ${hash})
+    INSERT INTO athletes (id, name, hand, invite_email, password_hash, first_name, last_name)
+    VALUES (${id}, ${name}, ${input.hand || ""}, ${email}, ${hash}, ${first}, ${last})
     RETURNING *
   `) as Record<string, unknown>[];
   return toAthlete(rows[0]);
 }
 
+/**
+ * Column for each camelCase profile key. Driving the write off one map, rather
+ * than seventeen hand-written ternaries, is what keeps a field from being
+ * silently forgotten on the way to the database.
+ */
+const PROFILE_COLUMNS = {
+  firstName: "first_name",
+  lastName: "last_name",
+  phone: "phone",
+  heightIn: "height_in",
+  weightLb: "weight_lb",
+  weightSource: "weight_source",
+  weightAt: "weight_at",
+  bats: "bats",
+  positions: "positions",
+  school: "school",
+  hsGradYear: "hs_grad_year",
+  collegeGradYear: "college_grad_year",
+  status: "status",
+  guardianName: "guardian_name",
+  guardianPhone: "guardian_phone",
+  emergencyContact: "emergency_contact",
+  injuryNotes: "injury_notes",
+  coachNotes: "coach_notes",
+  level: "level",
+  birthDate: "birth_date",
+  hand: "hand",
+  inviteEmail: "invite_email",
+} satisfies Record<string, string>;
+
+/**
+ * Every profile key accepts `undefined` (leave the stored value alone), a
+ * value, or `null` (clear it). `name` stays accepted for the roster's inline
+ * rename, but is never written directly — it is derived from first + last.
+ */
+export type AthletePatch = Partial<
+  Record<keyof typeof PROFILE_COLUMNS, string | number | null>
+> & {
+  name?: string | null;
+  archived?: boolean;
+  password?: string;
+  cnsThresholdPct?: number | null;
+};
+
 export async function updateAthlete(
   id: string,
-  patch: {
-    name?: string;
-    hand?: string;
-    inviteEmail?: string | null;
-    archived?: boolean;
-    password?: string;
-    cnsThresholdPct?: number | null;
-    level?: string | null;
-    birthDate?: string | null;
-  },
+  patch: AthletePatch,
 ): Promise<Athlete | null> {
   const cur = await getAthlete(id);
   if (!cur) return null;
-  const name = patch.name?.trim() ?? cur.name;
-  const hand = patch.hand ?? cur.hand;
-  const inviteEmail =
-    patch.inviteEmail === undefined
-      ? cur.inviteEmail
-      : patch.inviteEmail?.trim().toLowerCase() || null;
-  const archived = patch.archived ?? cur.archived;
-  const cns =
-    patch.cnsThresholdPct === undefined
-      ? cur.cnsThresholdPct
-      : patch.cnsThresholdPct;
-  const level = patch.level === undefined ? cur.level : patch.level;
-  const birthDate =
-    patch.birthDate === undefined ? cur.birthDate : patch.birthDate || null;
 
-  if (patch.password) {
-    const hash = await hashPassword(patch.password);
-    const rows = (await sql`
-      UPDATE athletes
-      SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
-          archived = ${archived}, cns_threshold_pct = ${cns},
-          level = ${level}, birth_date = ${birthDate}, password_hash = ${hash}
-      WHERE id = ${id} RETURNING *
-    `) as Record<string, unknown>[];
-    const updated = rows[0] ? toAthlete(rows[0]) : null;
-    if (updated) await stampUnleveledSessions(id, level);
-    return updated;
+  // The roster's inline rename PATCHes `name` directly. Accept it, split it,
+  // and let the derivation below rebuild `name` — otherwise renaming an
+  // athlete silently stops working.
+  if (
+    patch.name !== undefined &&
+    patch.firstName === undefined &&
+    patch.lastName === undefined
+  ) {
+    const s = splitName(String(patch.name ?? ""));
+    patch.firstName = s.first;
+    patch.lastName = s.last;
   }
 
-  const rows = (await sql`
-    UPDATE athletes
-    SET name = ${name}, hand = ${hand}, invite_email = ${inviteEmail},
-        archived = ${archived}, cns_threshold_pct = ${cns},
-        level = ${level}, birth_date = ${birthDate}
-    WHERE id = ${id} RETURNING *
-  `) as Record<string, unknown>[];
+  // Logins are matched on lower(invite_email), so a raw write of
+  // "Bob@Example.COM " would lock that athlete out of his own account.
+  if (patch.inviteEmail !== undefined)
+    patch.inviteEmail =
+      String(patch.inviteEmail ?? "").trim().toLowerCase() || null;
+
+  /*
+   * `name` is a display string, never independently authored. Deriving it
+   * here — the single write path — is what stops it drifting from the
+   * first/last columns the profile edits.
+   */
+  const first =
+    patch.firstName !== undefined
+      ? String(patch.firstName ?? "")
+      : cur.firstName ?? splitName(cur.name).first;
+  const last =
+    patch.lastName !== undefined
+      ? String(patch.lastName ?? "")
+      : cur.lastName ?? splitName(cur.name).last;
+  const name = joinName(first, last) || cur.name;
+
+  /*
+   * Build the SET list from only the keys actually present in the patch. An
+   * absent key is never mentioned in the UPDATE; a key set to `null` is
+   * written as NULL. `name` is always set, since it is derived, not supplied.
+   */
+  const cols: string[] = [];
+  const vals: unknown[] = [];
+  const set = (col: string, v: unknown) => {
+    vals.push(v);
+    cols.push(`${col} = $${vals.length}`);
+  };
+
+  set("name", name);
+  for (const [key, col] of Object.entries(PROFILE_COLUMNS)) {
+    const v = (patch as Record<string, unknown>)[key];
+    if (v !== undefined) set(col, v);
+  }
+  if (patch.archived !== undefined) set("archived", patch.archived);
+  if (patch.cnsThresholdPct !== undefined)
+    set("cns_threshold_pct", patch.cnsThresholdPct);
+  if (patch.password) set("password_hash", await hashPassword(patch.password));
+
+  vals.push(id);
+  const rows = (
+    await pgPool.query(
+      `UPDATE athletes SET ${cols.join(", ")} WHERE id = $${vals.length} RETURNING *`,
+      vals,
+    )
+  ).rows;
   const updated = rows[0] ? toAthlete(rows[0]) : null;
+
+  const level =
+    patch.level === undefined ? cur.level : (patch.level as string | null);
   if (updated) await stampUnleveledSessions(id, level);
   return updated;
 }
