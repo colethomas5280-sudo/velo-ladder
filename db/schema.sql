@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 13). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 14). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -20,6 +20,38 @@ CREATE UNIQUE INDEX IF NOT EXISTS athletes_invite_token_idx
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS cns_threshold_pct real;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS birth_date date;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS level text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS first_name text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS last_name text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS phone text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS height_in int;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_lb numeric(5,1);
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_source text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_at date;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS bats text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS positions text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS school text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS hs_grad_year int;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS college_grad_year int;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS status text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS guardian_name text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS guardian_phone text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS emergency_contact text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS injury_notes text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS coach_notes text;
+
+-- Backfill first/last from the existing single name, splitting on the LAST
+-- space. Runs once: only rows that have never been split are touched, so a
+-- coach's later correction is never overwritten by a re-run of setup.
+UPDATE athletes
+   SET first_name = CASE
+         WHEN position(' ' in btrim(name)) = 0 THEN btrim(name)
+         ELSE btrim(substring(btrim(name) from 1 for length(btrim(name)) - position(' ' in reverse(btrim(name)))))
+       END,
+       last_name = CASE
+         WHEN position(' ' in btrim(name)) = 0 THEN ''
+         ELSE substring(btrim(name) from length(btrim(name)) - position(' ' in reverse(btrim(name))) + 2)
+       END
+ WHERE first_name IS NULL AND name IS NOT NULL;
 CREATE INDEX IF NOT EXISTS athletes_email_idx ON athletes(lower(invite_email));
 
 CREATE TABLE IF NOT EXISTS training_sessions (
