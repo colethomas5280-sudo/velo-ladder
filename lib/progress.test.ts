@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CHART_WINDOWS, progressWindow } from "@/lib/progress";
+import { CHART_WINDOWS, progressWindow, smoothPath, type Pt } from "@/lib/progress";
 import { TRACKERS } from "@/lib/velo";
 import type { RecoveryEntry, Throws, TrackerId, TrainingSession } from "@/lib/types";
 
@@ -233,4 +233,159 @@ test("an empty window reports zero of both", () => {
   const w = win();
   assert.equal(w.sessionDays, 0);
   assert.equal(w.recoveryDays, 0);
+});
+
+/* ------------------------------------------------------------------ *
+ * smoothPath — the curve must never invent a velocity
+ * ------------------------------------------------------------------ */
+
+/** Sample a cubic Bezier's y at t. */
+const bezierY = (y0: number, y1: number, y2: number, y3: number, t: number) => {
+  const u = 1 - t;
+  return u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3;
+};
+
+/** Highest and lowest y the drawn curve actually reaches. */
+function curveBounds(pts: Pt[]) {
+  const segs = smoothPath(pts);
+  let lo = Infinity;
+  let hi = -Infinity;
+  segs.forEach((s, i) => {
+    for (let k = 0; k <= 60; k++) {
+      const y = bezierY(pts[i].y, s.c1.y, s.c2.y, s.to.y, k / 60);
+      lo = Math.min(lo, y);
+      hi = Math.max(hi, y);
+    }
+  });
+  return { lo, hi };
+}
+
+const at = (...ys: number[]): Pt[] => ys.map((y, x) => ({ x, y }));
+
+test("smoothPath needs at least two points to draw anything", () => {
+  assert.deepEqual(smoothPath([]), []);
+  assert.deepEqual(smoothPath(at(90)), []);
+  assert.equal(smoothPath(at(90, 92)).length, 1);
+});
+
+test("one segment per gap between points", () => {
+  assert.equal(smoothPath(at(90, 92, 94, 91)).length, 3);
+});
+
+test("the curve never rises above the highest point it joins", () => {
+  // A spike is what makes a cardinal spline bulge: the curve either side of
+  // 100 would arc above it, drawing a velocity that was never thrown.
+  const pts = at(90, 90, 100, 90, 90);
+  const { hi } = curveBounds(pts);
+  assert.ok(hi <= 100 + 1e-9, `curve reached ${hi}, above the 100 it joins`);
+});
+
+test("the curve never dips below the lowest point it joins", () => {
+  const pts = at(95, 95, 85, 95, 95);
+  const { lo } = curveBounds(pts);
+  assert.ok(lo >= 85 - 1e-9, `curve reached ${lo}, below the 85 it joins`);
+});
+
+test("every segment stays between its own two endpoints", () => {
+  // The strong form: not just the overall range, but each leg individually.
+  const pts = at(88, 95, 91, 97, 86, 93, 90);
+  const segs = smoothPath(pts);
+  segs.forEach((s, i) => {
+    const a = pts[i].y;
+    const b = s.to.y;
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    for (let k = 0; k <= 40; k++) {
+      const y = bezierY(a, s.c1.y, s.c2.y, b, k / 40);
+      assert.ok(
+        y >= lo - 1e-9 && y <= hi + 1e-9,
+        `segment ${i} reached ${y}, outside [${lo}, ${hi}]`,
+      );
+    }
+  });
+});
+
+test("a flat run stays flat rather than rippling", () => {
+  const pts = at(92, 92, 92, 92);
+  const { lo, hi } = curveBounds(pts);
+  assert.ok(Math.abs(hi - 92) < 1e-9 && Math.abs(lo - 92) < 1e-9);
+});
+
+test("a steadily climbing line still climbs the whole way", () => {
+  const pts = at(88, 90, 92, 94);
+  const segs = smoothPath(pts);
+  segs.forEach((s, i) => {
+    let prev = pts[i].y;
+    for (let k = 1; k <= 30; k++) {
+      const y = bezierY(pts[i].y, s.c1.y, s.c2.y, s.to.y, k / 30);
+      assert.ok(y >= prev - 1e-9, `segment ${i} went backwards`);
+      prev = y;
+    }
+  });
+});
+
+test("the curve passes exactly through every real session", () => {
+  // The dots sit on the data; the curve must not drift off them.
+  const pts = at(90, 96, 89, 94);
+  const segs = smoothPath(pts);
+  segs.forEach((s, i) => {
+    assert.equal(bezierY(pts[i].y, s.c1.y, s.c2.y, s.to.y, 0), pts[i].y);
+    assert.equal(s.to.y, pts[i + 1].y);
+  });
+});
+
+test("uneven gaps between sessions are handled", () => {
+  // Sessions are days apart, not evenly spaced, so x steps vary.
+  const pts: Pt[] = [
+    { x: 0, y: 90 },
+    { x: 12, y: 97 },
+    { x: 14, y: 88 },
+    { x: 40, y: 93 },
+  ];
+  const segs = smoothPath(pts);
+  assert.equal(segs.length, 3);
+  const { hi, lo } = curveBounds(pts);
+  assert.ok(hi <= 97 + 1e-9 && lo >= 88 - 1e-9);
+});
+
+test("a small step into a big jump does not dip below the step", () => {
+  /*
+   * The case the Fritsch-Carlson circle exists for, and the one my first pass
+   * missed. Both tangents point the same way here, so the sign guards do
+   * nothing — but the middle tangent is ~5x the first segment's own slope, and
+   * an unclamped curve swings well under 88 on its way from 88 to 89.
+   */
+  /*
+   * Chosen by measurement, not by eye: overshoot starts around a 12:1 ratio
+   * between neighbouring slopes. These two segments are 15:1, which puts
+   * alpha^2 + beta^2 at 65 — comfortably inside the band where the curve
+   * misbehaves but a loosened threshold would wave it through. Unclamped this
+   * dips to 90.295, below the 90 it starts from.
+   */
+  // Two ratios on purpose. 15:1 sits just inside the band a loosened
+  // threshold would wave through; 55:1 is steep enough to catch a wrong
+  // Hermite-to-Bezier constant, which clamping alone would otherwise hide.
+  for (const pts of [at(90, 90.5, 98), at(88, 88.2, 99)]) {
+    const segs = smoothPath(pts);
+    const lo = pts[0].y;
+    const hi = pts[1].y;
+    for (let k = 0; k <= 400; k++) {
+      const y = bezierY(pts[0].y, segs[0].c1.y, segs[0].c2.y, segs[0].to.y, k / 400);
+      assert.ok(
+        y >= lo - 1e-9 && y <= hi + 1e-9,
+        `dipped to ${y}, outside [${lo}, ${hi}]`,
+      );
+    }
+  }
+});
+
+test("a plateau between two slopes stays a plateau", () => {
+  // Flat data alone proves nothing: every tangent is zero anyway. It takes a
+  // flat run with a climb into it and a fall out of it to need the guard.
+  const pts = at(90, 95, 95, 90);
+  const segs = smoothPath(pts);
+  for (let k = 0; k <= 40; k++) {
+    const y = bezierY(pts[1].y, segs[1].c1.y, segs[1].c2.y, segs[1].to.y, k / 40);
+    assert.ok(Math.abs(y - 95) < 1e-9, `plateau rippled to ${y}`);
+  }
 });

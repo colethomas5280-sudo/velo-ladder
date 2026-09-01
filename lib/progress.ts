@@ -132,3 +132,83 @@ export function progressWindow({
     recoveryDays,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * Drawing the line between sessions
+ * ------------------------------------------------------------------ */
+
+export interface Pt {
+  x: number;
+  y: number;
+}
+
+/** A cubic Bezier leg: two control points and where it ends. */
+export interface CurveSegment {
+  c1: Pt;
+  c2: Pt;
+  to: Pt;
+}
+
+/**
+ * Monotone cubic interpolation (Fritsch-Carlson), as Bezier control points.
+ *
+ * Smoothing a velocity line is not purely cosmetic. A Catmull-Rom or cardinal
+ * spline bulges past the points it joins, so the curve between two sessions
+ * can peak above either of them — drawing a number the athlete never threw,
+ * sometimes above the dashed line marking their own PR.
+ *
+ * This keeps each segment monotone: between two sessions the curve can only
+ * travel between those two values. Two guards do that work — a tangent
+ * pointing against a segment's direction is zeroed, and the remaining
+ * tangents are scaled back inside the Fritsch-Carlson circle.
+ */
+export function smoothPath(points: Pt[]): CurveSegment[] {
+  const n = points.length;
+  if (n < 2) return [];
+
+  const dx: number[] = [];
+  const delta: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = points[i + 1].x - points[i].x;
+    dx.push(h);
+    delta.push(h === 0 ? 0 : (points[i + 1].y - points[i].y) / h);
+  }
+
+  // Tangents start as the average of the neighbouring secants.
+  const m: number[] = new Array(n);
+  m[0] = delta[0];
+  m[n - 1] = delta[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = (delta[i - 1] + delta[i]) / 2;
+
+  for (let i = 0; i < n - 1; i++) {
+    // A flat segment must stay flat, or the curve dips around a plateau.
+    if (delta[i] === 0) {
+      m[i] = 0;
+      m[i + 1] = 0;
+      continue;
+    }
+    // A tangent running against the segment guarantees a bulge past an end.
+    if (m[i] / delta[i] < 0) m[i] = 0;
+    if (m[i + 1] / delta[i] < 0) m[i + 1] = 0;
+
+    const a = m[i] / delta[i];
+    const b = m[i + 1] / delta[i];
+    const sq = a * a + b * b;
+    if (sq > 9) {
+      const t = 3 / Math.sqrt(sq);
+      m[i] = t * a * delta[i];
+      m[i + 1] = t * b * delta[i];
+    }
+  }
+
+  const out: CurveSegment[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3;
+    out.push({
+      c1: { x: points[i].x + h, y: points[i].y + m[i] * h },
+      c2: { x: points[i + 1].x - h, y: points[i + 1].y - m[i + 1] * h },
+      to: points[i + 1],
+    });
+  }
+  return out;
+}

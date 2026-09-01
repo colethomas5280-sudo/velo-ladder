@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { TrainingSession, RecoveryEntry } from "@/lib/types";
-import { CHART_WINDOWS, STEP_DAYS, progressWindow } from "@/lib/progress";
+import {
+  CHART_WINDOWS,
+  STEP_DAYS,
+  progressWindow,
+  smoothPath,
+} from "@/lib/progress";
 import {
   type TrackerConfig,
   groupById,
@@ -214,12 +219,23 @@ export default function ProgressChart({
           .filter((x): x is { v: number; i: number } => x.v != null);
         if (!pts.length) continue;
 
-        // The line spans the gaps; the dots mark the days that are real.
-        g.strokeStyle = color;
-        g.lineWidth = l.width;
-        g.beginPath();
-        pts.forEach((x, n) => (n ? g.lineTo(X(x.i), Y(x.v)) : g.moveTo(X(x.i), Y(x.v))));
-        if (pts.length > 1) g.stroke();
+        /*
+         * The line spans the gaps; the dots mark the days that are real.
+         * Curved rather than jointed, through monotone interpolation, so the
+         * smoothing can never carry the line above a session that was thrown.
+         */
+        const screen = pts.map((x) => ({ x: X(x.i), y: Y(x.v) }));
+        if (screen.length > 1) {
+          g.strokeStyle = color;
+          g.lineWidth = l.width;
+          g.lineJoin = "round";
+          g.lineCap = "round";
+          g.beginPath();
+          g.moveTo(screen[0].x, screen[0].y);
+          for (const seg of smoothPath(screen))
+            g.bezierCurveTo(seg.c1.x, seg.c1.y, seg.c2.x, seg.c2.y, seg.to.x, seg.to.y);
+          g.stroke();
+        }
 
         for (const x of pts) {
           g.fillStyle = color;
