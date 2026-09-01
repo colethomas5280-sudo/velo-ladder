@@ -55,7 +55,7 @@ test("missing counts only the fields a coach would actually chase", () => {
     firstName: "Martin", lastName: "Duff", phone: "555-0100",
     birthDate: "2000-03-02", level: "High School",
     heightIn: 74, weightLb: 190, school: "Ralston Valley",
-    positions: null, hsGradYear: null, bats: null, // optional — must not count
+    hsGradYear: null, bats: null, // optional — must not count
   };
   assert.deepEqual(missingProfileFields(full), []);
   const bare = { ...full, phone: null, school: "" };

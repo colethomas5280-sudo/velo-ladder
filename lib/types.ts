@@ -30,7 +30,6 @@ export interface Athlete {
   weightSource: string | null;
   weightAt: string | null;
   bats: string | null;
-  positions: string | null;
   school: string | null;
   hsGradYear: number | null;
   collegeGradYear: number | null;

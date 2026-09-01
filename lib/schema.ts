@@ -34,6 +34,9 @@ ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_lb numeric(5,1);
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_source text;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_at date;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS bats text;
+-- Retired. Positions only ever held RHP/LHP, which the hand column already
+-- encodes — two columns for one fact, free to contradict each other. The column
+-- stays so fresh and existing databases keep the same shape; nothing reads it.
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS positions text;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS school text;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS hs_grad_year int;

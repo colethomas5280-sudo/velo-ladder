@@ -97,7 +97,7 @@ test('a coach\'s `name` that splits to an empty first name is refused (finding 4
 });
 
 test("over-long free text is refused rather than truncated", () => {
-  const r = parseProfilePatch({ positions: "P".repeat(500) }, true);
+  const r = parseProfilePatch({ school: "P".repeat(500) }, true);
   assert.equal(r.ok, false, "silently truncating loses what he typed");
 });
 
