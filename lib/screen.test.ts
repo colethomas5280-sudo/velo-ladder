@@ -15,6 +15,7 @@ import {
   isApplicable,
   screenCounts,
   screenFields,
+  screenReport,
   fillNormal,
   testMark,
   alerts,
@@ -673,6 +674,228 @@ test("a screen marked normal throughout grades clean, with nothing left blank", 
   assert.equal(counts.deviation, 0);
   for (const t of SCREEN_TESTS)
     assert.equal(testMark(t, filled), "green", `${t.key} should be green`);
+});
+
+/* ------------------------------------------------------------------ *
+ * Re-screening: cleared vs never looked at
+ * ------------------------------------------------------------------ */
+
+test("a deviation re-screened clean is resolved", () => {
+  const c = compareScreens({ [SQ.L]: "bad" }, { [SQ.L]: "good" }, [sample]);
+  assert.equal(c.resolved.length, 1);
+  assert.equal(c.unchecked.length, 0);
+});
+
+/*
+ * The lie a re-screen must not tell. Nobody looked at that leg this time, and
+ * reporting it as fixed hands the athlete a win he hasn't been given.
+ */
+test("a deviation nobody re-screened is unchecked, not resolved", () => {
+  const c = compareScreens({ [SQ.L]: "bad" }, {}, [sample]);
+  assert.equal(c.resolved.length, 0, "nothing was observed");
+  assert.equal(c.unchecked.length, 1);
+  assert.equal(c.unchecked[0].finding.key, "bad", "it keeps what it last said");
+});
+
+test("a deviation skipped on purpose is unchecked too", () => {
+  const c = compareScreens({ [SQ.L]: "bad" }, { [SQ.L]: NOT_TESTED }, [sample]);
+  assert.equal(c.unchecked.length, 1);
+  assert.equal(c.resolved.length, 0);
+});
+
+/*
+ * The exception. A follow-up exists only because the gate above it came up
+ * limited, so a gate that screens clean retires the question outright — that
+ * is cleared, not unchecked, even though nobody answered the follow-up.
+ */
+test("a deviation whose branch closed is resolved", () => {
+  const before: Results = { "pt.tilt": "cannot-arch", "pt.quality-limited": "shake" };
+  const after: Results = { "pt.tilt": "both", "pt.quality-able": "smooth" };
+  const c = compareScreens(before, after, [branching]);
+  assert.deepEqual(
+    c.resolved.map((d) => d.field.key).sort(),
+    ["pt.quality-limited", "pt.tilt"],
+    "the gate cleared, and the question under it stopped applying",
+  );
+  assert.equal(c.unchecked.length, 0, "nothing here went unlooked-at");
+});
+
+/* ------------------------------------------------------------------ *
+ * The report the panel renders
+ * ------------------------------------------------------------------ */
+
+test("the report leads with the worst test, not the first one", () => {
+  const r = screenReport(
+    { [SQ.L]: "mid", [SQ.R]: "good", "gtd.first": "fail" },
+    null,
+    [sample, gated],
+  );
+  assert.equal(r[0].test.key, "gtd", "red outranks yellow regardless of order");
+  assert.equal(r[0].status, "red");
+  assert.equal(r[1].status, "yellow");
+});
+
+test("tests of equal standing keep the order they are screened in", () => {
+  // Both red, so only the tiebreak can decide — otherwise this asserts nothing.
+  const results: Results = { [SQ.L]: "bad", "gtd.first": "fail" };
+  assert.deepEqual(
+    screenReport(results, null, [sample, gated]).map((x) => x.test.key),
+    ["smp", "gtd"],
+  );
+  assert.deepEqual(
+    screenReport(results, null, [gated, sample]).map((x) => x.test.key),
+    ["gtd", "smp"],
+    "the tiebreak follows the sheet, not the alphabet or the id",
+  );
+});
+
+test("a test nobody ran sinks below a clean one", () => {
+  const r = screenReport({ "gtd.first": "pass", "gtd.second": "ok" }, null, [
+    sample,
+    gated,
+  ]);
+  assert.equal(r[0].test.key, "gtd");
+  assert.equal(r[0].status, "clean");
+  assert.equal(r[1].status, "skipped", "nothing recorded is not the same as passing");
+});
+
+test("a test skipped on purpose still reads as skipped", () => {
+  const r = screenReport({ [SQ.L]: NOT_TESTED, [SQ.R]: NOT_TESTED }, null, [sample]);
+  assert.equal(r[0].status, "skipped");
+  assert.equal(r[0].recorded, 2, "the skip itself was recorded");
+});
+
+test("a deviation with no colour yet is ungraded, not clean", () => {
+  const uncoloured: ScreenTest = {
+    key: "uc", label: "UC", group: "core",
+    subTests: [
+      { key: "q", label: "Q", findings: [
+        { key: "good", label: "Good", normal: true },
+        { key: "off", label: "Off" },
+      ] },
+    ],
+  };
+  const r = screenReport({ "uc.q": "off" }, null, [uncoloured]);
+  assert.equal(r[0].status, "ungraded");
+  assert.equal(r[0].mark, null, "and it still shows no mark");
+  assert.equal(r[0].work.length, 1, "but the work is on the list");
+});
+
+test("the work list holds deviations only", () => {
+  const r = screenReport({ [SQ.L]: "bad", [SQ.R]: "good" }, null, [sample]);
+  assert.deepEqual(
+    r[0].work.map((w) => w.field.key),
+    [SQ.L],
+  );
+});
+
+test("counts say how much of the test was actually recorded", () => {
+  const r = screenReport({ [SQ.L]: "good" }, null, [sample]);
+  assert.equal(r[0].recorded, 1);
+  assert.equal(r[0].asked, 2, "the other side was asked and left blank");
+});
+
+test("with no previous screen nothing claims a direction", () => {
+  const r = screenReport({ [SQ.L]: "bad" }, null, [sample]);
+  assert.equal(r[0].work[0].trend, null);
+  assert.equal(r[0].work[0].before, undefined);
+});
+
+test("a reading that got better, worse, or stayed put is named as such", () => {
+  const trend = (before: string, after: string) =>
+    screenReport({ [SQ.L]: after }, { [SQ.L]: before }, [sample])[0].work[0].trend;
+  assert.equal(trend("bad", "mid"), "improved");
+  assert.equal(trend("mid", "bad"), "worsened");
+  assert.equal(trend("mid", "mid"), "unchanged");
+});
+
+test("a deviation that wasn't there last screen is new", () => {
+  const r = screenReport({ [SQ.L]: "bad" }, { [SQ.L]: "good" }, [sample]);
+  assert.equal(r[0].work[0].trend, "new");
+});
+
+/*
+ * Two findings that carry no colour have no order between them, so the move
+ * is reported as a change and nothing more. Calling it an improvement would
+ * be inventing a direction the mapping never supplied.
+ */
+test("a move the scale can't rank is a change, not progress", () => {
+  const uncoloured: ScreenTest = {
+    key: "uc", label: "UC", group: "core",
+    subTests: [
+      { key: "q", label: "Q", findings: [
+        { key: "good", label: "Good", normal: true },
+        { key: "a", label: "A" },
+        { key: "b", label: "B" },
+      ] },
+    ],
+  };
+  const r = screenReport({ "uc.q": "b" }, { "uc.q": "a" }, [uncoloured]);
+  assert.equal(r[0].work[0].trend, "changed");
+  assert.equal(r[0].work[0].before?.key, "a", "and it keeps what it moved from");
+});
+
+/*
+ * And the half-ranked case, which is the one that bites: an ungraded finding
+ * compares as less than every colour, so a reading moving from "no colour
+ * yet" to RED reports as an improvement unless the missing rank is caught.
+ */
+test("a move onto the scale from nowhere is a change, not an improvement", () => {
+  const half: ScreenTest = {
+    key: "hf", label: "HF", group: "core",
+    subTests: [
+      { key: "q", label: "Q", findings: [
+        { key: "good", label: "Good", normal: true, severity: "green" },
+        { key: "plain", label: "Plain" },
+        { key: "bad", label: "Bad", severity: "red" },
+      ] },
+    ],
+  };
+  assert.equal(
+    screenReport({ "hf.q": "bad" }, { "hf.q": "plain" }, [half])[0].work[0].trend,
+    "changed",
+  );
+  assert.equal(
+    screenReport({ "hf.q": "plain" }, { "hf.q": "bad" }, [half])[0].work[0].trend,
+    "changed",
+    "and it doesn't read as progress in the other direction either",
+  );
+});
+
+test("cleared and unchecked land on the test they belong to", () => {
+  const r = screenReport(
+    { [SQ.L]: "good", "gtd.first": "pass", "gtd.second": "ok" },
+    { [SQ.L]: "bad", [SQ.R]: "bad", "gtd.first": "fail" },
+    [sample, gated],
+  );
+  const smp = r.find((x) => x.test.key === "smp")!;
+  const gtd = r.find((x) => x.test.key === "gtd")!;
+  assert.deepEqual(smp.cleared.map((d) => d.field.key), [SQ.L]);
+  assert.deepEqual(smp.unchecked.map((d) => d.field.key), [SQ.R]);
+  assert.deepEqual(gtd.cleared.map((d) => d.field.key), ["gtd.first"]);
+  assert.equal(gtd.unchecked.length, 0);
+});
+
+/*
+ * On the real sheet: an athlete who passed everything gets a panel with no
+ * work on it at all, and seventeen tests that say so.
+ */
+test("a clean screen produces a report with nothing to work on", () => {
+  const r = screenReport(fillNormal({}));
+  assert.equal(r.length, SCREEN_TESTS.length);
+  assert.deepEqual(
+    r.filter((x) => x.status !== "clean").map((x) => x.test.key),
+    [],
+  );
+  assert.equal(r.reduce((n, x) => n + x.work.length, 0), 0);
+});
+
+test("an unrecorded screen is seventeen skipped tests, not seventeen passes", () => {
+  const r = screenReport({});
+  assert.deepEqual(
+    r.filter((x) => x.status !== "skipped").map((x) => x.test.key),
+    [],
+  );
 });
 
 /* ------------------------------------------------------------------ *
