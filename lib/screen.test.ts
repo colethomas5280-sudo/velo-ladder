@@ -18,6 +18,7 @@ import {
   alerts,
   visibleScreen,
   type Results,
+  type Finding,
   type ScreenTest,
 } from "@/lib/screen";
 
@@ -251,12 +252,27 @@ test("only non-normal findings count as deviations", () => {
   assert.equal(d[0].finding.label, "Bad");
 });
 
-test("both normals in a two-normal list are normal", () => {
-  // Ankle Rocking marks Good Inversion AND Good Eversion on the sheet.
-  const key = K("ankle-rocking", "seated-wo-holding", "L");
-  assert.equal(deviations({ [key]: "good-inversion" }).length, 0);
-  assert.equal(deviations({ [key]: "good-eversion" }).length, 0);
-  assert.equal(deviations({ [key]: "limited-eversion" }).length, 1);
+test("a list with more than one passing answer treats both as passing", () => {
+  /*
+   * Held as a fixture. The real case was Ankle Rocking, whose 2019 column
+   * shaded both Good Inversion and Good Eversion — but that turned out to be
+   * the sheet squeezing two questions into one column, and the app asks them
+   * separately. The capability stays because a future test may need it.
+   */
+  const t: ScreenTest = {
+    key: "two", label: "Two", group: "core",
+    subTests: [{
+      key: "q", label: "Q",
+      findings: [
+        { key: "a", label: "A", normal: true },
+        { key: "b", label: "B", normal: true },
+        { key: "c", label: "C", severity: "red" },
+      ],
+    }],
+  };
+  assert.equal(deviations({ "two.q": "a" }, [t]).length, 0);
+  assert.equal(deviations({ "two.q": "b" }, [t]).length, 0);
+  assert.equal(deviations({ "two.q": "c" }, [t]).length, 1);
 });
 
 test("a blank screen has no deviations rather than fifty-two", () => {
@@ -893,4 +909,206 @@ test("push-off grades the improvement, not the constrained baseline", () => {
   assert.equal(testMark(t, { [P]: "gt-6", [R]: "gt-half" }), "green");
   assert.equal(testMark(t, { [P]: "gt-6", [R]: "none" }), "red", "a good baseline earns nothing");
   assert.equal(testMark(t, { [P]: "5-to-6", [R]: "none" }), "red");
+});
+
+/* ------------------------------------------------------------------ *
+ * A canary over the whole config
+ *
+ * Pelvic Rotation regressed to "no mark" on every graded outcome and nothing
+ * noticed, because its outcomes had only been checked by a throwaway script.
+ * This walks every test in the config instead of trusting that each one got
+ * its own block — including the seven not yet rebuilt, and any added later.
+ * ------------------------------------------------------------------ */
+
+/** Answer a test end to end, taking the nth option at each question. */
+function answerFully(t: ScreenTest, pick: (f: Finding[]) => Finding): Results {
+  const results: Results = {};
+  // Repeat so branches opened by an answer get answered in turn.
+  for (let pass = 0; pass < 4; pass++)
+    for (const field of screenFields([t])) {
+      if (!isApplicable(field, results) || results[field.key]) continue;
+      results[field.key] = pick(field.subTest.findings).key;
+    }
+  return results;
+}
+
+test("a fully answered screen yields a mark wherever the colours exist", () => {
+  for (const t of SCREEN_TESTS) {
+    for (const pick of [
+      (f: Finding[]) => f[0],
+      (f: Finding[]) => f[f.length - 1],
+    ]) {
+      const results = answerFully(t, pick);
+      // Only meaningful once every answer given carries a colour — the
+      // unrebuilt tests still have none, and null is right for those.
+      const graded = screenFields([t])
+        .filter((f) => isApplicable(f, results))
+        .every((f) => {
+          const found = findingFor(f, results);
+          return !found || found.severity || found.alert;
+        });
+      if (!graded) continue;
+      assert.notEqual(
+        testMark(t, results),
+        null,
+        `${t.key} answered end to end, every answer coloured, yet shows no mark`,
+      );
+    }
+  }
+});
+
+test("a finding that opens a branch defers its colour rather than voiding it", () => {
+  /*
+   * The regression itself, in miniature. "Limited" carries no colour because
+   * the branch it opens carries one. Treating that as an ungraded deviation
+   * wiped the mark off every graded outcome of Pelvic Rotation.
+   */
+  const t: ScreenTest = {
+    key: "def", label: "Def", group: "core",
+    subTests: [
+      {
+        key: "gate", label: "Gate",
+        findings: [
+          { key: "ok", label: "OK", normal: true, severity: "green" },
+          { key: "limited", label: "Limited" },
+          { key: "orphan", label: "Orphan" },
+        ],
+      },
+      {
+        key: "branch", label: "Branch",
+        dependsOn: { subTest: "gate", findings: ["limited"] },
+        findings: [{ key: "worse", label: "Worse", severity: "red" }],
+      },
+      // A second reading that passes, so an ungraded answer on the gate has a
+      // green sitting beside it to be wrongly promoted to.
+      {
+        key: "other", label: "Other",
+        findings: [{ key: "fine", label: "Fine", normal: true, severity: "green" }],
+      },
+    ],
+  };
+  const clean = { "def.other": "fine" };
+  assert.equal(testMark(t, { ...clean, "def.gate": "limited", "def.branch": "worse" }), "red");
+  assert.equal(testMark(t, { ...clean, "def.gate": "limited" }), null, "branch unanswered");
+  /*
+   * "Orphan" opens nothing and carries no colour, so it is genuinely ungraded
+   * and must not inherit the other reading's green. Deferral has to be keyed
+   * on the specific finding — treating every answer on a branching sub-test
+   * as deferred puts the false green straight back.
+   */
+  assert.equal(testMark(t, { ...clean, "def.gate": "orphan" }), null, "must not read green");
+  /*
+   * The coach picked "limited", answered the follow-up, then changed the
+   * first answer. The stale branch reply stays stored on purpose, so that
+   * changing back doesn't lose it — but it belongs to a finding that is no
+   * longer selected, and must not be read as having resolved this one.
+   */
+  assert.equal(
+    testMark(t, { ...clean, "def.gate": "orphan", "def.branch": "worse" }),
+    null,
+    "a stale branch answer must not resolve an unrelated finding",
+  );
+});
+
+/* ------------------------------------------------------------------ *
+ * The two tests that had only ever been checked by script
+ * ------------------------------------------------------------------ */
+
+const tilt = () => SCREEN_TESTS.find((x) => x.key === "pelvic-tilt")!;
+const PT = {
+  t: K("pelvic-tilt", "tilt"),
+  a: K("pelvic-tilt", "quality-tilting"),
+  b: K("pelvic-tilt", "quality-limited"),
+};
+
+test("pelvic tilt: the same follow-up answer differs by branch", () => {
+  assert.equal(testMark(tilt(), { [PT.t]: "can-tilt-both", [PT.a]: "smooth" }), "green");
+  assert.equal(testMark(tilt(), { [PT.t]: "can-tilt-both", [PT.a]: "shake" }), "yellow");
+  assert.equal(testMark(tilt(), { [PT.t]: "cannot-arch", [PT.b]: "smooth" }), "yellow");
+  assert.equal(testMark(tilt(), { [PT.t]: "cannot-arch", [PT.b]: "shake" }), "red");
+  assert.equal(testMark(tilt(), { [PT.t]: "cannot-flatten", [PT.b]: "shake" }), "red");
+});
+
+test("pelvic tilt: failing both directions ends it, and pain flags it", () => {
+  assert.equal(testMark(tilt(), { [PT.t]: "cannot-either" }), "red");
+  assert.equal(testMark(tilt(), { [PT.t]: PAINFUL }), "alert");
+  assert.equal(testMark(tilt(), { [PT.t]: NOT_TESTED }), null);
+});
+
+const rot = () => SCREEN_TESTS.find((x) => x.key === "pelvic-rotation")!;
+const PR = {
+  r: K("pelvic-rotation", "rotation"),
+  both: K("pelvic-rotation", "assist-bilateral"),
+  right: K("pelvic-rotation", "assist-right"),
+  left: K("pelvic-rotation", "assist-left"),
+};
+
+test("pelvic rotation: assistance decides a bilateral limitation", () => {
+  assert.equal(testMark(rot(), { [PR.r]: "good-bilateral" }), "green");
+  assert.equal(testMark(rot(), { [PR.r]: "limited-bilateral", [PR.both]: "improves-bilateral" }), "yellow");
+  assert.equal(testMark(rot(), { [PR.r]: "limited-bilateral", [PR.both]: "no-improvement" }), "red");
+  // Improving on only one side out of a bilateral limitation stays red.
+  assert.equal(testMark(rot(), { [PR.r]: "limited-bilateral", [PR.both]: "improves-right" }), "red");
+  assert.equal(testMark(rot(), { [PR.r]: "limited-bilateral", [PR.both]: "improves-left" }), "red");
+});
+
+test("pelvic rotation: a one-sided limitation is yellow either way, both sides", () => {
+  for (const [gate, follow] of [["limited-right", PR.right], ["limited-left", PR.left]] as const) {
+    assert.equal(testMark(rot(), { [PR.r]: gate, [follow]: "improves" }), "yellow");
+    assert.equal(testMark(rot(), { [PR.r]: gate, [follow]: "no-improvement" }), "yellow");
+  }
+});
+
+test("pelvic rotation: each limitation opens only its own follow-up", () => {
+  const fields = screenFields([rot()]);
+  const f = (k: string) => fields.find((x) => x.key === k)!;
+  assert.equal(isApplicable(f(PR.right), { [PR.r]: "limited-right" }), true);
+  assert.equal(isApplicable(f(PR.left), { [PR.r]: "limited-right" }), false);
+  assert.equal(isApplicable(f(PR.both), { [PR.r]: "limited-right" }), false);
+});
+
+/* ------------------------------------------------------------------ *
+ * Ankle Rocking — two movements, each with two branches
+ * ------------------------------------------------------------------ */
+
+const rocking = () => SCREEN_TESTS.find((x) => x.key === "ankle-rocking")!;
+
+for (const move of ["eversion", "inversion"] as const) {
+  const g = K("ankle-rocking", move);
+  const one = K("ankle-rocking", `${move}-held-one`);
+  const both = K("ankle-rocking", `${move}-held-both`);
+  const other = move === "eversion" ? K("ankle-rocking", "inversion") : K("ankle-rocking", "eversion");
+  const clean = { [other]: "good-bilateral" };
+
+  test(`ankle rocking (${move}): holding the knee restores it, so yellow`, () => {
+    for (const side of ["limited-right", "limited-left"]) {
+      assert.equal(testMark(rocking(), { ...clean, [g]: side, [one]: "fixed" }), "yellow");
+      assert.equal(testMark(rocking(), { ...clean, [g]: side, [one]: "still-limited" }), "red");
+    }
+  });
+
+  test(`ankle rocking (${move}): anything still limited when held is red`, () => {
+    assert.equal(testMark(rocking(), { ...clean, [g]: "limited-bilateral", [both]: "normal" }), "yellow");
+    for (const still of ["still-right", "still-left", "still-both"])
+      assert.equal(testMark(rocking(), { ...clean, [g]: "limited-bilateral", [both]: still }), "red", still);
+  });
+
+  test(`ankle rocking (${move}): one limitation opens one branch`, () => {
+    const fields = screenFields([rocking()]);
+    const f = (k: string) => fields.find((x) => x.key === k)!;
+    assert.equal(isApplicable(f(one), { [g]: "limited-right" }), true);
+    assert.equal(isApplicable(f(both), { [g]: "limited-right" }), false);
+    assert.equal(isApplicable(f(both), { [g]: "limited-bilateral" }), true);
+    assert.equal(isApplicable(f(one), { [g]: "limited-bilateral" }), false);
+  });
+}
+
+test("ankle rocking: good on both movements is green", () => {
+  assert.equal(
+    testMark(rocking(), {
+      [K("ankle-rocking", "eversion")]: "good-bilateral",
+      [K("ankle-rocking", "inversion")]: "good-bilateral",
+    }),
+    "green",
+  );
 });
