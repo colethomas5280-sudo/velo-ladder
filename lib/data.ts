@@ -761,11 +761,17 @@ export async function listLeaderboardData(): Promise<{
  * Movement screens
  * ------------------------------------------------------------------ */
 
-function toScreen(r: Record<string, unknown>): MovementScreen {
+/**
+ * Exported for its own test. `date` has to go through `isoDate` like every
+ * other date column: PGlite hands back a Date, and `String()` on one produces
+ * "Tue Sep 08 2026 18:00:00 GMT-0600" — which is not a date the form can put
+ * in an input, does not match `todayISO()`, and names the wrong day.
+ */
+export function toScreen(r: Record<string, unknown>): MovementScreen {
   return {
     id: String(r.id),
     athleteId: String(r.athlete_id),
-    date: String(r.date),
+    date: isoDate(r.date),
     results: (r.results ?? {}) as Record<string, string>,
     notes: String(r.notes ?? ""),
   };

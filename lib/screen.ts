@@ -100,10 +100,6 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
   { id: "arms", title: "Arms" },
 ];
 
-/** Shorthand: a finding list where the first entry is the normal one. */
-const f = (...items: [string, string][]): Finding[] =>
-  items.map(([key, label], i) => ({ key, label, ...(i === 0 ? { normal: true } : {}) }));
-
 /**
  * Push-Off, which runs identically on the mound and on flat ground. Defined
  * once and used by both variants: two copies would drift, and the whole point
@@ -816,6 +812,38 @@ export function testMark(test: ScreenTest, results: Results): TestMark | null {
     }
   }
   return ungraded ? null : worst;
+}
+
+/**
+ * Fill every blank, applicable reading with its normal finding.
+ *
+ * What "all normal" means on a screen a coach actually ran. It repeats,
+ * because answering a gate normally OPENS the branch beneath it — a good wide
+ * squat earns the arms-down question — and a single pass would leave the
+ * newly-opened readings blank while claiming the test was complete.
+ *
+ * Sub-tests with no normal answer are left alone. The ankle follow-ups are
+ * the case: you only reach them because something was limited, so there is no
+ * normal to assert. They are unreachable from a normal gate anyway, and this
+ * skips them rather than relying on that staying true.
+ */
+export function fillNormal(results: Results, tests: ScreenTest[] = SCREEN_TESTS): Results {
+  const out = { ...results };
+  const fields = screenFields(tests);
+  // Each pass that changes anything fills at least one field, so this ends.
+  for (let pass = 0; pass <= fields.length; pass++) {
+    let changed = false;
+    for (const field of fields) {
+      if (out[field.key] || field.subTest.diagnostic) continue;
+      if (!isApplicable(field, out)) continue;
+      const normal = field.subTest.findings.find((x) => x.normal);
+      if (!normal) continue;
+      out[field.key] = normal.key;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return out;
 }
 
 /** Every alerting finding on the screen — pain, and anything like it. */
