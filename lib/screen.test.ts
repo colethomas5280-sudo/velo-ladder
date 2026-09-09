@@ -165,17 +165,32 @@ test("an ordinary field is always applicable", () => {
   assert.equal(isApplicable(field(K("hip-45", "45-degree-angle", "L")), {}), true);
 });
 
-test("arms down is only reached by breaking parallel", () => {
-  const armsDown = field(K("wide-squat", "arms-down"));
-  assert.equal(isApplicable(armsDown, {}), false, "blank parent must not open it");
-  assert.equal(
-    isApplicable(armsDown, { [K("wide-squat", "arms-in-front")]: "limited-squat" }),
-    false,
-  );
-  assert.equal(
-    isApplicable(armsDown, { [K("wide-squat", "arms-in-front")]: "good-squat" }),
-    true,
-  );
+const gated: ScreenTest = {
+  key: "gtd", label: "Gated", group: "core",
+  subTests: [
+    {
+      key: "first", label: "First",
+      findings: [
+        { key: "pass", label: "Pass", normal: true },
+        { key: "fail", label: "Fail", severity: "red" },
+      ],
+    },
+    {
+      key: "second", label: "Second",
+      dependsOn: { subTest: "first", findings: ["pass"] },
+      findings: [
+        { key: "ok", label: "OK", normal: true, severity: "green" },
+        { key: "no", label: "No", severity: "red" },
+      ],
+    },
+  ],
+};
+
+test("a gated sub-test is reached only by the answer that opens it", () => {
+  const second = screenFields([gated]).find((f) => f.key === "gtd.second")!;
+  assert.equal(isApplicable(second, {}), false, "blank parent must not open it");
+  assert.equal(isApplicable(second, { "gtd.first": "fail" }), false);
+  assert.equal(isApplicable(second, { "gtd.first": "pass" }), true);
 });
 
 /*
@@ -213,11 +228,8 @@ test("a bilateral dependency is resolved per side", () => {
 });
 
 test("a field that never happened is not counted as blank", () => {
-  const results = { [K("wide-squat", "arms-in-front")]: "limited-squat" };
-  const before = screenCounts({}).notApplicable;
-  // Answering the parent the wrong way keeps Arms Down out of reach.
-  assert.equal(screenCounts(results).notApplicable, before);
-  assert.ok(before >= 1);
+  assert.equal(screenCounts({ "gtd.first": "fail" }, [gated]).notApplicable, 1);
+  assert.equal(screenCounts({ "gtd.first": "pass" }, [gated]).notApplicable, 0);
 });
 
 /* ------------------------------------------------------------------ *
@@ -281,14 +293,11 @@ test("a blank screen has no deviations rather than fifty-two", () => {
 });
 
 test("a deviation on a field that never happened is not reported", () => {
-  const results: Results = {
-    [K("wide-squat", "arms-in-front")]: "limited-squat",
-    [K("wide-squat", "arms-down")]: "unstable",
-  };
   // The stale answer stays in the row but must not be read back out.
+  const results: Results = { "gtd.first": "fail", "gtd.second": "no" };
   assert.deepEqual(
-    deviations(results).map((d) => d.field.key),
-    [K("wide-squat", "arms-in-front")],
+    deviations(results, [gated]).map((d) => d.field.key),
+    ["gtd.first"],
   );
 });
 
@@ -1293,4 +1302,141 @@ test("lunge has no findings left ungraded", () => {
   for (const s of lunge().subTests)
     for (const f of s.findings)
       assert.ok(f.severity, `${s.key} -> ${f.label} has no colour`);
+});
+
+/* ------------------------------------------------------------------ *
+ * Wide Squat — a gate, then a grade, graded once
+ * ------------------------------------------------------------------ */
+
+const squat = () => SCREEN_TESTS.find((x) => x.key === "wide-squat")!;
+const WS = { front: K("wide-squat", "arms-front"), down: K("wide-squat", "arms-down") };
+
+test("wide squat: a limited squat fails outright and ends the test", () => {
+  assert.equal(testMark(squat(), { [WS.front]: "limited" }), "red");
+  const down = screenFields([squat()]).find((f) => f.key === WS.down)!;
+  assert.equal(isApplicable(down, { [WS.front]: "limited" }), false);
+});
+
+test("wide squat: a good squat earns the second question, not a green", () => {
+  // The gate carries no colour of its own — lowering the arms decides it.
+  assert.equal(testMark(squat(), { [WS.front]: "good" }), null, "not green yet");
+  assert.equal(testMark(squat(), { [WS.front]: "good", [WS.down]: "maintained" }), "green");
+  assert.equal(testMark(squat(), { [WS.front]: "good", [WS.down]: "lost" }), "red");
+});
+
+test("wide squat offers no yellow, and is graded once", () => {
+  const colours = squat().subTests.flatMap((s) => s.findings.map((f) => f.severity));
+  assert.equal(colours.includes("yellow"), false);
+  assert.equal(screenFields([squat()]).length, 2, "one reading each, no sides");
+  for (const s of squat().subTests) assert.equal(s.sides, undefined);
+});
+
+test("wide squat: pain flags it at either question", () => {
+  assert.equal(testMark(squat(), { [WS.front]: PAINFUL }), "alert");
+  assert.equal(testMark(squat(), { [WS.front]: "good", [WS.down]: PAINFUL }), "alert");
+});
+
+/* ------------------------------------------------------------------ *
+ * Shoulder 90/90 — one reading per shoulder
+ * ------------------------------------------------------------------ */
+
+const shoulder = () => SCREEN_TESTS.find((x) => x.key === "shoulder-90-90")!;
+const SH = { L: K("shoulder-90-90", "external-rotation", "L"), R: K("shoulder-90-90", "external-rotation", "R") };
+
+test("shoulder 90/90: each finding carries its own colour", () => {
+  assert.equal(testMark(shoulder(), { [SH.L]: "greater", [SH.R]: "greater" }), "green");
+  assert.equal(testMark(shoulder(), { [SH.L]: "equal", [SH.R]: "equal" }), "yellow");
+  assert.equal(testMark(shoulder(), { [SH.L]: "less", [SH.R]: "less" }), "red");
+});
+
+test("shoulder 90/90: the worse shoulder decides the test, either side", () => {
+  assert.equal(testMark(shoulder(), { [SH.L]: "greater", [SH.R]: "equal" }), "yellow");
+  assert.equal(testMark(shoulder(), { [SH.R]: "greater", [SH.L]: "equal" }), "yellow");
+  assert.equal(testMark(shoulder(), { [SH.L]: "greater", [SH.R]: "less" }), "red");
+  assert.equal(testMark(shoulder(), { [SH.R]: "greater", [SH.L]: "less" }), "red");
+});
+
+test("shoulder 90/90: pain on either shoulder flags it, and nothing branches", () => {
+  assert.equal(testMark(shoulder(), { [SH.L]: "greater", [SH.R]: PAINFUL }), "alert");
+  assert.equal(shoulder().subTests[0].dependsOn, undefined);
+  assert.equal(screenFields([shoulder()]).length, 2);
+});
+
+/* ------------------------------------------------------------------ *
+ * Windshield Wiper — one movement, two positions, both shoulders
+ * ------------------------------------------------------------------ */
+
+const wiper = () => SCREEN_TESTS.find((x) => x.key === "windshield-wiper")!;
+const WW = {
+  fL: K("windshield-wiper", "arm-front", "L"),
+  fR: K("windshield-wiper", "arm-front", "R"),
+  sL: K("windshield-wiper", "arm-side", "L"),
+  sR: K("windshield-wiper", "arm-side", "R"),
+};
+const wiperClean = Object.fromEntries(Object.values(WW).map((k) => [k, "gte-90"]));
+
+test("windshield wiper: four clean readings is green", () => {
+  assert.equal(testMark(wiper(), wiperClean), "green");
+  assert.equal(screenFields([wiper()]).length, 4);
+});
+
+test("windshield wiper: any reading under 90 turns the test red", () => {
+  // Asserted for all four, not one and assumed for the rest.
+  for (const key of Object.values(WW))
+    assert.equal(testMark(wiper(), { ...wiperClean, [key]: "lt-90" }), "red", key);
+});
+
+test("windshield wiper offers no yellow, and neither position gates the other", () => {
+  const colours = wiper().subTests.flatMap((s) => s.findings.map((f) => f.severity));
+  assert.equal(colours.includes("yellow"), false);
+  for (const s of wiper().subTests) assert.equal(s.dependsOn, undefined);
+});
+
+test("windshield wiper: pain at any of the four readings flags it", () => {
+  for (const key of Object.values(WW))
+    assert.equal(testMark(wiper(), { ...wiperClean, [key]: PAINFUL }), "alert", key);
+});
+
+/* ------------------------------------------------------------------ *
+ * The config is complete
+ * ------------------------------------------------------------------ */
+
+test("every finding is graded, or defers to a branch that grades it", () => {
+  /*
+   * All seventeen tests now come from the app rather than the 2019 sheet, so
+   * an uncoloured finding is a mistake rather than a gap. The exception is a
+   * gate: "good squat" and "limited without assistance" carry no colour
+   * because the question they open supplies one.
+   */
+  const ungraded: string[] = [];
+  for (const t of SCREEN_TESTS)
+    for (const s of t.subTests)
+      for (const f of s.findings) {
+        if (f.severity || f.alert) continue;
+        const defers = t.subTests.some(
+          (x) => x.dependsOn?.subTest === s.key && x.dependsOn.findings.includes(f.key),
+        );
+        if (!defers) ungraded.push(`${t.key}.${s.key} -> ${f.label}`);
+      }
+  assert.deepEqual(ungraded, []);
+});
+
+test("every gate leads somewhere, and every branch has a gate", () => {
+  for (const t of SCREEN_TESTS) {
+    for (const s of t.subTests) {
+      if (!s.dependsOn) continue;
+      const parent = t.subTests.find((x) => x.key === s.dependsOn!.subTest);
+      assert.ok(parent, `${t.key}.${s.key} branches off nothing`);
+    }
+    // A finding with no colour must open something, or it grades nothing.
+    for (const s of t.subTests)
+      for (const f of s.findings)
+        if (!f.severity && !f.alert)
+          assert.ok(
+            t.subTests.some(
+              (x) => x.dependsOn?.subTest === s.key && x.dependsOn.findings.includes(f.key),
+            ),
+            `${t.key}.${s.key} -> ${f.label} carries no colour and opens nothing`,
+          );
+  }
 });
