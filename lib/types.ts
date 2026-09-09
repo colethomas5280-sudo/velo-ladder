@@ -82,6 +82,15 @@ export interface Resource {
 }
 
 /** Daily recovery check-in. Every 1-5 rating: 5 is the good end. */
+/** One OnBaseU movement screen. `results` maps field key -> finding key. */
+export interface MovementScreen {
+  id: string;
+  athleteId: string;
+  date: string;
+  results: Record<string, string>;
+  notes: string;
+}
+
 export interface RecoveryEntry {
   id: string;
   athleteId: string;

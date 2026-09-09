@@ -9,6 +9,7 @@ import type {
   Resource,
   RecoveryEntry,
   Setback,
+  MovementScreen,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
 import { joinName, splitName } from "./profile";
@@ -754,4 +755,62 @@ export async function listLeaderboardData(): Promise<{
     })),
     sessions: (sRows as Record<string, unknown>[]).map(toSession),
   };
+}
+
+/* ------------------------------------------------------------------ *
+ * Movement screens
+ * ------------------------------------------------------------------ */
+
+function toScreen(r: Record<string, unknown>): MovementScreen {
+  return {
+    id: String(r.id),
+    athleteId: String(r.athlete_id),
+    date: String(r.date),
+    results: (r.results ?? {}) as Record<string, string>,
+    notes: String(r.notes ?? ""),
+  };
+}
+
+export async function listScreens(athleteId: string): Promise<MovementScreen[]> {
+  const rows = (await sql`
+    SELECT * FROM movement_screens WHERE athlete_id = ${athleteId}
+    ORDER BY date ASC
+  `) as Record<string, unknown>[];
+  return rows.map(toScreen);
+}
+
+export interface ScreenInput {
+  date: string;
+  results: Record<string, string>;
+  notes: string;
+}
+
+/**
+ * One screen per athlete per day. Re-saving the same date replaces it, so a
+ * coach correcting a mis-tap doesn't leave two versions of the same session
+ * for the comparison view to disagree about.
+ */
+export async function upsertScreen(
+  athleteId: string,
+  input: ScreenInput,
+  createdBy: string,
+): Promise<MovementScreen> {
+  const id = crypto.randomUUID();
+  const rows = (await sql`
+    INSERT INTO movement_screens (id, athlete_id, date, results, notes, created_by)
+    VALUES (${id}, ${athleteId}, ${input.date},
+            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy})
+    ON CONFLICT (athlete_id, date) DO UPDATE SET
+      results = EXCLUDED.results,
+      notes = EXCLUDED.notes,
+      updated_at = now()
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toScreen(rows[0]);
+}
+
+export async function deleteScreen(athleteId: string, date: string): Promise<void> {
+  await sql`
+    DELETE FROM movement_screens WHERE athlete_id = ${athleteId} AND date = ${date}
+  `;
 }

@@ -24,6 +24,7 @@ const EXPECTED_TABLES = [
   "recovery_entries",
   "setbacks",
   "resources",
+  "movement_screens",
 ] as const;
 
 /** What actually exists, and where — the answer to "but setup said it worked". */

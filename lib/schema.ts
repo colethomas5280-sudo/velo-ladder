@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 14;
+export const SCHEMA_VERSION = 15;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -184,6 +184,24 @@ BEGIN
   END LOOP;
 END
 $mig$;
+
+-- v15: OnBaseU movement screens. Results are JSONB keyed by test.sub-test,
+-- with an :L / :R suffix where the sub-test is graded per side, so revising
+-- the battery is a config edit rather than a migration.
+CREATE TABLE IF NOT EXISTS movement_screens (
+  id          text PRIMARY KEY,
+  athlete_id  text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  date        date NOT NULL,
+  results     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  notes       text NOT NULL DEFAULT '',
+  created_by  text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- One screen per athlete per day, so re-saving a date replaces it rather than
+-- leaving two versions for the comparison view to disagree about.
+CREATE UNIQUE INDEX IF NOT EXISTS ms_athlete_date_uidx
+  ON movement_screens(athlete_id, date);
 `;
 
 /** The one real session already logged, imported so there is live data on day one. */

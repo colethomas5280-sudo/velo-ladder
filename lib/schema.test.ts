@@ -171,6 +171,7 @@ test("the schema applies to an empty database", async () => {
 
   assert.deepEqual(await tablesIn(db), [
     "athletes",
+    "movement_screens",
     "recovery_entries",
     "resources",
     "setbacks",
@@ -213,7 +214,7 @@ test("the schema is safe to run twice", async () => {
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
   await applyAsProduction(db, SCHEMA_SQL);
-  assert.equal((await tablesIn(db)).length, 5);
+  assert.equal((await tablesIn(db)).length, 6);
 });
 
 test("the seed applies on top of a fresh schema", async () => {
