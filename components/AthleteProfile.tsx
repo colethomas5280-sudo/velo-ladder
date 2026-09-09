@@ -8,6 +8,7 @@ import type {
   TrainingSession,
   TrackerId,
   RecoveryEntry,
+  MovementScreen,
 } from "@/lib/types";
 import {
   TRACKERS,
@@ -33,6 +34,7 @@ import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
+import ScreenModal from "./ScreenModal";
 import GuidanceCard from "./GuidanceCard";
 import ProfileSummary from "./ProfileSummary";
 
@@ -58,6 +60,15 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     `/api/athletes/${athleteId}/recovery`,
     fetcher,
   );
+  /*
+   * Coach-only for now: the form is the only thing reading screens, and the
+   * athlete's own view of them is the next piece rather than this one.
+   */
+  const { data: screenData, mutate: mutateScreens } = useSWR<MovementScreen[]>(
+    canManage ? `/api/athletes/${athleteId}/screens` : null,
+    fetcher,
+  );
+  const screens = useMemo(() => screenData ?? [], [screenData]);
   const recovery = useMemo(() => recoveryData ?? [], [recoveryData]);
 
   const [tracker, setTracker] = useTracker();
@@ -88,6 +99,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   /** null = closed, "pick" = choosing session type, "entry" = the weight grid */
   const [modal, setModal] = useState<null | "pick" | "entry">(null);
+  const [screenOpen, setScreenOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (m: string) => {
     setToast(m);
@@ -246,15 +258,25 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         athlete={athlete}
         sessions={allSessions}
         action={
-          <button
-            className="track-link"
-            onClick={() => {
-              setSaveError(null);
-              setModal("pick");
-            }}
-          >
-            + Track a new session
-          </button>
+          <div className="mast-actions">
+            <button
+              className="track-link"
+              onClick={() => {
+                setSaveError(null);
+                setModal("pick");
+              }}
+            >
+              + Track a new session
+            </button>
+            {canManage && (
+              <button
+                className="track-link"
+                onClick={() => setScreenOpen(true)}
+              >
+                + Movement screen
+              </button>
+            )}
+          </div>
         }
       />
 
@@ -355,6 +377,21 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
             error={saveError}
           />
         </SessionModal>
+      )}
+
+      {screenOpen && canManage && (
+        <ScreenModal
+          athleteId={athleteId}
+          athleteName={athlete.name}
+          initial={screens.find((s) => s.date === todayISO()) ?? null}
+          takenDates={screens.map((s) => s.date)}
+          onClose={() => setScreenOpen(false)}
+          onSaved={(msg) => {
+            setScreenOpen(false);
+            mutateScreens();
+            showToast(msg);
+          }}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

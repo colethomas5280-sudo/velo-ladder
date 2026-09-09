@@ -15,6 +15,7 @@ import {
   isApplicable,
   screenCounts,
   screenFields,
+  fillNormal,
   testMark,
   alerts,
   visibleScreen,
@@ -571,6 +572,107 @@ test("an alert on a branch that never happened is not raised", () => {
   };
   assert.equal(testMark(t, { "y.a": "no", "y.b": "ow" }), null);
   assert.equal(alerts({ "y.a": "no", "y.b": "ow" }, [t]).length, 0);
+});
+
+/* ------------------------------------------------------------------ *
+ * Marking a test normal
+ * ------------------------------------------------------------------ */
+
+test("filling normal answers every blank reading of a test", () => {
+  const filled = fillNormal({}, [sample]);
+  assert.deepEqual(filled, { [SQ.L]: "good", [SQ.R]: "good" });
+});
+
+test("filling normal leaves an answer the coach already gave", () => {
+  const filled = fillNormal({ [SQ.R]: "bad" }, [sample]);
+  assert.equal(filled[SQ.R], "bad", "a recorded deviation must survive");
+  assert.equal(filled[SQ.L], "good");
+});
+
+/*
+ * The reason this repeats. A good wide squat is not the end of the test, it
+ * is what earns the arms-down question — so one pass would fill the gate,
+ * open a reading, and leave it blank while reporting the test complete.
+ */
+test("filling normal opens each gate and fills what appears beneath it", () => {
+  assert.deepEqual(fillNormal({}, [gated]), { "gtd.first": "pass", "gtd.second": "ok" });
+});
+
+/*
+ * And the reason it repeats rather than relying on one ordered pass: nothing
+ * makes a sub-test appear after the one it depends on. Declared the other way
+ * round, a single sweep would look at the branch before its gate was answered,
+ * decide it never happened, and leave the test half-filled.
+ */
+test("filling normal fills a branch declared above its own gate", () => {
+  const outOfOrder: ScreenTest = {
+    key: "oo", label: "OO", group: "core",
+    subTests: [
+      { key: "second", label: "Second", dependsOn: { subTest: "first", findings: ["pass"] },
+        findings: [{ key: "ok", label: "OK", normal: true }, { key: "no", label: "No" }] },
+      { key: "first", label: "First",
+        findings: [{ key: "pass", label: "Pass", normal: true }, { key: "fail", label: "Fail" }] },
+    ],
+  };
+  assert.deepEqual(fillNormal({}, [outOfOrder]), { "oo.first": "pass", "oo.second": "ok" });
+});
+
+test("filling normal does not answer a branch that stayed shut", () => {
+  const filled = fillNormal({ "gtd.first": "fail" }, [gated]);
+  assert.equal("gtd.second" in filled, false, "that reading never happened");
+});
+
+test("filling normal respects which side opened the branch", () => {
+  const filled = fillNormal({ "bt.parent:L": "yes", "bt.parent:R": "no" }, [bilateralDep]);
+  assert.equal(filled["bt.child:L"], "ok");
+  assert.equal("bt.child:R" in filled, false, "the right leg never earned it");
+});
+
+test("filling normal skips a sub-test with no normal answer", () => {
+  const noNormal: ScreenTest = {
+    key: "nn", label: "NN", group: "core",
+    subTests: [
+      { key: "q", label: "Q", findings: [
+        { key: "a", label: "A", severity: "yellow" },
+        { key: "b", label: "B", severity: "red" },
+      ] },
+    ],
+  };
+  assert.deepEqual(fillNormal({}, [noNormal]), {}, "nothing here is a pass to assert");
+});
+
+test("filling normal leaves diagnostic questions alone", () => {
+  const withDiag: ScreenTest = {
+    key: "dg", label: "DG", group: "core",
+    subTests: [
+      { key: "q", label: "Q", findings: [{ key: "good", label: "Good", normal: true }] },
+      { key: "why", label: "Why", diagnostic: true,
+        findings: [{ key: "held", label: "Held", normal: true }] },
+    ],
+  };
+  assert.deepEqual(fillNormal({}, [withDiag]), { "dg.q": "good" });
+});
+
+test("filling normal does not mutate the results it was given", () => {
+  const before: Results = {};
+  fillNormal(before, [sample]);
+  assert.deepEqual(before, {}, "the caller's object must be untouched");
+});
+
+/*
+ * The whole point of the button, on the real sheet: an athlete who passed
+ * everything comes out green everywhere, with no reading left blank and
+ * nothing for the coach to hunt for.
+ */
+test("a screen marked normal throughout grades clean, with nothing left blank", () => {
+  const filled = fillNormal({});
+  assert.deepEqual(deviations(filled), [], "a clean screen has no deviations");
+  assert.deepEqual(alerts(filled), [], "and nothing to flag");
+  const counts = screenCounts(filled);
+  assert.equal(counts.blank, 0, "every reachable reading is answered");
+  assert.equal(counts.deviation, 0);
+  for (const t of SCREEN_TESTS)
+    assert.equal(testMark(t, filled), "green", `${t.key} should be green`);
 });
 
 /* ------------------------------------------------------------------ *

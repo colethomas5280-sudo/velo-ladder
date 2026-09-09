@@ -27,6 +27,7 @@ html {
   --on-accent: #fff;
   --chalk: #2c6b8f;
   --good: #2c8a52;
+  --warn: #a07708;
   --bad: #bd4526;
   --chart-alt: #6f5091;
   --glow: rgba(189, 83, 16, 0);
@@ -49,6 +50,7 @@ html {
     --on-accent: #17120b;
     --chalk: #6fb2d8;
     --good: #49bd7b;
+    --warn: #d9a52e;
     --bad: #e5744d;
     --chart-alt: #a68ccc;
     --glow: rgba(255, 125, 31, 0.38);
@@ -69,6 +71,7 @@ html {
   --on-accent: #17120b;
   --chalk: #6fb2d8;
   --good: #49bd7b;
+  --warn: #d9a52e;
   --bad: #e5744d;
   --chart-alt: #a68ccc;
   --glow: rgba(255, 125, 31, 0.38);
@@ -2343,4 +2346,235 @@ table.roster-table {
   padding: 2px 6px;
   margin-left: 8px;
   white-space: nowrap;
+}
+
+.mast-actions {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+/* ---------- movement screen: recording ---------- */
+.ms {
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ms-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ms-top .field {
+  flex: 0 0 auto;
+}
+.ms-progress {
+  margin-left: auto;
+  text-align: right;
+  line-height: 1.25;
+}
+.ms-progress b {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-size: 17px;
+}
+.ms-progress span {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.ms-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+  background: var(--panel-2);
+  border-left: 3px solid var(--line);
+  border-radius: 0 8px 8px 0;
+  padding: 9px 12px;
+}
+.ms-note.warn {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 9%, var(--panel));
+  border-left-color: var(--accent);
+}
+.ms-note .linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.ms-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ms-group > .eyebrow {
+  margin-bottom: 2px;
+}
+.ms-test {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.ms-test.open {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+.ms-test-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  font-size: 14.5px;
+}
+.ms-test-toggle:hover {
+  background: var(--panel-2);
+}
+.ms-test-name {
+  font-weight: 600;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ms-dot {
+  flex: 0 0 auto;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: transparent;
+}
+.ms-dot.green {
+  background: var(--good);
+  border-color: var(--good);
+}
+.ms-dot.yellow {
+  background: var(--warn);
+  border-color: var(--warn);
+}
+.ms-dot.red {
+  background: var(--bad);
+  border-color: var(--bad);
+}
+/* Pain is off the scale, so it is a shape rather than a fourth colour. */
+.ms-dot.alert {
+  border-radius: 2px;
+  background: var(--ink);
+  border-color: var(--ink);
+  transform: rotate(45deg);
+}
+.ms-mark {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.ms-count {
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.ms-test-toggle .caret {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.ms-test-body {
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ms-q {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+}
+.ms-q-label b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.ms-help {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+.ms-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ms-answers.sided {
+  flex-direction: row;
+  gap: 10px;
+}
+.ms-answer {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ms-side {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+/*
+ * Its own select rather than the check-in's .wl-select. That one carries
+ * `flex: 1 1 220px` for a row layout; dropped into this column it read as a
+ * 220px-TALL dropdown, which is how it first rendered.
+ */
+.ms-select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.ms-select option[value=""] {
+  color: var(--ink-faint);
+}
+.ms-normal {
+  align-self: flex-start;
+}
+.ms-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+/*
+ * Delete sits apart from the save/cancel pair, and its confirm deliberately
+ * does NOT inherit that slot — the second click lands somewhere the first one
+ * wasn't, so a double-tap can't take out a screen the coach only considered.
+ */
+.ms-actions .ms-del {
+  margin-left: auto;
+  color: var(--ink-faint);
+}
+@media (max-width: 560px) {
+  .ms-answers.sided {
+    flex-direction: column;
+  }
 }
