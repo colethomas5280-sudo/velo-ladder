@@ -369,8 +369,6 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "spine-rotation",
         label: "Spine rotation",
         sides: "lr",
-        // Colours inferred from Hip 45, which uses this exact shape and was
-        // confirmed green / yellow / red in order.
         findings: [
           { key: "greater", label: "Greater than 45\u00b0 turning", normal: true, severity: "green" },
           { key: "equal", label: "Equal to 45\u00b0 turning", severity: "yellow" },
@@ -403,8 +401,6 @@ export const SCREEN_TESTS: ScreenTest[] = [
         // Graded once — the athlete steps one way, so there is no side to split.
         key: "distance",
         label: "How far did the athlete side step?",
-        // Colours inferred from Hip 45, which uses this same greater / equal /
-        // less shape and was confirmed green, yellow, red in order.
         findings: [
           { key: "greater", label: "Greater than the ball", normal: true, severity: "green" },
           { key: "equal", label: "Equal to the ball", severity: "yellow" },
@@ -556,22 +552,28 @@ export const SCREEN_TESTS: ScreenTest[] = [
     group: "posture",
     subTests: [
       {
-        key: "arms-in-front",
-        label: "Arms in Front",
-        help: "Feet shoulder width, toes straight ahead, arms out front. Descend as deeply as possible with heels down and chest forward. Looking for the thighs to break parallel.",
-        findings: f(["good-squat", "Good Squat"], ["limited-squat", "Limited Squat"]),
+        /*
+         * A gate. A good squat is not green on its own — it earns the second
+         * question, which is where the colour comes from. A limited squat
+         * fails outright and there is nothing further to ask.
+         */
+        key: "arms-front",
+        label: "How was their wide squat with arms out front?",
+        help: "Feet shoulder width, toes straight ahead, arms out in front. Descend as deeply as possible with the heels down and the chest forward, looking for the thighs to break parallel.",
+        findings: [
+          { key: "good", label: "Good squat", normal: true },
+          { key: "limited", label: "Limited squat", severity: "red" },
+        ],
       },
       {
         key: "arms-down",
-        label: "Arms Down",
-        /*
-         * Only performed if they broke parallel — the procedure says "if the
-         * player breaks parallel, now have them lower their arms". Otherwise
-         * this isn't unrecorded, it never happened.
-         */
-        dependsOn: { subTest: "arms-in-front", findings: ["good-squat"] },
-        help: "From the bottom of the squat, lower the fists to the floor inside the footprint and hold without losing control.",
-        findings: f(["stable", "Stable"], ["unstable", "Unstable"]),
+        label: "How was the squat when lowering the arms?",
+        dependsOn: { subTest: "arms-front", findings: ["good"] },
+        help: "From the bottom of the squat, lower the fists towards the floor inside the footprint and hold without losing control.",
+        findings: [
+          { key: "maintained", label: "Maintained stable squat when lowering arms", normal: true, severity: "green" },
+          { key: "lost", label: "Loses stable squat when lowering arms", severity: "red" },
+        ],
       },
     ],
   },
@@ -581,14 +583,17 @@ export const SCREEN_TESTS: ScreenTest[] = [
     group: "arms",
     subTests: [
       {
-        key: "standing-tall",
-        label: "Standing Tall",
+        // Left and right rather than dominant and non-dominant: the app asks
+        // it per shoulder, and how much weight to give the non-throwing side
+        // is a reading of the result, not part of recording it.
+        key: "external-rotation",
+        label: "How far does the shoulder externally rotate?",
         sides: "lr",
-        findings: f(
-          ["greater-spine", "Greater than Spine Angle"],
-          ["equal-spine", "Equal to Spine Angle"],
-          ["less-spine", "Less than Spine Angle"],
-        ),
+        findings: [
+          { key: "greater", label: "Greater than spine angle", normal: true, severity: "green" },
+          { key: "equal", label: "Equal to spine angle", severity: "yellow" },
+          { key: "less", label: "Less than spine angle", severity: "red" },
+        ],
       },
     ],
   },
@@ -598,16 +603,24 @@ export const SCREEN_TESTS: ScreenTest[] = [
     group: "arms",
     subTests: [
       {
-        key: "in-front",
-        label: "In Front",
+        // The same movement measured two ways, each shoulder, so four
+        // readings. Neither position gates the other.
+        key: "arm-front",
+        label: "How far does the shoulder internally rotate with the arm out front?",
         sides: "lr",
-        findings: f(["gte-90", "= or > 90°"], ["lt-90", "< 90°"]),
+        findings: [
+          { key: "gte-90", label: "Equal to or greater than 90\u00b0", normal: true, severity: "green" },
+          { key: "lt-90", label: "Less than 90\u00b0", severity: "red" },
+        ],
       },
       {
-        key: "at-side",
-        label: "At Side",
+        key: "arm-side",
+        label: "How far does the shoulder internally rotate with the arm out to the side?",
         sides: "lr",
-        findings: f(["gte-90", "= or > 90°"], ["lt-90", "< 90°"]),
+        findings: [
+          { key: "gte-90", label: "Equal to or greater than 90\u00b0", normal: true, severity: "green" },
+          { key: "lt-90", label: "Less than 90\u00b0", severity: "red" },
+        ],
       },
     ],
   },
@@ -617,16 +630,24 @@ export const SCREEN_TESTS: ScreenTest[] = [
     group: "arms",
     subTests: [
       {
-        key: "palm-towards",
-        label: "Palm Towards (Curve)",
+        // Two movements, each forearm, so four readings. Same questions on
+        // both sides — the side comes from the column, not the wording.
+        key: "supination",
+        label: "How far does the forearm supinate?",
         sides: "lr",
-        findings: f(["gte-80", "80 degrees or More"], ["lt-80", "Less than 80 Degrees"]),
+        findings: [
+          { key: "gte-80", label: "80\u00b0 or more of supination", normal: true, severity: "green" },
+          { key: "lt-80", label: "Less than 80\u00b0 of supination", severity: "red" },
+        ],
       },
       {
-        key: "palm-away",
-        label: "Palm Away (Change-Up)",
+        key: "pronation",
+        label: "How far does the forearm pronate?",
         sides: "lr",
-        findings: f(["gte-80", "80 degrees or More"], ["lt-80", "Less than 80 Degrees"]),
+        findings: [
+          { key: "gte-80", label: "80\u00b0 or more of pronation", normal: true, severity: "green" },
+          { key: "lt-80", label: "Less than 80\u00b0 of pronation", severity: "red" },
+        ],
       },
     ],
   },

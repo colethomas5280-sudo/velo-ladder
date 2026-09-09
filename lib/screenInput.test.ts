@@ -85,12 +85,12 @@ test("an answer on a closed branch is kept, not stripped", () => {
     {
       date: TODAY,
       results: {
-        [fieldKey("wide-squat", "arms-in-front")]: "limited-squat",
-        [fieldKey("wide-squat", "arms-down")]: "stable",
+        [fieldKey("wide-squat", "arms-front")]: "limited",
+        [fieldKey("wide-squat", "arms-down")]: "maintained",
       },
     },
     TODAY,
   );
   assert.equal(r.ok, true);
-  assert.equal(r.value!.results[fieldKey("wide-squat", "arms-down")], "stable");
+  assert.equal(r.value!.results[fieldKey("wide-squat", "arms-down")], "maintained");
 });
