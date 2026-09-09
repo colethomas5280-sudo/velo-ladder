@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { parseScreenInput } from "@/lib/screenInput";
 import {
   SCREEN_GROUPS,
+  SIDE_SETS,
   SCREEN_TESTS,
   NOT_TESTED,
   PAINFUL,
@@ -38,7 +39,7 @@ const sample: ScreenTest = {
     {
       key: "q",
       label: "Q",
-      bilateral: true,
+      sides: "lr",
       findings: [
         { key: "good", label: "Good", normal: true, severity: "green" },
         { key: "mid", label: "Middling", severity: "yellow" },
@@ -106,9 +107,9 @@ test("a dependent sub-test names a real sibling and a real finding of it", () =>
           `${t.key}.${s.key} depends on "${key}", which ${parent!.key} doesn't offer`,
         );
       assert.equal(
-        parent!.bilateral ?? false,
-        s.bilateral ?? false,
-        `${t.key}.${s.key} and its parent must be graded the same number of times`,
+        parent!.sides,
+        s.sides,
+        `${t.key}.${s.key} and its parent must be graded on the same sides`,
       );
     }
 });
@@ -190,13 +191,13 @@ const bilateralDep: ScreenTest = {
     {
       key: "parent",
       label: "Parent",
-      bilateral: true,
+      sides: "lr",
       findings: [{ key: "yes", label: "Yes", normal: true }, { key: "no", label: "No" }],
     },
     {
       key: "child",
       label: "Child",
-      bilateral: true,
+      sides: "lr",
       dependsOn: { subTest: "parent", findings: ["yes"] },
       findings: [{ key: "ok", label: "OK", normal: true }, { key: "bad", label: "Bad" }],
     },
@@ -603,7 +604,7 @@ test("an ungraded deviation shows no mark rather than the other side's green", (
   const t: ScreenTest = {
     key: "half", label: "Half", group: "core",
     subTests: [{
-      key: "s", label: "S", bilateral: true,
+      key: "s", label: "S", sides: "lr",
       findings: [
         { key: "ok", label: "OK", normal: true, severity: "green" },
         { key: "bad", label: "Bad" }, // colour not supplied yet
@@ -1068,47 +1069,228 @@ test("pelvic rotation: each limitation opens only its own follow-up", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * Ankle Rocking — two movements, each with two branches
+ * Ankle Rocking and Ankle Rolling
+ *
+ * The same interview four times over. Asserted for every movement of both
+ * tests rather than for one and assumed for the rest — Ankle Rolling was
+ * rewritten wholesale and not one test noticed, because it had none.
  * ------------------------------------------------------------------ */
 
-const rocking = () => SCREEN_TESTS.find((x) => x.key === "ankle-rocking")!;
+const ANKLE: [string, string[]][] = [
+  ["ankle-rocking", ["eversion", "inversion"]],
+  ["ankle-rolling", ["lateral", "medial"]],
+];
 
-for (const move of ["eversion", "inversion"] as const) {
-  const g = K("ankle-rocking", move);
-  const one = K("ankle-rocking", `${move}-held-one`);
-  const both = K("ankle-rocking", `${move}-held-both`);
-  const other = move === "eversion" ? K("ankle-rocking", "inversion") : K("ankle-rocking", "eversion");
-  const clean = { [other]: "good-bilateral" };
+for (const [testKey, moves] of ANKLE) {
+  const t = () => SCREEN_TESTS.find((x) => x.key === testKey)!;
+  const allGood = Object.fromEntries(moves.map((m) => [K(testKey, m), "good-bilateral"]));
 
-  test(`ankle rocking (${move}): holding the knee restores it, so yellow`, () => {
-    for (const side of ["limited-right", "limited-left"]) {
-      assert.equal(testMark(rocking(), { ...clean, [g]: side, [one]: "fixed" }), "yellow");
-      assert.equal(testMark(rocking(), { ...clean, [g]: side, [one]: "still-limited" }), "red");
-    }
+  test(`${testKey}: good on every movement is green`, () => {
+    assert.equal(testMark(t(), allGood), "green");
   });
 
-  test(`ankle rocking (${move}): anything still limited when held is red`, () => {
-    assert.equal(testMark(rocking(), { ...clean, [g]: "limited-bilateral", [both]: "normal" }), "yellow");
-    for (const still of ["still-right", "still-left", "still-both"])
-      assert.equal(testMark(rocking(), { ...clean, [g]: "limited-bilateral", [both]: still }), "red", still);
+  for (const move of moves) {
+    const g = K(testKey, move);
+    const one = K(testKey, `${move}-held-one`);
+    const both = K(testKey, `${move}-held-both`);
+
+    test(`${testKey} (${move}): holding restores it, so yellow; still limited, red`, () => {
+      for (const side of ["limited-right", "limited-left"]) {
+        assert.equal(testMark(t(), { ...allGood, [g]: side, [one]: "fixed" }), "yellow", side);
+        assert.equal(testMark(t(), { ...allGood, [g]: side, [one]: "still-limited" }), "red", side);
+      }
+    });
+
+    test(`${testKey} (${move}): bilateral limitation grades on what is left`, () => {
+      assert.equal(testMark(t(), { ...allGood, [g]: "limited-bilateral", [both]: "normal" }), "yellow");
+      for (const still of ["still-right", "still-left", "still-both"])
+        assert.equal(testMark(t(), { ...allGood, [g]: "limited-bilateral", [both]: still }), "red", still);
+    });
+
+    test(`${testKey} (${move}): a limitation opens its own branch only`, () => {
+      const fields = screenFields([t()]);
+      const f = (k: string) => fields.find((x) => x.key === k)!;
+      assert.equal(isApplicable(f(one), { [g]: "limited-right" }), true);
+      assert.equal(isApplicable(f(both), { [g]: "limited-right" }), false);
+      assert.equal(isApplicable(f(both), { [g]: "limited-bilateral" }), true);
+      assert.equal(isApplicable(f(one), { [g]: "limited-bilateral" }), false);
+    });
+
+    test(`${testKey} (${move}): a limitation with its branch unanswered shows no mark`, () => {
+      // It must not inherit the other movement's green.
+      assert.equal(testMark(t(), { ...allGood, [g]: "limited-right" }), null);
+      assert.equal(testMark(t(), { ...allGood, [g]: "limited-bilateral" }), null);
+    });
+
+    test(`${testKey} (${move}): pain flags the test`, () => {
+      assert.equal(testMark(t(), { ...allGood, [g]: PAINFUL }), "alert");
+    });
+  }
+
+  test(`${testKey}: a clean screen asks nothing beyond its two questions`, () => {
+    const open = screenFields([t()]).filter((f) => isApplicable(f, allGood));
+    assert.deepEqual(open.map((f) => f.subTest.key).sort(), [...moves].sort());
   });
 
-  test(`ankle rocking (${move}): one limitation opens one branch`, () => {
-    const fields = screenFields([rocking()]);
-    const f = (k: string) => fields.find((x) => x.key === k)!;
-    assert.equal(isApplicable(f(one), { [g]: "limited-right" }), true);
-    assert.equal(isApplicable(f(both), { [g]: "limited-right" }), false);
-    assert.equal(isApplicable(f(both), { [g]: "limited-bilateral" }), true);
-    assert.equal(isApplicable(f(one), { [g]: "limited-bilateral" }), false);
+  test(`${testKey}: both movements limited means four questions, not two or six`, () => {
+    // One side limited on the first movement, both sides on the second: each
+    // opens its own branch and only its own.
+    const results: Results = {
+      [K(testKey, moves[0])]: "limited-right",
+      [K(testKey, moves[1])]: "limited-bilateral",
+    };
+    const open = screenFields([t()])
+      .filter((f) => isApplicable(f, results))
+      .map((f) => f.subTest.key)
+      .sort();
+    assert.deepEqual(open, [
+      moves[0],
+      `${moves[0]}-held-one`,
+      moves[1],
+      `${moves[1]}-held-both`,
+    ].sort());
   });
 }
 
-test("ankle rocking: good on both movements is green", () => {
+
+/* ------------------------------------------------------------------ *
+ * Half-Kneeling Narrow Base — pass or fail, no middle
+ * ------------------------------------------------------------------ */
+
+const kneel = () => SCREEN_TESTS.find((x) => x.key === "half-kneeling")!;
+const KN = K("half-kneeling", "stability");
+
+test("half-kneeling: stable on both sides is the only pass", () => {
+  assert.equal(testMark(kneel(), { [KN]: "stable" }), "green");
+  for (const fail of ["unstable-right", "unstable-left", "unstable-bilateral", "unable"])
+    assert.equal(testMark(kneel(), { [KN]: fail }), "red", fail);
+});
+
+test("half-kneeling offers no yellow at all", () => {
+  // Deliberate, not an unfilled mapping: one knee, both knees and unable to
+  // get into position all grade the same.
+  const colours = kneel().subTests.flatMap((s) => s.findings.map((f) => f.severity));
+  assert.equal(colours.includes("yellow"), false);
+  assert.equal(colours.filter((c) => c === undefined).length, 0, "nothing left ungraded");
+});
+
+test("half-kneeling: one question, no branches, pain still flags it", () => {
+  assert.equal(screenFields([kneel()]).length, 1);
+  assert.equal(kneel().subTests[0].dependsOn, undefined);
+  assert.equal(testMark(kneel(), { [KN]: PAINFUL }), "alert");
+});
+
+/* ------------------------------------------------------------------ *
+ * Sides: left/right, or dominant/non-dominant
+ * ------------------------------------------------------------------ */
+
+test("a dominance-graded sub-test stores D and N, not L and R", () => {
+  /*
+   * Stored in its own vocabulary rather than resolved through the athlete's
+   * throwing hand. A screen has to keep meaning what it meant if that hand is
+   * later corrected in the profile — otherwise old screens silently swap sides.
+   */
+  const t: ScreenTest = {
+    key: "dom", label: "Dom", group: "posture",
+    subTests: [{
+      key: "q", label: "Q", sides: "dominance",
+      findings: [{ key: "ok", label: "OK", normal: true, severity: "green" }],
+    }],
+  };
+  assert.deepEqual(screenFields([t]).map((f) => f.key), ["dom.q:D", "dom.q:N"]);
+  assert.deepEqual(screenFields([t]).map((f) => f.side), ["D", "N"]);
+});
+
+test("each side set carries its own labels for the form", () => {
+  assert.deepEqual(SIDE_SETS.lr.map((s) => s.label), ["Left", "Right"]);
+  assert.deepEqual(SIDE_SETS.dominance.map((s) => s.label), ["Dominant", "Non-dominant"]);
+});
+
+test("a dominance branch resolves per side, like a left/right one", () => {
+  const t: ScreenTest = {
+    key: "db", label: "DB", group: "posture",
+    subTests: [
+      {
+        key: "gate", label: "Gate", sides: "dominance",
+        findings: [
+          { key: "ok", label: "OK", normal: true, severity: "green" },
+          { key: "no", label: "No" },
+        ],
+      },
+      {
+        key: "why", label: "Why", sides: "dominance",
+        dependsOn: { subTest: "gate", findings: ["no"] },
+        findings: [{ key: "bad", label: "Bad", severity: "red" }],
+      },
+    ],
+  };
+  const fields = screenFields([t]);
+  const why = (side: string) => fields.find((f) => f.key === `db.why:${side}`)!;
+  const results = { "db.gate:D": "no", "db.gate:N": "ok" };
+  assert.equal(isApplicable(why("D"), results), true, "dominant side failed");
+  assert.equal(isApplicable(why("N"), results), false, "non-dominant side was fine");
+});
+
+test("every sub-test graded on sides uses a declared side set", () => {
+  for (const t of SCREEN_TESTS)
+    for (const s of t.subTests)
+      if (s.sides) assert.ok(s.sides in SIDE_SETS, `${t.key}.${s.key} has an unknown side set`);
+});
+
+/* ------------------------------------------------------------------ *
+ * Lunge w/ Extension — two questions, graded dominant and non-dominant
+ * ------------------------------------------------------------------ */
+
+const lunge = () => SCREEN_TESTS.find((x) => x.key === "lunge-extension")!;
+const LG = {
+  sD: K("lunge-extension", "starting-position", "D"),
+  sN: K("lunge-extension", "starting-position", "N"),
+  eD: K("lunge-extension", "extension", "D"),
+  eN: K("lunge-extension", "extension", "N"),
+};
+const lungeClean = { [LG.sD]: "good", [LG.sN]: "good", [LG.eD]: "good", [LG.eN]: "good" };
+
+test("lunge: starting position grades on each side independently", () => {
+  assert.equal(testMark(lunge(), lungeClean), "green");
+  for (const side of [LG.sD, LG.sN]) {
+    assert.equal(testMark(lunge(), { ...lungeClean, [side]: "limited-stride" }), "yellow", side);
+    assert.equal(testMark(lunge(), { ...lungeClean, [side]: "limited-shoulder" }), "yellow", side);
+    assert.equal(testMark(lunge(), { ...lungeClean, [side]: "limited-both" }), "red", side);
+  }
+});
+
+test("lunge: the worse side decides the test", () => {
   assert.equal(
-    testMark(rocking(), {
-      [K("ankle-rocking", "eversion")]: "good-bilateral",
-      [K("ankle-rocking", "inversion")]: "good-bilateral",
-    }),
-    "green",
+    testMark(lunge(), { ...lungeClean, [LG.sD]: "limited-stride", [LG.sN]: "limited-both" }),
+    "red",
   );
+});
+
+test("lunge: both questions are asked on both sides, neither gates the other", () => {
+  for (const s of lunge().subTests) {
+    assert.equal(s.dependsOn, undefined, `${s.key} should not branch`);
+    assert.equal(s.sides, "dominance");
+  }
+  assert.equal(screenFields([lunge()]).length, 4);
+});
+
+test("lunge: pain on either side flags the test", () => {
+  assert.equal(testMark(lunge(), { ...lungeClean, [LG.sD]: PAINFUL }), "alert");
+  assert.equal(testMark(lunge(), { ...lungeClean, [LG.eN]: PAINFUL }), "alert");
+});
+
+test("lunge: extension grades on each side, and the worst reading wins", () => {
+  for (const side of [LG.eD, LG.eN])
+    assert.equal(testMark(lunge(), { ...lungeClean, [side]: "limited" }), "red", side);
+  // A clean starting position does not soften a failed extension.
+  assert.equal(
+    testMark(lunge(), { ...lungeClean, [LG.sD]: "limited-stride", [LG.eN]: "limited" }),
+    "red",
+  );
+});
+
+test("lunge has no findings left ungraded", () => {
+  for (const s of lunge().subTests)
+    for (const f of s.findings)
+      assert.ok(f.severity, `${s.key} -> ${f.label} has no colour`);
 });

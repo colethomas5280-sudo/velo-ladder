@@ -57,8 +57,8 @@ export interface SubTest {
    * they must not be counted as deviations or coloured as failures.
    */
   diagnostic?: boolean;
-  /** Graded once per side, as the sheet's L / R columns. */
-  bilateral?: boolean;
+  /** Graded twice — left and right, or dominant and non-dominant. */
+  sides?: SideSet;
   /**
    * Only performed when another sub-test came out one of a set of ways.
    * Several answers can lead to the same follow-up — on Pelvic Tilt, "cannot
@@ -139,47 +139,57 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
 ];
 
 /**
- * Ankle Rocking, per movement. Eversion and inversion are the same interview
- * twice over, so it is generated rather than written out: two copies of a
- * four-way gate with two branches under it would not stay in step.
+ * Ankle Rocking and Ankle Rolling, per movement.
  *
- * The grading rule is the same down both branches — if holding the knees
+ * Four interviews of identical shape — eversion, inversion, lateral tibial
+ * rotation, medial tibial rotation — each a four-way gate with two branches
+ * under it. Generated from one definition because four written-out copies
+ * would not stay in step, and the two tests are the same procedure applied to
+ * different movements.
+ *
+ * The grading rule is the same down every branch: if holding the knees
  * restores the movement it is a yellow, and anything still limited is a red.
  */
-function ankleRockingSubTests(move: "eversion" | "inversion"): SubTest[] {
-  const dir = move === "eversion" ? "eversion (rolling in)" : "inversion (rolling out)";
-  const cap = move[0].toUpperCase() + move.slice(1);
+function ankleSubTests(spec: {
+  /** Stable key stem — never change it, it is in the database. */
+  key: string;
+  /** The movement as the question asks it, e.g. "seated eversion (rolling in)". */
+  question: string;
+  /** The movement as an answer names it, e.g. "eversion". */
+  noun: string;
+}): SubTest[] {
+  const { key, question, noun } = spec;
   return [
     {
-      key: move,
-      label: `How was seated ${dir} without holding the knees?`,
+      key,
+      label: `How was ${question} without holding the knees?`,
       findings: [
-        { key: "good-bilateral", label: `Good ${move} bilaterally`, normal: true, severity: "green" },
-        { key: "limited-right", label: `Limited ${move} on the right` },
-        { key: "limited-left", label: `Limited ${move} on the left` },
-        { key: "limited-bilateral", label: `Limited ${move} bilaterally` },
+        { key: "good-bilateral", label: `Good ${noun} bilaterally`, normal: true, severity: "green" },
+        { key: "limited-right", label: `Limited ${noun} on the right` },
+        { key: "limited-left", label: `Limited ${noun} on the left` },
+        { key: "limited-bilateral", label: `Limited ${noun} bilaterally` },
       ],
     },
     {
-      // One ankle was limited, so the question is only about that ankle.
-      key: `${move}-held-one`,
-      label: "Did holding the knee fix that ankle?",
-      dependsOn: { subTest: move, findings: ["limited-right", "limited-left"] },
+      // One side was limited, so the question is only about that side.
+      key: `${key}-held-one`,
+      label: "Did holding the knee fix that side?",
+      dependsOn: { subTest: key, findings: ["limited-right", "limited-left"] },
       findings: [
         { key: "fixed", label: "Holding the knee restored it", severity: "yellow" },
         { key: "still-limited", label: "Still limited when holding the knee", severity: "red" },
       ],
     },
     {
-      // Both ankles were limited, so holding can fix both, one, or neither.
-      key: `${move}-held-both`,
-      label: `How was ${move} when holding the knees?`,
-      dependsOn: { subTest: move, findings: ["limited-bilateral"] },
+      // Both sides were limited, so holding can fix both, one, or neither.
+      key: `${key}-held-both`,
+      label: `How was ${noun} when holding the knees?`,
+      dependsOn: { subTest: key, findings: ["limited-bilateral"] },
       findings: [
-        { key: "normal", label: `Normal ${move} when holding the knees`, severity: "yellow" },
-        { key: "still-right", label: `Still limited ${move} on the right`, severity: "red" },
-        { key: "still-left", label: `Still limited ${move} on the left`, severity: "red" },
-        { key: "still-both", label: `Still limited ${move} bilaterally`, severity: "red" },
+        { key: "normal", label: `Normal ${noun} when holding the knees`, severity: "yellow" },
+        { key: "still-right", label: `Still limited ${noun} on the right`, severity: "red" },
+        { key: "still-left", label: `Still limited ${noun} on the left`, severity: "red" },
+        { key: "still-both", label: `Still limited ${noun} bilaterally`, severity: "red" },
       ],
     },
   ];
@@ -308,7 +318,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "hip-ir",
         label: "Hip internal rotation",
-        bilateral: true,
+        sides: "lr",
         findings: [
           { key: "touches", label: "Touches the bat", normal: true, severity: "green" },
           { key: "short", label: "Short of the bat", severity: "yellow" },
@@ -322,7 +332,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "holding-pelvis",
         label: "With the pelvis held",
-        bilateral: true,
+        sides: "lr",
         dependsOn: { subTest: "hip-ir", findings: ["short"] },
         help: "Hold the pelvis steady and have them turn again. Reaching the bat now means the limit was stability; still coming up short means it is mobility.",
         findings: [
@@ -341,7 +351,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         // Same question of each hip, no follow-up either way.
         key: "45-degree-angle",
         label: "45 Degree Angle",
-        bilateral: true,
+        sides: "lr",
         findings: [
           { key: "greater", label: "Greater than 45\u00b0", normal: true, severity: "green" },
           { key: "equal", label: "Equal to 45\u00b0", severity: "yellow" },
@@ -358,7 +368,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
       {
         key: "spine-rotation",
         label: "Spine rotation",
-        bilateral: true,
+        sides: "lr",
         // Colours inferred from Hip 45, which uses this exact shape and was
         // confirmed green / yellow / red in order.
         findings: [
@@ -375,7 +385,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "cervical",
         label: "Cervical rotation",
-        bilateral: true,
+        sides: "lr",
         help: "As they rotate the trunk, have them look back the other way — turning right, they look left. Watch whether the chin reaches the collarbone.",
         findings: [
           { key: "touches", label: "Chin touches clavicle", normal: true, severity: "green" },
@@ -430,7 +440,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
       {
         key: "height",
         label: "What was the height of their heel lift?",
-        bilateral: true,
+        sides: "lr",
         help: "Toes of the standing foot to the wall, the other foot behind it and then lifted clear. Balancing on the standing foot alone, lift that heel off the ground.",
         findings: [
           // A gate, like Push-Off's first stage: a good lift carries no colour
@@ -442,7 +452,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
       {
         key: "quality",
         label: "What was the quality of the heel lift?",
-        bilateral: true,
+        sides: "lr",
         dependsOn: { subTest: "height", findings: ["good"] },
         findings: [
           { key: "straight-up", label: "Raises straight up", normal: true, severity: "green" },
@@ -456,27 +466,26 @@ export const SCREEN_TESTS: ScreenTest[] = [
     label: "Ankle Rocking Test",
     group: "stride",
     subTests: [
-      ...ankleRockingSubTests("eversion"),
-      ...ankleRockingSubTests("inversion"),
+      ...ankleSubTests({ key: "eversion", question: "seated eversion (rolling in)", noun: "eversion" }),
+      ...ankleSubTests({ key: "inversion", question: "seated inversion (rolling out)", noun: "inversion" }),
     ],
   },
   {
+    // The same procedure as Ankle Rocking, applied to tibial rotation.
     key: "ankle-rolling",
     label: "Ankle Rolling Test",
     group: "stride",
     subTests: [
-      {
-        key: "turning-in",
-        label: "Seated Turning In",
-        bilateral: true,
-        findings: f(["gte-20", "20 degrees or more"], ["limited", "Limited (<20 degrees)"]),
-      },
-      {
-        key: "turning-out",
-        label: "Seated Turning Out",
-        bilateral: true,
-        findings: f(["gte-20", "20 degrees or more"], ["limited", "Limited (<20 degrees)"]),
-      },
+      ...ankleSubTests({
+        key: "lateral",
+        question: "seated lateral (turning out) tibial rotation",
+        noun: "lateral rotation",
+      }),
+      ...ankleSubTests({
+        key: "medial",
+        question: "seated medial (turning in) tibial rotation",
+        noun: "medial rotation",
+      }),
     ],
   },
   {
@@ -485,14 +494,25 @@ export const SCREEN_TESTS: ScreenTest[] = [
     group: "posture",
     subTests: [
       {
-        key: "on-base-line",
-        label: "On Base Line",
-        bilateral: true,
-        findings: f(
-          ["good", "Good"],
-          ["unstable", "Unstable"],
-          ["unable", "Unable to Complete"],
-        ),
+        /*
+         * One question, nothing branching off it. Graded once, with which
+         * knee was down living in the answer rather than in a per-side grade.
+         */
+        key: "stability",
+        label: "How was their half-kneeling stability?",
+        findings: [
+          { key: "stable", label: "Stable bilaterally", normal: true, severity: "green" },
+          /*
+           * No yellow on this test. Stable on both sides or not — one knee,
+           * both knees and unable to get there all grade the same. It is the
+           * only test on the screen with no middle ground, so the absence is
+           * deliberate rather than a mapping still to be filled in.
+           */
+          { key: "unstable-right", label: "Unstable with the right knee down", severity: "red" },
+          { key: "unstable-left", label: "Unstable with the left knee down", severity: "red" },
+          { key: "unstable-bilateral", label: "Unstable bilaterally", severity: "red" },
+          { key: "unable", label: "Unable to get into position", severity: "red" },
+        ],
       },
     ],
   },
@@ -502,23 +522,31 @@ export const SCREEN_TESTS: ScreenTest[] = [
     group: "posture",
     subTests: [
       {
-        key: "in-full-stride",
-        label: "In Full Stride",
-        bilateral: true,
-        findings: f(
-          ["can-get-in", "Can Get into Starting Position"],
-          ["cant-get-in", "Can't Get into Starting Position"],
-        ),
+        /*
+         * Graded dominant and non-dominant rather than left and right, because
+         * handedness changes what this movement should look like.
+         *
+         * Not a gate: both questions are asked on both sides. The four answers
+         * grade the quality of the position, not whether they reached it.
+         */
+        key: "starting-position",
+        label: "Could they get into their starting position?",
+        sides: "dominance",
+        findings: [
+          { key: "good", label: "Good starting position", normal: true, severity: "green" },
+          { key: "limited-stride", label: "Limited stride", severity: "yellow" },
+          { key: "limited-shoulder", label: "Limited shoulder flexion", severity: "yellow" },
+          { key: "limited-both", label: "Limited stride and shoulders", severity: "red" },
+        ],
       },
       {
-        key: "trying-to-extend",
-        label: "Trying to Extend",
-        bilateral: true,
-        findings: f(
-          ["good-extension", "Good Extension"],
-          ["shoulders-dont-clear", "Shoulders Don't Clear Mid-Thigh"],
-          ["lost-shoulder-flexion", "Lost Shoulder Flexion"],
-        ),
+        key: "extension",
+        label: "How was their lunge with extension?",
+        sides: "dominance",
+        findings: [
+          { key: "good", label: "Good spine or hip extension (past mid-knee)", normal: true, severity: "green" },
+          { key: "limited", label: "Limited spine or hip extension", severity: "red" },
+        ],
       },
     ],
   },
@@ -555,7 +583,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
       {
         key: "standing-tall",
         label: "Standing Tall",
-        bilateral: true,
+        sides: "lr",
         findings: f(
           ["greater-spine", "Greater than Spine Angle"],
           ["equal-spine", "Equal to Spine Angle"],
@@ -572,13 +600,13 @@ export const SCREEN_TESTS: ScreenTest[] = [
       {
         key: "in-front",
         label: "In Front",
-        bilateral: true,
+        sides: "lr",
         findings: f(["gte-90", "= or > 90°"], ["lt-90", "< 90°"]),
       },
       {
         key: "at-side",
         label: "At Side",
-        bilateral: true,
+        sides: "lr",
         findings: f(["gte-90", "= or > 90°"], ["lt-90", "< 90°"]),
       },
     ],
@@ -591,13 +619,13 @@ export const SCREEN_TESTS: ScreenTest[] = [
       {
         key: "palm-towards",
         label: "Palm Towards (Curve)",
-        bilateral: true,
+        sides: "lr",
         findings: f(["gte-80", "80 degrees or More"], ["lt-80", "Less than 80 Degrees"]),
       },
       {
         key: "palm-away",
         label: "Palm Away (Change-Up)",
-        bilateral: true,
+        sides: "lr",
         findings: f(["gte-80", "80 degrees or More"], ["lt-80", "Less than 80 Degrees"]),
       },
     ],
@@ -613,8 +641,33 @@ export const SCREEN_TESTS: ScreenTest[] = [
  * Holding Shoulders, and an unqualified key would collide.
  * ------------------------------------------------------------------ */
 
-export const SIDES = ["L", "R"] as const;
-export type Side = (typeof SIDES)[number];
+/**
+ * Some tests are graded twice. Usually that is left and right — but Lunge with
+ * Extension is graded dominant and non-dominant, because handedness changes
+ * what the movement should look like.
+ *
+ * Stored as its own vocabulary rather than resolved to a side through the
+ * athlete's throwing hand: a screen has to keep meaning what it meant if that
+ * hand is later corrected in the profile.
+ */
+export const SIDE_SETS = {
+  lr: [
+    { key: "L", label: "Left" },
+    { key: "R", label: "Right" },
+  ],
+  dominance: [
+    { key: "D", label: "Dominant" },
+    { key: "N", label: "Non-dominant" },
+  ],
+} as const;
+
+export type SideSet = keyof typeof SIDE_SETS;
+export type Side = string;
+
+/** The sides a sub-test is graded on, or an empty list if graded once. */
+export function sidesOf(subTest: SubTest): readonly { key: string; label: string }[] {
+  return subTest.sides ? SIDE_SETS[subTest.sides] : [];
+}
 
 export type Results = Record<string, string>;
 
@@ -634,9 +687,10 @@ export function screenFields(tests: ScreenTest[] = SCREEN_TESTS): Field[] {
   const out: Field[] = [];
   for (const test of tests)
     for (const subTest of test.subTests) {
-      if (subTest.bilateral)
-        for (const side of SIDES)
-          out.push({ key: fieldKey(test.key, subTest.key, side), test, subTest, side });
+      const sides = sidesOf(subTest);
+      if (sides.length)
+        for (const side of sides)
+          out.push({ key: fieldKey(test.key, subTest.key, side.key), test, subTest, side: side.key });
       else out.push({ key: fieldKey(test.key, subTest.key), test, subTest });
     }
   return out;
