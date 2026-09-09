@@ -879,12 +879,14 @@ export function screenCounts(results: Results, tests: ScreenTest[] = SCREEN_TEST
 }
 
 export interface ScreenChange {
-  /** Was a deviation last time, isn't now. */
+  /** Was a deviation last time, and was re-screened clean. */
   resolved: Deviation[];
   /** Still a deviation, though the finding itself may have moved. */
   persisting: { field: Field; before: Finding; after: Finding }[];
   /** Wasn't a deviation last time, is now. */
   appeared: Deviation[];
+  /** Was a deviation last time and nobody looked this time. */
+  unchecked: Deviation[];
 }
 
 /**
@@ -892,13 +894,24 @@ export interface ScreenChange {
  * than collapsing to "still bad": Pelvic Tilt going from Both Limited to Hard
  * Time Arching Back is real progress, and a comparison that only asked
  * "normal or not" would report no change at all.
+ *
+ * A reading that was a deviation and is now BLANK is `unchecked`, not
+ * resolved. Nothing was observed, and telling an athlete he has fixed
+ * something nobody re-tested is the one lie a re-screen must not tell. A
+ * reading whose branch has closed does count as resolved — the gate above it
+ * came back clean, so the follow-up genuinely no longer applies.
  */
 export function compareScreens(
   before: Results,
   after: Results,
   tests: ScreenTest[] = SCREEN_TESTS,
 ): ScreenChange {
-  const change: ScreenChange = { resolved: [], persisting: [], appeared: [] };
+  const change: ScreenChange = {
+    resolved: [],
+    persisting: [],
+    appeared: [],
+    unchecked: [],
+  };
   const dev = (r: Results, field: Field): Finding | null => {
     if (!isApplicable(field, r)) return null;
     const finding = findingFor(field, r);
@@ -908,10 +921,150 @@ export function compareScreens(
     const b = dev(before, field);
     const a = dev(after, field);
     if (b && a) change.persisting.push({ field, before: b, after: a });
-    else if (b && !a) change.resolved.push({ field, finding: b });
-    else if (!b && a) change.appeared.push({ field, finding: a });
+    else if (b && !a) {
+      // Cleared, or simply not looked at — see the note above.
+      const looked = !isApplicable(field, after) || !!findingFor(field, after);
+      (looked ? change.resolved : change.unchecked).push({ field, finding: b });
+    } else if (!b && a) change.appeared.push({ field, finding: a });
   }
   return change;
+}
+
+/* ------------------------------------------------------------------ *
+ * Reading a screen back
+ *
+ * The panel is a work list, not a report card. It leads with what to do
+ * something about, and it says what moved since last time — because the
+ * second screen is the one that tells an athlete whether the work worked.
+ * ------------------------------------------------------------------ */
+
+/** How one reading moved between screens. */
+export type Trend = "new" | "improved" | "worsened" | "changed" | "unchanged";
+
+/**
+ * A test's headline. Distinct from `TestMark` in two ways that matter to the
+ * ordering: a test carrying deviations nobody has graded is `ungraded` rather
+ * than nothing, and a test nobody ran is `skipped` rather than clean.
+ */
+export type ReportStatus = "alert" | "red" | "yellow" | "ungraded" | "clean" | "skipped";
+
+export interface ReportReading {
+  field: Field;
+  finding: Finding;
+  /** What this reading said last screen, when it was a deviation then too. */
+  before?: Finding;
+  /** Null when there is no previous screen to compare against. */
+  trend: Trend | null;
+}
+
+export interface TestReport {
+  test: ScreenTest;
+  mark: TestMark | null;
+  status: ReportStatus;
+  /** Deviations standing now, in sheet order — the work. */
+  work: ReportReading[];
+  /** Deviations last screen that came back clean. */
+  cleared: Deviation[];
+  /** Deviations last screen that nobody re-screened. */
+  unchecked: Deviation[];
+  recorded: number;
+  asked: number;
+}
+
+/** Where a finding sits on the scale, or null when it carries no colour. */
+function rankOf(finding: Finding): number | null {
+  if (finding.alert) return 4;
+  if (finding.severity) return RANK[finding.severity] + 1;
+  return null;
+}
+
+/**
+ * Two findings that both lack a colour, or that differ without moving on the
+ * scale, are "changed" rather than better or worse. Claiming a direction the
+ * mapping doesn't support is how a work list turns into a horoscope.
+ */
+function trendOf(before: Finding | undefined, after: Finding): Trend {
+  if (!before) return "new";
+  if (before.key === after.key) return "unchanged";
+  const b = rankOf(before);
+  const a = rankOf(after);
+  if (b == null || a == null) return "changed";
+  if (a < b) return "improved";
+  if (a > b) return "worsened";
+  return "changed";
+}
+
+const STATUS_ORDER: Record<ReportStatus, number> = {
+  alert: 5,
+  red: 4,
+  yellow: 3,
+  ungraded: 2,
+  clean: 1,
+  skipped: 0,
+};
+
+/**
+ * Every test, worst first, with what changed since the previous screen.
+ *
+ * Sorted by status rather than by the config order the coach screens in: the
+ * point of the panel is that the first thing on it is the first thing to work
+ * on. Ties keep sheet order, so the list doesn't reshuffle between screens
+ * for no reason.
+ */
+export function screenReport(
+  results: Results,
+  previous: Results | null = null,
+  tests: ScreenTest[] = SCREEN_TESTS,
+): TestReport[] {
+  const change = previous ? compareScreens(previous, results, tests) : null;
+  const byTest = (list: Deviation[] | undefined, key: string) =>
+    (list ?? []).filter((d) => d.field.test.key === key);
+  const priorFinding = new Map<string, Finding>();
+  for (const d of change?.persisting ?? [])
+    priorFinding.set(d.field.key, d.before);
+
+  const reports = tests.map((test): TestReport => {
+    const counts = screenCounts(results, [test]);
+    const recorded = counts.normal + counts.deviation + counts.notTested;
+    const asked = recorded + counts.blank;
+    const mark = testMark(test, results);
+    const work = deviations(results, [test]).map(
+      ({ field, finding }): ReportReading => {
+        const before = priorFinding.get(field.key);
+        return {
+          field,
+          finding,
+          ...(before ? { before } : {}),
+          trend: previous ? trendOf(before, finding) : null,
+        };
+      },
+    );
+
+    let status: ReportStatus;
+    if (counts.normal + counts.deviation === 0) status = "skipped";
+    else if (mark === "alert" || mark === "red" || mark === "yellow") status = mark;
+    else if (work.length) status = "ungraded";
+    else status = "clean";
+
+    return {
+      test,
+      mark,
+      status,
+      work,
+      cleared: byTest(change?.resolved, test.key),
+      unchecked: byTest(change?.unchecked, test.key),
+      recorded,
+      asked,
+    };
+  });
+
+  return reports
+    .map((r, i) => ({ r, i }))
+    .sort(
+      (x, y) =>
+        STATUS_ORDER[y.r.status] - STATUS_ORDER[x.r.status] || x.i - y.i,
+    )
+    .map(({ r }) => r);
 }
 
 /* ------------------------------------------------------------------ *

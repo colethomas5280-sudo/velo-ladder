@@ -2578,3 +2578,234 @@ table.roster-table {
     flex-direction: column;
   }
 }
+
+/* ---------- movement screen: reading it back ---------- */
+.screen-card {
+  margin-top: 16px;
+}
+.sc-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sc-pick {
+  width: auto;
+  padding: 6px 8px;
+  font-size: 12.5px;
+}
+.sc-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+/*
+ * The headline is a count of work, not a score. An athlete reading "3 tests to
+ * work on" has been handed a list; the same screen rendered as "9 of 17 green"
+ * has been handed a grade, and a grade is the thing this panel is not.
+ */
+.sc-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+.sc-count .n {
+  font-family: var(--font-display), sans-serif;
+  font-size: 34px;
+  line-height: 1;
+}
+.sc-count .l {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.sc-count.has-work .n {
+  color: var(--accent);
+}
+.sc-count.clear .n {
+  color: var(--good);
+}
+.sc-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.sc-when {
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.sc-moved {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 0 8px 8px 0;
+  background: var(--panel-2);
+  border-left: 3px solid var(--line);
+  font-size: 13.5px;
+  color: var(--ink-dim);
+}
+.sc-moved .eyebrow {
+  display: block;
+  margin-bottom: 3px;
+}
+.sc-h {
+  margin: 18px 0 8px;
+}
+.sc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sc-row {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.sc-row.open {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+.sc-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+.sc-row-head:hover {
+  background: var(--panel-2);
+}
+.sc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14.5px;
+}
+.sc-name em {
+  display: block;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.sc-trend {
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--ink-faint);
+}
+.sc-trend.t-improved {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 35%, var(--line));
+}
+.sc-trend.t-worsened,
+.sc-trend.t-new {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 35%, var(--line));
+}
+.sc-row-head .caret {
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+.sc-row-body {
+  padding: 4px 12px 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.sc-findings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sc-findings li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sc-findings li:last-child {
+  border-bottom: 0;
+}
+.sc-finding {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+}
+.sc-side {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.sc-note-good {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--good);
+}
+.sc-clean {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.sc-clean.sc-dim {
+  color: var(--ink-faint);
+}
+.sc-notes {
+  margin-top: 14px;
+}
+.sc-actions {
+  margin-top: 14px;
+}
+.sc-block {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 0 8px 8px 0;
+  background: var(--panel-2);
+  border-left: 3px solid var(--line);
+}
+.sc-block ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.sc-block li {
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  margin: 3px 0;
+}
+.sc-block.sc-good {
+  border-left-color: var(--good);
+}
+.sc-block.sc-good li {
+  color: var(--ink);
+}
