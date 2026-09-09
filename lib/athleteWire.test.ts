@@ -1,17 +1,187 @@
-import { test } from "node:test";
+import { test, after, mock } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative, sep } from "node:path";
 import { PROFILE_FIELDS, visibleProfile } from "@/lib/profile";
 
 /* ------------------------------------------------------------------ *
- * finding 1 — coachNotes must never reach the athlete it is about.
+ * Nothing coach-only reaches the wire
  *
- * Task 3 added the `visibleProfile` role filter to GET /api/athletes/[id]
- * but not to the list route, which serves an athlete their own row. This
- * guards both halves: the filter itself drops every hidden key, and no
- * athlete-reachable route hands a raw athlete row to `json()`.
+ * `GET /api/athletes` once returned an athlete their own row with
+ * `coachNotes` verbatim. It survived six of seven task reviews, and the test
+ * written afterwards scanned route SOURCE with a regex — which never matched
+ * the route it was written for, and could not have matched a route that
+ * copies fields by hand or maps over rows.
+ *
+ * So this runs the routes instead. It seeds a database, signs in as a real
+ * athlete, calls the GET handler of every route under app/api, and reads the
+ * response body looking for values that must never appear in one. A route
+ * added later is swept without anyone remembering to add it.
+ *
+ * Limits, stated rather than implied: it sweeps GET only — the historical bug
+ * and the bulk of the read surface — and it proves a value is absent, not
+ * that authorisation is correct.
  * ------------------------------------------------------------------ */
+
+const COACH_EMAIL = "coach@wire.test";
+const ATHLETE_EMAIL = "kid@wire.test";
+const OTHER_EMAIL = "other@wire.test";
+
+/* Distinctive enough that a hit is never a coincidence. */
+const COACH_NOTE = "SENTINEL-coach-note-6b1f4a";
+const OTHER_NOTE = "SENTINEL-other-athlete-note-91cc7d";
+const SCREEN_NOTE = "SENTINEL-screen-note-2ae503";
+const PASSWORD = "SENTINEL-password-plain-77d0b2";
+
+process.env.USE_PGLITE = "1";
+process.env.DATABASE_URL = "";
+const DB_DIR = mkdtempSync(join(tmpdir(), "velo-wire-"));
+process.env.PGLITE_DIR = DB_DIR;
+after(() => rmSync(DB_DIR, { recursive: true, force: true }));
+process.env.COACH_EMAILS = COACH_EMAIL;
+process.env.SETUP_KEY = "wire-test-key";
+
+/** Swapped between roles by the sweep; the auth mock reads it each call. */
+let signedInAs: string | null = ATHLETE_EMAIL;
+/*
+ * `exports` is the current option name; @types/node 20 still describes the
+ * `namedExports` spelling this runtime deprecates, so the cast is the types
+ * lagging rather than a shape being smuggled past them.
+ */
+mock.module("@/lib/auth", {
+  exports: {
+    auth: async () => (signedInAs ? { user: { email: signedInAs } } : null),
+  },
+} as Parameters<typeof mock.module>[1]);
+
+interface Seeded {
+  athleteId: string;
+  otherId: string;
+  sessionId: string;
+  setbackId: string;
+  resourceId: string;
+  inviteToken: string;
+  passwordHash: string;
+}
+
+async function seed(): Promise<Seeded> {
+  const { execScript, sql } = await import("@/lib/db");
+  const { SCHEMA_SQL } = await import("@/lib/schema");
+  await execScript(SCHEMA_SQL);
+
+  const data = await import("@/lib/data");
+  const athlete = await data.createAthlete({
+    name: "Wire Athlete",
+    hand: "R",
+    inviteEmail: ATHLETE_EMAIL,
+    password: PASSWORD,
+  });
+  const other = await data.createAthlete({
+    name: "Other Athlete",
+    hand: "L",
+    inviteEmail: OTHER_EMAIL,
+  });
+
+  await data.updateAthlete(athlete.id, { coachNotes: COACH_NOTE });
+  await data.updateAthlete(other.id, { coachNotes: OTHER_NOTE });
+
+  const session = await data.createSession({
+    athleteId: athlete.id,
+    type: "mound",
+    date: "2026-09-01",
+    notes: "",
+    throws: { m5: [80, 91, 92, 90] },
+    createdBy: COACH_EMAIL,
+  });
+  await data.upsertRecovery(
+    athlete.id,
+    { date: "2026-09-01", soreness: 3, notes: "" },
+    COACH_EMAIL,
+  );
+  await data.upsertScreen(
+    athlete.id,
+    { date: "2026-09-01", results: { "hip-45.45-degree-angle:L": "greater" }, notes: SCREEN_NOTE },
+    COACH_EMAIL,
+  );
+  await sql`
+    INSERT INTO setbacks (id, athlete_id, kind, opened_on, detail)
+    VALUES ('sb-wire', ${athlete.id}, 'soreness', '2026-09-01', 'sore')
+  `;
+  const resource = await data.createResource({
+    title: "Wire resource",
+    body: "body",
+    category: "protocol",
+  });
+  const token = (await data.createInvite(other.id))!;
+
+  const [row] = (await sql`
+    SELECT password_hash FROM athletes WHERE id = ${athlete.id}
+  `) as { password_hash: string }[];
+
+  return {
+    athleteId: athlete.id,
+    otherId: other.id,
+    sessionId: session.id,
+    setbackId: "sb-wire",
+    resourceId: resource.id,
+    inviteToken: token,
+    passwordHash: row.password_hash,
+  };
+}
+
+/** Every `route.ts` under app/api, recursively. */
+function routeFiles(dir: string): string[] {
+  const out: string[] = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name);
+    if (e.isDirectory()) out.push(...routeFiles(p));
+    else if (e.name === "route.ts") out.push(p);
+  }
+  return out.sort();
+}
+
+/**
+ * What to pass for a route's dynamic segments, decided by the segment ABOVE
+ * them — `athletes/[id]` and `sessions/[id]` both spell the param `id` and
+ * mean different things.
+ *
+ * A shape this doesn't recognise throws rather than being skipped. A new
+ * route with an unfamiliar parameter should stop the suite and make someone
+ * decide what it is, which is the whole point of sweeping automatically.
+ */
+function paramsFor(file: string, seeded: Seeded): Record<string, string> {
+  const parts = relative(join(process.cwd(), "app", "api"), file).split(sep);
+  parts.pop(); // route.ts
+  const params: Record<string, string> = {};
+  parts.forEach((segment, i) => {
+    const m = /^\[(?:\.\.\.)?([A-Za-z0-9_]+)\]$/.exec(segment);
+    if (!m) return;
+    const parent = parts[i - 1];
+    const value =
+      parent === "athletes"
+        ? seeded.athleteId
+        : parent === "sessions"
+          ? seeded.sessionId
+          : parent === "setbacks"
+            ? seeded.setbackId
+            : parent === "resources"
+              ? seeded.resourceId
+              : parent === "join"
+                ? seeded.inviteToken
+                : null;
+    if (value === null)
+      throw new Error(
+        `${file}: don't know what to pass for [${m[1]}] under '${parent}'. ` +
+          `Add it to paramsFor so this route gets swept.`,
+      );
+    params[m[1]] = value;
+  });
+  return params;
+}
+
+/** NextAuth's own handler — not ours, and it serves no athlete data. */
+const NOT_OURS = join("auth", "[...nextauth]");
 
 const HIDDEN = PROFILE_FIELDS.filter((f) => !f.athleteCanSee).map((f) => f.key);
 
@@ -36,44 +206,130 @@ test("visibleProfile strips every athleteCanSee:false key for an athlete", () =>
   assert.equal(visibleProfile(row, true).coachNotes, row.coachNotes);
 });
 
-/** Every `route.ts` under app/api, recursively. */
-function routeFiles(dir: string): string[] {
-  const out: string[] = [];
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    const p = join(dir, e.name);
-    if (e.isDirectory()) out.push(...routeFiles(p));
-    else if (e.name === "route.ts") out.push(p);
+/**
+ * Call every route's GET as one role and return what each said.
+ *
+ * A 401/403/404 is a pass — nothing was handed over. What matters is the body
+ * of everything that answered.
+ */
+async function sweep(as: string | null, seeded: Seeded) {
+  signedInAs = as;
+  const files = routeFiles(join(process.cwd(), "app", "api"));
+  const answered: { file: string; status: number; body: string }[] = [];
+
+  for (const file of files) {
+    if (file.includes(NOT_OURS)) continue;
+    const mod = (await import(file)) as {
+      GET?: (r: Request, c: { params: Promise<Record<string, string>> }) => Promise<Response>;
+    };
+    if (typeof mod.GET !== "function") continue;
+
+    const params = paramsFor(file, seeded);
+    const url = new URL("http://wire.test/api");
+    const res = await mod.GET(new Request(url), { params: Promise.resolve(params) });
+    answered.push({
+      file: relative(process.cwd(), file),
+      status: res.status,
+      body: await res.text(),
+    });
   }
-  return out;
+  return answered;
 }
 
-test("no athlete-reachable route hands a raw athlete row to json()", () => {
-  const apiDir = join(process.cwd(), "app", "api");
-  for (const file of routeFiles(apiDir)) {
-    const src = readFileSync(file, "utf8");
+let seeded: Seeded;
+let asAthlete: Awaited<ReturnType<typeof sweep>>;
+let asCoach: Awaited<ReturnType<typeof sweep>>;
 
-    // Identifiers bound to a full athlete row.
-    const bound = new Set<string>();
-    for (const m of src.matchAll(
-      /(?:const|let)\s+([A-Za-z0-9_]+)\s*=\s*[^\n;]*?await\s+(?:getAthlete|listAthletes)\s*\(/g,
-    ))
-      bound.add(m[1]);
+/** Everything below reads the sweep, so say so when the sweep never ran. */
+function swept(): Awaited<ReturnType<typeof sweep>> {
+  assert.ok(asAthlete && asCoach, "the sweep didn't run — fix that failure first");
+  return [...asAthlete, ...asCoach];
+}
 
-    // Any of those reaching a json(...) response — the file must run it
-    // through visibleProfile somewhere.
-    for (const id of bound) {
-      if (!new RegExp(`json\\(\\s*${id}[.\\s)]`).test(src)) continue;
-      assert.ok(
-        /visibleProfile/.test(src),
-        `${file}: json(${id}) ships an athlete row but the file never calls visibleProfile`,
-      );
-    }
+test("seed a database and sweep every GET route as each role", async () => {
+  seeded = await seed();
+  asAthlete = await sweep(ATHLETE_EMAIL, seeded);
+  asCoach = await sweep(COACH_EMAIL, seeded);
 
-    // The old bug shape: json(await listAthletes()) with no filter at all.
+  /*
+   * The guard on the guard. A sweep where every route 403s proves nothing at
+   * all, and that is exactly how the test this replaced managed to pass.
+   */
+  const served = asAthlete.filter((r) => r.status === 200 && r.body.length > 2);
+  assert.ok(
+    served.length >= 5,
+    `only ${served.length} routes served the athlete a body — the sweep isn't reaching anything`,
+  );
+  assert.ok(
+    served.some((r) => r.body.includes("Wire Athlete")),
+    "the athlete's own row never came back, so nothing here was really tested",
+  );
+  /*
+   * A route that blows up is a route the sweep did not read, which is the
+   * same blind spot as one that 403s — silently untested while counted.
+   */
+  for (const r of [...asAthlete, ...asCoach])
+    assert.notEqual(r.status, 500, `${r.file} threw during the sweep: ${r.body}`);
+
+  if (process.env.WIRE_COVERAGE)
+    for (const r of asAthlete)
+      console.log(`  ${String(r.status).padEnd(4)} ${r.body.length.toString().padStart(6)}b  ${r.file}`);
+});
+
+test("no coach-only note reaches the athlete on any route", () => {
+  swept();
+  for (const r of asAthlete) {
     assert.equal(
-      /json\(\s*await\s+(?:getAthlete|listAthletes)\s*\(/.test(src),
+      r.body.includes(COACH_NOTE),
       false,
-      `${file}: a raw getAthlete/listAthletes result goes straight to json()`,
+      `${r.file} (${r.status}) served the athlete their own coachNotes`,
+    );
+    assert.equal(
+      r.body.includes(OTHER_NOTE),
+      false,
+      `${r.file} (${r.status}) served the athlete another athlete's coachNotes`,
+    );
+    assert.equal(
+      r.body.includes(SCREEN_NOTE),
+      false,
+      `${r.file} (${r.status}) served the athlete the coach's screen note`,
     );
   }
+});
+
+/*
+ * These are secrets rather than coach-only fields, so the coach's own
+ * responses are held to the same standard. A password hash on the wire is a
+ * password hash on the wire whoever asked for it.
+ */
+test("no password hash or invite token reaches anyone", () => {
+  for (const r of swept()) {
+    assert.equal(
+      r.body.includes(seeded.passwordHash),
+      false,
+      `${r.file} (${r.status}) put a password hash on the wire`,
+    );
+    assert.equal(
+      r.body.includes(PASSWORD),
+      false,
+      `${r.file} (${r.status}) put a plaintext password on the wire`,
+    );
+    assert.equal(
+      r.body.includes(seeded.inviteToken),
+      false,
+      `${r.file} (${r.status}) put a live invite token on the wire`,
+    );
+  }
+});
+
+test("the coach does still get the notes — the filter isn't just deleting everything", () => {
+  swept();
+  assert.ok(
+    asCoach.some((r) => r.body.includes(COACH_NOTE)),
+    "no route served the coach their own note, so the athlete's blank proves nothing",
+  );
+  assert.ok(
+    asCoach.some((r) => r.body.includes(SCREEN_NOTE)),
+    "no route served the coach the screen note either",
+  );
 });
