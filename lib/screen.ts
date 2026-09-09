@@ -138,6 +138,53 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
   },
 ];
 
+/**
+ * Ankle Rocking, per movement. Eversion and inversion are the same interview
+ * twice over, so it is generated rather than written out: two copies of a
+ * four-way gate with two branches under it would not stay in step.
+ *
+ * The grading rule is the same down both branches — if holding the knees
+ * restores the movement it is a yellow, and anything still limited is a red.
+ */
+function ankleRockingSubTests(move: "eversion" | "inversion"): SubTest[] {
+  const dir = move === "eversion" ? "eversion (rolling in)" : "inversion (rolling out)";
+  const cap = move[0].toUpperCase() + move.slice(1);
+  return [
+    {
+      key: move,
+      label: `How was seated ${dir} without holding the knees?`,
+      findings: [
+        { key: "good-bilateral", label: `Good ${move} bilaterally`, normal: true, severity: "green" },
+        { key: "limited-right", label: `Limited ${move} on the right` },
+        { key: "limited-left", label: `Limited ${move} on the left` },
+        { key: "limited-bilateral", label: `Limited ${move} bilaterally` },
+      ],
+    },
+    {
+      // One ankle was limited, so the question is only about that ankle.
+      key: `${move}-held-one`,
+      label: "Did holding the knee fix that ankle?",
+      dependsOn: { subTest: move, findings: ["limited-right", "limited-left"] },
+      findings: [
+        { key: "fixed", label: "Holding the knee restored it", severity: "yellow" },
+        { key: "still-limited", label: "Still limited when holding the knee", severity: "red" },
+      ],
+    },
+    {
+      // Both ankles were limited, so holding can fix both, one, or neither.
+      key: `${move}-held-both`,
+      label: `How was ${move} when holding the knees?`,
+      dependsOn: { subTest: move, findings: ["limited-bilateral"] },
+      findings: [
+        { key: "normal", label: `Normal ${move} when holding the knees`, severity: "yellow" },
+        { key: "still-right", label: `Still limited ${move} on the right`, severity: "red" },
+        { key: "still-left", label: `Still limited ${move} on the left`, severity: "red" },
+        { key: "still-both", label: `Still limited ${move} bilaterally`, severity: "red" },
+      ],
+    },
+  ];
+}
+
 export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "pelvic-tilt",
@@ -409,29 +456,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
     label: "Ankle Rocking Test",
     group: "stride",
     subTests: [
-      {
-        key: "seated-wo-holding",
-        label: "Seated w/o Holding",
-        bilateral: true,
-        findings: [
-          { key: "good-inversion", label: "Good Inversion", normal: true },
-          { key: "good-eversion", label: "Good Eversion", normal: true },
-          { key: "limited-eversion", label: "Limited Eversion (Roll In)" },
-          { key: "limited-inversion", label: "Limited Inversion (Roll Out)" },
-        ],
-      },
-      {
-        key: "seated-holding",
-        label: "Seated Holding",
-        bilateral: true,
-        diagnostic: true,
-        findings: [
-          { key: "improves-eversion", label: "Improves Eversion" },
-          { key: "improves-inversion", label: "Improves Inversion" },
-          { key: "limited-eversion", label: "Limited Eversion (Roll In)" },
-          { key: "limited-inversion", label: "Limited Inversion (Roll Out)" },
-        ],
-      },
+      ...ankleRockingSubTests("eversion"),
+      ...ankleRockingSubTests("inversion"),
     ],
   },
   {
@@ -654,6 +680,36 @@ export function deviations(results: Results, tests: ScreenTest[] = SCREEN_TESTS)
 const RANK: Record<Severity, number> = { green: 0, yellow: 1, red: 2 };
 
 /**
+ * Has this answer handed its colour to a follow-up that actually supplied one?
+ *
+ * Such a finding carries no colour on purpose — "limited without assistance"
+ * is not an ungraded deviation, it is a deferred one, and treating the two
+ * alike wiped the mark off every graded outcome of Pelvic Rotation.
+ *
+ * But deferring to a follow-up nobody answered supplies nothing, and the test
+ * would then inherit a green from some other reading. So the branch has to
+ * have been answered with something that carries a colour, on this same side.
+ */
+function deferredAndResolved(
+  test: ScreenTest,
+  field: Field,
+  finding: Finding,
+  results: Results,
+): boolean {
+  const branches = test.subTests.filter(
+    (s) =>
+      s.dependsOn?.subTest === field.subTest.key &&
+      s.dependsOn.findings.includes(finding.key),
+  );
+  return branches.some((s) => {
+    const value = results[fieldKey(test.key, s.key, field.side)];
+    if (!value) return false;
+    const answered = subTestFindings(s).find((x) => x.key === value);
+    return !!(answered?.severity || answered?.alert);
+  });
+}
+
+/**
  * A test's mark is the worst of its findings, the way the OnBaseU app rolls it
  * up — except that an alert short-circuits, since pain is not a rank. Null
  * until the mapping is filled in, deliberately: an ungraded screen shows no
@@ -670,12 +726,16 @@ export function testMark(test: ScreenTest, results: Results): TestMark | null {
     if (finding.alert) return "alert";
     if (finding.severity) {
       if (!worst || RANK[finding.severity] > RANK[worst]) worst = finding.severity;
-    } else if (!finding.normal && !field.subTest.diagnostic) {
+    } else if (
+      !finding.normal &&
+      !field.subTest.diagnostic &&
+      !deferredAndResolved(test, field, finding, results)
+    ) {
       /*
-       * A deviation whose colour hasn't been supplied yet. Worst-of would
-       * quietly return the OTHER side's green and call the test clean — one
-       * leg short of the bat reported as passing. No mark is the honest
-       * answer until the mapping is filled in.
+       * A deviation whose colour hasn't been supplied yet — and which defers
+       * to nothing. Worst-of would quietly return the OTHER side's green and
+       * call the test clean: one leg short of the bat reported as passing.
+       * No mark is the honest answer until the mapping is filled in.
        */
       ungraded = true;
     }
