@@ -212,9 +212,23 @@ function ankleSubTests(spec: {
       key: `${key}-held-one`,
       label: "Did holding the knee fix that side?",
       dependsOn: { subTest: key, findings: ["limited-right", "limited-left"] },
+      /*
+       * Worded to match the bilateral branch below. The two used to say the
+       * same thing two ways — "Holding the knee restored it" against "Normal
+       * eversion when holding the knees" — and a coach reading down the form
+       * shouldn't have to work out that those are one finding.
+       *
+       * Keys are unchanged, so screens recorded under the old labels still
+       * read back correctly: the label is what a coach sees, the key is what
+       * the database holds.
+       */
       findings: [
-        { key: "fixed", label: "Holding the knee restored it", severity: "yellow" },
-        { key: "still-limited", label: "Still limited when holding the knee", severity: "red" },
+        { key: "fixed", label: `Normal ${noun} when holding that knee`, severity: "yellow" },
+        {
+          key: "still-limited",
+          label: `Still limited ${noun} when holding that knee`,
+          severity: "red",
+        },
       ],
     },
     {
