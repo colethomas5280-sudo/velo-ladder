@@ -61,8 +61,8 @@ export interface DashboardData {
   };
 }
 
-const STALE_DAYS = 14;
-const RECENT_DAYS = 7;
+export const STALE_DAYS = 14;
+export const RECENT_DAYS = 7;
 
 function daysAgo(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);

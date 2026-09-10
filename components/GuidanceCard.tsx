@@ -4,7 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import type { Setback } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
-import { EXPLAINER, type Guidance } from "@/lib/setback";
+import { CNS_WINDOW_DAYS, EXPLAINER, type Guidance } from "@/lib/setback";
 import { fmtDate } from "@/lib/velo";
 
 interface StatusPayload {
@@ -96,7 +96,9 @@ export default function GuidanceCard({
         <div className="g-band">
           {bandOpen ? (
             <>
-              <span>Flag a max day this far under his 30-day average:</span>
+              <span>
+                Flag a max day this far under his {CNS_WINDOW_DAYS}-day average:
+              </span>
               <input
                 className="tin"
                 inputMode="decimal"
