@@ -143,11 +143,23 @@ export default function ScreenPanel({
     () => (screen ? screenReport(standing.results, standing.previous) : []),
     [screen, standing],
   );
+
+  /*
+   * Two standings, and the difference matters.
+   *
+   * `standing` is truncated to the screen being READ, which is what the work
+   * list and the comparison need — page back to August and you should see
+   * August. The SCHEDULE is not a property of the screen you happen to be
+   * looking at, though; it is a property of the athlete today. Computing it
+   * from the truncated standing told a coach paging back through history that
+   * an athlete screened two days ago was overdue a full screen.
+   */
+  const current = useMemo(() => standingScreen(screens), [screens]);
   const plan = useMemo(
-    () => retestPlan(standing, todayISO(), undefined, { call, phase }),
-    [standing, call, phase],
+    () => retestPlan(current, todayISO(), undefined, { call, phase }),
+    [current, call, phase],
   );
-  const standingCall = rescreenStanding(call, standing) ? call : null;
+  const standingCall = rescreenStanding(call, current) ? call : null;
   // What this particular screen looked at, for the line that says so.
   const covered = useMemo(
     () =>
