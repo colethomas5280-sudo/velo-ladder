@@ -18,6 +18,10 @@ import {
   screenReport,
   screenSummary,
   statusRank,
+  retestBand,
+  retestStatus,
+  dueRank,
+  RETEST_CADENCE,
   fillNormal,
   testMark,
   alerts,
@@ -960,6 +964,59 @@ test("statuses sort worst first, and skipped sits below clean", () => {
   const order: ReportStatus[] = ["skipped", "clean", "ungraded", "yellow", "red", "alert"];
   const ranked = [...order].sort((a, b) => statusRank(b) - statusRank(a));
   assert.deepEqual(ranked, ["alert", "red", "yellow", "ungraded", "clean", "skipped"]);
+});
+
+/* ------------------------------------------------------------------ *
+ * When to screen again
+ * ------------------------------------------------------------------ */
+
+test("anything short of clean puts an athlete on the correcting clock", () => {
+  for (const worst of ["alert", "red", "yellow", "ungraded", "skipped"] as ReportStatus[])
+    assert.equal(retestBand(worst), "correcting", `${worst} is work in progress`);
+  assert.equal(retestBand("clean"), "maintaining");
+});
+
+/*
+ * A screen with nothing usable on it must not inherit the long clock. No
+ * data is not evidence of nothing wrong, and 12 weeks is a long time to wait
+ * to find that out.
+ */
+test("a screen with no usable readings takes the short clock, not the long one", () => {
+  assert.equal(retestBand("skipped"), "correcting");
+});
+
+test("the correcting window is 4-6 weeks, the maintaining window 8-12", () => {
+  assert.deepEqual(RETEST_CADENCE.correcting, { from: 28, to: 42 });
+  assert.deepEqual(RETEST_CADENCE.maintaining, { from: 56, to: 84 });
+});
+
+test("a window has three states: not yet, due, and past it", () => {
+  const at = (d: number) => retestStatus("red", d).state;
+  assert.equal(at(0), "not-due", "screened today");
+  assert.equal(at(27), "not-due", "the day before it opens");
+  assert.equal(at(28), "due", "4 weeks — the window opens");
+  assert.equal(at(42), "due", "6 weeks — still inside it");
+  assert.equal(at(43), "overdue", "the day after it closes");
+});
+
+test("a clean athlete's window is the later one, not the same one", () => {
+  const at = (d: number) => retestStatus("clean", d).state;
+  assert.equal(at(42), "not-due", "6 weeks is early for someone with nothing to fix");
+  assert.equal(at(56), "due");
+  assert.equal(at(84), "due");
+  assert.equal(at(85), "overdue");
+});
+
+test("the two clocks disagree about the same elapsed time", () => {
+  assert.equal(retestStatus("yellow", 45).state, "overdue");
+  assert.equal(retestStatus("clean", 45).state, "not-due");
+});
+
+test("due states sort most pressing first", () => {
+  const order = (["not-due", "due", "overdue"] as const)
+    .slice()
+    .sort((a, b) => dueRank(b) - dueRank(a));
+  assert.deepEqual(order, ["overdue", "due", "not-due"]);
 });
 
 /* ------------------------------------------------------------------ *

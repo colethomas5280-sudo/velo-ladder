@@ -5,8 +5,14 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
-import { statusRank, type ReportStatus } from "@/lib/screen";
-import { daysBetween, fmtDate, todayISO } from "@/lib/velo";
+import {
+  dueRank,
+  retestStatus,
+  statusRank,
+  type DueState,
+  type ReportStatus,
+} from "@/lib/screen";
+import { daysBetween, todayISO } from "@/lib/velo";
 import ScreenPanel from "./ScreenPanel";
 
 /* ------------------------------------------------------------------ *
@@ -71,13 +77,29 @@ const DOT: Record<ReportStatus, string> = {
 };
 
 /** "today" / "yesterday" / "3 weeks ago" — plain elapsed time, no verdict. */
-function since(date: string): string {
-  const days = daysBetween(date, todayISO());
+function since(days: number): string {
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 14) return `${days} days ago`;
   if (days < 60) return `${Math.round(days / 7)} weeks ago`;
   return `${Math.round(days / 30)} months ago`;
+}
+
+const DUE_LABEL: Record<DueState, string> = {
+  overdue: "Overdue",
+  due: "Due now",
+  "not-due": "",
+};
+
+/**
+ * A row's place in the queue.
+ *
+ * Elapsed days are computed against today in the browser rather than on the
+ * server, so a coach travelling doesn't see yesterday's answer.
+ */
+function schedule(row: ScreenOverviewRow, today: string) {
+  const days = daysBetween(row.date!, today);
+  return { days, ...retestStatus(row.summary!.worst, days) };
 }
 
 function Roster() {
@@ -87,17 +109,28 @@ function Roster() {
   );
   const rows = useMemo(() => data ?? [], [data]);
 
+  /*
+   * Sorted by when they're needed, then by how bad it is.
+   *
+   * Severity alone put a red athlete screened yesterday above a clean one
+   * nobody has seen in four months, which reads as urgent and isn't — there
+   * is nothing to do about that red today. The dot still carries severity, so
+   * nothing is hidden by ordering on the schedule instead.
+   */
+  const today = todayISO();
   const screened = useMemo(
     () =>
       rows
-        .filter((r) => r.summary)
+        .filter((r) => r.summary && r.date)
+        .map((r) => ({ row: r, due: schedule(r, today) }))
         .sort(
           (a, b) =>
-            statusRank(b.summary!.worst) - statusRank(a.summary!.worst) ||
+            dueRank(b.due.state) - dueRank(a.due.state) ||
+            statusRank(b.row.summary!.worst) - statusRank(a.row.summary!.worst) ||
             // Then longest since screening, so the stalest sits above the fresh.
-            (a.date ?? "").localeCompare(b.date ?? ""),
+            b.due.days - a.due.days,
         ),
-    [rows],
+    [rows, today],
   );
   const never = useMemo(() => rows.filter((r) => !r.summary), [rows]);
 
@@ -105,7 +138,7 @@ function Roster() {
     <section className="card pad tests-card">
       <div className="sec-h">
         <h3>Movement screen</h3>
-        <span className="sub">OnBaseU · 17 tests</span>
+        <span className="sub">Retest 4–6 weeks correcting · 8–12 weeks clean</span>
       </div>
 
       {isLoading && <p className="widget-empty">Loading…</p>}
@@ -123,11 +156,18 @@ function Roster() {
 
       {screened.length > 0 && (
         <ul className="tr-list">
-          {screened.map((r) => (
+          {screened.map(({ row: r, due }) => (
             <li key={r.athleteId}>
               <Link href={`/tests/${r.athleteId}`} className="tr-row">
                 <span className={`ms-dot ${DOT[r.summary!.worst]}`} />
-                <span className="tr-name">{r.name}</span>
+                <span className="tr-name">
+                  {r.name}
+                  {due.state !== "not-due" && (
+                    <em className={`tr-due t-${due.state}`}>
+                      {DUE_LABEL[due.state]}
+                    </em>
+                  )}
+                </span>
                 <span className="tr-work">
                   {r.summary!.work > 0
                     ? `${r.summary!.work} to work on`
@@ -140,8 +180,12 @@ function Roster() {
                   )}
                 </span>
                 <span className="tr-when">
-                  {fmtDate(r.date!)}
-                  <em>{since(r.date!)}</em>
+                  {since(due.days)}
+                  <em>
+                    {due.state === "not-due"
+                      ? `retest in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`
+                      : `${due.band === "correcting" ? "4–6" : "8–12"} week retest`}
+                  </em>
                 </span>
               </Link>
             </li>

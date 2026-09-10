@@ -1105,6 +1105,63 @@ export function screenSummary(
 }
 
 /* ------------------------------------------------------------------ *
+ * When to screen again
+ *
+ * Two cadences, from Cole: an athlete you are working to correct gets
+ * re-screened at 4-6 weeks, to see whether the work is moving anything. An
+ * athlete who came back clean gets 8-12 weeks, to confirm nothing has
+ * regressed.
+ *
+ * The band is set by the athlete's WORST standing status rather than per
+ * test, because a re-screen runs the sheet — you don't retest one hip in
+ * isolation. One red puts the whole athlete on the short clock.
+ * ------------------------------------------------------------------ */
+
+export type RetestBand = "correcting" | "maintaining";
+
+/** Not yet, inside the window, or past the end of it. */
+export type DueState = "not-due" | "due" | "overdue";
+
+export const RETEST_CADENCE: Record<RetestBand, { from: number; to: number }> = {
+  correcting: { from: 28, to: 42 },
+  maintaining: { from: 56, to: 84 },
+};
+
+/**
+ * Which clock an athlete is on.
+ *
+ * Everything that isn't clean takes the short one. Pain is not a colour, but
+ * it is certainly not "no work to do", so it lands here with the rest —
+ * inventing a third cadence for it would be putting words in Cole's mouth.
+ * A screen with no usable readings takes the short clock too: no data is not
+ * evidence of nothing wrong.
+ */
+export function retestBand(worst: ReportStatus): RetestBand {
+  return worst === "clean" ? "maintaining" : "correcting";
+}
+
+export interface RetestStatus {
+  band: RetestBand;
+  state: DueState;
+  /** The window, in days since the last screen. */
+  from: number;
+  to: number;
+}
+
+export function retestStatus(worst: ReportStatus, daysSince: number): RetestStatus {
+  const band = retestBand(worst);
+  const { from, to } = RETEST_CADENCE[band];
+  const state: DueState =
+    daysSince < from ? "not-due" : daysSince <= to ? "due" : "overdue";
+  return { band, state, from, to };
+}
+
+/** Where a due state sorts on the roster — most pressing first. */
+export function dueRank(state: DueState): number {
+  return state === "overdue" ? 2 : state === "due" ? 1 : 0;
+}
+
+/* ------------------------------------------------------------------ *
  * What an athlete may see
  * ------------------------------------------------------------------ */
 

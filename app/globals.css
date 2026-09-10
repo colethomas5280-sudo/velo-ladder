@@ -2898,8 +2898,16 @@ table.roster-table {
 .tests-never > .eyebrow {
   margin-bottom: 8px;
 }
+/*
+ * Wraps rather than holding one line. The caption spells out both cadences,
+ * which is too long for a phone — and `nowrap`, left over from when it read
+ * "OnBaseU · 17 tests", pushed the page 87px wide instead of breaking.
+ */
+.tests-card .sec-h {
+  flex-wrap: wrap;
+}
 .tests-card .sec-h .sub {
-  white-space: nowrap;
+  min-width: 0;
 }
 
 /* the pointer left on the athlete profile */
@@ -2943,4 +2951,24 @@ table.roster-table {
     margin-left: auto;
     text-align: right;
   }
+}
+.tr-due {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.tr-due.t-due {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.tr-due.t-overdue {
+  color: var(--on-accent);
+  background: var(--bad);
 }
