@@ -2972,3 +2972,70 @@ table.roster-table {
   color: var(--on-accent);
   background: var(--bad);
 }
+
+/* ---------- movement screen: side to side ---------- */
+.sc-gaps {
+  margin-top: 4px;
+}
+.sc-gap {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--chalk);
+  border-radius: 0 10px 10px 0;
+  background: var(--panel);
+  padding: 10px 12px;
+  margin-bottom: 6px;
+}
+.sc-gap-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sc-gap-head b {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14.5px;
+}
+.sc-gap-sides {
+  display: flex;
+  gap: 10px;
+  margin-top: 7px;
+}
+.sc-gap-sides span {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font-size: 13px;
+  background: var(--panel-2);
+}
+.sc-gap-sides span em {
+  display: block;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 2px;
+}
+/* The side that came off worse, so the pair reads at a glance. */
+.sc-gap-sides span.worse {
+  border-color: color-mix(in srgb, var(--bad) 45%, var(--line));
+  background: color-mix(in srgb, var(--bad) 7%, var(--panel));
+}
+.sc-trend.t-narrowed {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 35%, var(--line));
+}
+.sc-trend.t-widened,
+.sc-trend.t-new {
+  color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 35%, var(--line));
+}
+@media (max-width: 560px) {
+  .sc-gap-sides {
+    flex-direction: column;
+    gap: 6px;
+  }
+}

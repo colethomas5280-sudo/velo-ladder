@@ -1081,6 +1081,8 @@ export interface ScreenSummary {
   work: number;
   /** Their keys, so a caller can date them without rebuilding the report. */
   failing: string[];
+  /** Sided readings whose two sides disagree. */
+  asymmetries: number;
   /** Tests flagged painful — counted separately, since pain isn't a rank. */
   painful: number;
   clean: number;
@@ -1103,9 +1105,133 @@ export function screenSummary(
     worst: reports[0]?.status ?? "skipped",
     work: reports.filter((r) => r.work.length).length,
     failing: reports.filter((r) => r.work.length).map((r) => r.test.key),
+    asymmetries: asymmetries(results, tests).length,
     painful: reports.filter((r) => r.status === "alert").length,
     clean: reports.filter((r) => r.status === "clean").length,
     skipped: reports.filter((r) => r.status === "skipped").length,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * Side to side
+ *
+ * In a rotational, single-side-dominant sport a lead-hip vs trail-hip or
+ * dominant vs non-dominant gap says more than any one reading. Two shoulders
+ * that both screen yellow are a different athlete from one that screens green
+ * and one that screens red, and the worst-of roll-up reports both as yellow.
+ *
+ * So this reads the sides against each other rather than against the scale,
+ * and the question it exists to answer is whether the gap is closing.
+ * ------------------------------------------------------------------ */
+
+export interface Asymmetry {
+  test: ScreenTest;
+  subTest: SubTest;
+  /** Both sides, in the order the config declares them. */
+  sides: { side: string; label: string; finding: Finding }[];
+  /** Distance on the colour scale. Null when either side carries no colour. */
+  gap: number | null;
+  /** The side that came off worse, or null when they rank level. */
+  worseSide: string | null;
+}
+
+/**
+ * Every sided reading whose two sides disagree.
+ *
+ * Disagreement is by FINDING, not by colour: two different answers that
+ * happen to share a colour are still two different answers, and flattening
+ * them to "both yellow" is the roll-up mistake this exists to avoid. `gap`
+ * then measures how far apart they are, which can be zero.
+ */
+export function asymmetries(
+  results: Results,
+  tests: ScreenTest[] = SCREEN_TESTS,
+): Asymmetry[] {
+  const out: Asymmetry[] = [];
+  for (const test of tests) {
+    for (const subTest of test.subTests) {
+      const sideSet = sidesOf(subTest);
+      if (!sideSet.length) continue;
+
+      const read = sideSet
+        .map((s) => {
+          const field: Field = {
+            key: fieldKey(test.key, subTest.key, s.key),
+            test,
+            subTest,
+            side: s.key,
+          };
+          if (!isApplicable(field, results)) return null;
+          const finding = findingFor(field, results);
+          return finding ? { side: s.key, label: s.label, finding } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+
+      /*
+       * One side missing is not a symmetry and not an asymmetry — it's a gap
+       * in the record, and claiming either would be inventing a reading.
+       *
+       * Belt and braces: the equality check below already drops a single
+       * reading, since one finding always matches itself. Kept because the
+       * rank comparison further down indexes both sides and would otherwise
+       * depend on that coincidence holding.
+       */
+      if (read.length < 2) continue;
+      if (read.every((r) => r.finding.key === read[0].finding.key)) continue;
+
+      const ranks = read.map((r) => rankOf(r.finding));
+      const rankable = ranks.every((r): r is number => r !== null);
+      const gap = rankable ? Math.max(...ranks) - Math.min(...ranks) : null;
+      const worseSide =
+        rankable && ranks[0] !== ranks[1]
+          ? read[ranks[0] > ranks[1] ? 0 : 1].side
+          : null;
+
+      out.push({ test, subTest, sides: read, gap, worseSide });
+    }
+  }
+  return out;
+}
+
+/** How a side-to-side gap moved. */
+export type GapTrend = "new" | "narrowed" | "widened" | "unchanged" | "changed";
+
+export interface AsymmetryReport {
+  standing: (Asymmetry & { trend: GapTrend | null; beforeGap: number | null })[];
+  /** Sides that disagreed last check and read level now. */
+  closed: Asymmetry[];
+}
+
+/**
+ * Side-to-side gaps, and whether they are closing.
+ *
+ * A gap that closed no longer appears in `standing` — it isn't an asymmetry
+ * any more — so it gets its own list. That is the one an athlete doing the
+ * corrective work most wants to see, and dropping it would hide the payoff.
+ */
+export function asymmetryReport(
+  results: Results,
+  previous: Results | null = null,
+  tests: ScreenTest[] = SCREEN_TESTS,
+): AsymmetryReport {
+  const now = asymmetries(results, tests);
+  const before = previous ? asymmetries(previous, tests) : [];
+  const key = (a: Asymmetry) => `${a.test.key}.${a.subTest.key}`;
+  const beforeBy = new Map(before.map((a) => [key(a), a]));
+  const nowKeys = new Set(now.map(key));
+
+  return {
+    standing: now.map((a) => {
+      const was = beforeBy.get(key(a));
+      if (!previous) return { ...a, trend: null, beforeGap: null };
+      if (!was) return { ...a, trend: "new" as GapTrend, beforeGap: null };
+      if (a.gap === null || was.gap === null)
+        return { ...a, trend: "changed" as GapTrend, beforeGap: was.gap };
+      const trend: GapTrend =
+        a.gap < was.gap ? "narrowed" : a.gap > was.gap ? "widened" : "unchanged";
+      return { ...a, trend, beforeGap: was.gap };
+    }),
+    closed: before.filter((a) => !nowKeys.has(key(a))),
   };
 }
 
@@ -1287,6 +1413,27 @@ export function retestPlan(
 /** Where a due state sorts on the roster — most pressing first. */
 export function dueRank(state: DueState): number {
   return state === "overdue" ? 2 : state === "due" ? 1 : 0;
+}
+
+/**
+ * Which of an athlete's two clocks speaks for them.
+ *
+ * The more pressing state wins. On a tie it is whichever opens sooner — an
+ * athlete five days into a spot-check window is nearer a spot-check than a
+ * full screen, and reporting the quarterly clock because it is the bigger job
+ * tells them about the thing that ISN'T next.
+ */
+export function leadClock<T extends { state: DueState; days: number | null; from: number }>(
+  full: T,
+  spot: T | null,
+): T {
+  if (!spot) return full;
+  const rank = dueRank(spot.state) - dueRank(full.state);
+  if (rank !== 0) return rank > 0 ? spot : full;
+  // Days until the window opens; already-open clocks go negative, which is
+  // the right direction — more overdue is more pressing.
+  const opens = (c: T) => (c.days === null ? -Infinity : c.from - c.days);
+  return opens(spot) <= opens(full) ? spot : full;
 }
 
 /* ------------------------------------------------------------------ *

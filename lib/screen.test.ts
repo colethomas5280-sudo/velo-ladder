@@ -17,8 +17,11 @@ import {
   screenFields,
   screenReport,
   screenSummary,
+  asymmetries,
+  asymmetryReport,
   statusRank,
   retestPlan,
+  leadClock,
   dueRank,
   RETEST_CADENCE,
   standingScreen,
@@ -976,6 +979,138 @@ test("statuses sort worst first, and skipped sits below clean", () => {
 });
 
 /* ------------------------------------------------------------------ *
+ * Side to side
+ * ------------------------------------------------------------------ */
+
+test("two sides that agree are not an asymmetry", () => {
+  assert.deepEqual(asymmetries({ [SQ.L]: "good", [SQ.R]: "good" }, [sample]), []);
+});
+
+test("two sides that disagree are, and the worse one is named", () => {
+  const [a] = asymmetries({ [SQ.L]: "good", [SQ.R]: "bad" }, [sample]);
+  assert.equal(a.gap, 2, "green to red is two steps");
+  assert.equal(a.worseSide, "R");
+  assert.deepEqual(a.sides.map((s) => s.label), ["Left", "Right"]);
+});
+
+/*
+ * The reason this exists at all. Two yellows and a green-plus-red both roll
+ * up to yellow, and they are not the same athlete.
+ */
+test("a gap is visible where the roll-up shows none", () => {
+  const evenly: Results = { [SQ.L]: "mid", [SQ.R]: "mid" };
+  const lopsided: Results = { [SQ.L]: "good", [SQ.R]: "bad" };
+  assert.equal(testMark(sample, evenly), "yellow");
+  assert.equal(testMark(sample, lopsided), "red");
+  assert.equal(asymmetries(evenly, [sample]).length, 0);
+  assert.equal(asymmetries(lopsided, [sample]).length, 1);
+});
+
+/*
+ * Asserts the outcome, not the guard that produces it: a lone reading is also
+ * caught by the equality check, so the explicit length guard above it cannot
+ * be reached and no mutation of it can fail this.
+ */
+test("one side unrecorded is neither symmetric nor asymmetric", () => {
+  assert.deepEqual(asymmetries({ [SQ.L]: "bad" }, [sample]), [], "nothing to compare");
+  assert.deepEqual(asymmetries({ [SQ.L]: "bad", [SQ.R]: NOT_TESTED }, [sample]), []);
+});
+
+test("a test graded once is never an asymmetry", () => {
+  assert.deepEqual(asymmetries({ "gtd.first": "fail" }, [gated]), []);
+});
+
+test("a side that never happened isn't compared", () => {
+  // Only the left leg qualified for the follow-up, so it has no counterpart.
+  const results: Results = {
+    "bt.parent:L": "yes",
+    "bt.parent:R": "no",
+    "bt.child:L": "bad",
+  };
+  const keys = asymmetries(results, [bilateralDep]).map((a) => a.subTest.key);
+  assert.deepEqual(keys, ["parent"], "the parents differ; the child has no pair");
+});
+
+/*
+ * Two answers that share a colour are still two answers. Flattening them to
+ * "both yellow" is exactly the roll-up mistake this is here to avoid.
+ */
+test("sides that differ inside one colour are still an asymmetry", () => {
+  const twoYellows: ScreenTest = {
+    key: "ty", label: "TY", group: "core",
+    subTests: [
+      { key: "q", label: "Q", sides: "lr", findings: [
+        { key: "good", label: "Good", normal: true, severity: "green" },
+        { key: "a", label: "A", severity: "yellow" },
+        { key: "b", label: "B", severity: "yellow" },
+      ] },
+    ],
+  };
+  const [a] = asymmetries({ "ty.q:L": "a", "ty.q:R": "b" }, [twoYellows]);
+  assert.ok(a, "different findings, same colour");
+  assert.equal(a.gap, 0, "no distance on the scale");
+  assert.equal(a.worseSide, null, "and so neither side is worse");
+});
+
+test("dominance-graded tests are read side to side like any other", () => {
+  const results: Results = {
+    "lunge-extension.extension:D": "good",
+    "lunge-extension.extension:N": "limited",
+  };
+  const [a] = asymmetries(results, SCREEN_TESTS);
+  assert.deepEqual(a.sides.map((s) => s.label), ["Dominant", "Non-dominant"]);
+  assert.equal(a.worseSide, "N");
+});
+
+test("with no previous screen a gap claims no direction", () => {
+  const r = asymmetryReport({ [SQ.L]: "good", [SQ.R]: "bad" }, null, [sample]);
+  assert.equal(r.standing[0].trend, null);
+  assert.deepEqual(r.closed, []);
+});
+
+test("a gap that narrows, widens, or holds is named as such", () => {
+  const trend = (before: [string, string], after: [string, string]) =>
+    asymmetryReport(
+      { [SQ.L]: after[0], [SQ.R]: after[1] },
+      { [SQ.L]: before[0], [SQ.R]: before[1] },
+      [sample],
+    ).standing[0].trend;
+  assert.equal(trend(["good", "bad"], ["good", "mid"]), "narrowed");
+  assert.equal(trend(["good", "mid"], ["good", "bad"]), "widened");
+  assert.equal(trend(["good", "bad"], ["good", "bad"]), "unchanged");
+});
+
+test("a gap that wasn't there last time is new", () => {
+  const r = asymmetryReport(
+    { [SQ.L]: "good", [SQ.R]: "bad" },
+    { [SQ.L]: "good", [SQ.R]: "good" },
+    [sample],
+  );
+  assert.equal(r.standing[0].trend, "new");
+});
+
+/*
+ * The payoff, and it drops off the standing list the moment it happens — a
+ * closed gap is not an asymmetry any more. Reported separately or not at all.
+ */
+test("a gap that closed is reported, not silently dropped", () => {
+  const r = asymmetryReport(
+    { [SQ.L]: "good", [SQ.R]: "good" },
+    { [SQ.L]: "good", [SQ.R]: "bad" },
+    [sample],
+  );
+  assert.deepEqual(r.standing, [], "nothing stands");
+  assert.equal(r.closed.length, 1, "but the athlete should still be told");
+  assert.equal(r.closed[0].worseSide, "R", "and which side it was");
+});
+
+test("a summary counts the gaps alongside the failures", () => {
+  const s = screenSummary({ [SQ.L]: "good", [SQ.R]: "bad" }, [sample]);
+  assert.equal(s.asymmetries, 1);
+  assert.equal(screenSummary(fillNormal({})).asymmetries, 0, "a clean screen is level");
+});
+
+/* ------------------------------------------------------------------ *
  * The standing picture
  * ------------------------------------------------------------------ */
 
@@ -1161,6 +1296,57 @@ test("a spot-check that clears the last deviation retires the spot clock", () =>
     PAIR,
   );
   assert.equal(retestPlan(st, "2026-03-01", PAIR).spot, null);
+});
+
+test("the nearer clock speaks for an athlete when neither is due yet", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const plan = retestPlan(st, "2026-01-10", PAIR);
+  assert.equal(plan.full.state, "not-due");
+  assert.equal(plan.spot!.state, "not-due");
+  assert.equal(
+    leadClock(plan.full, plan.spot).kind,
+    "spot",
+    "9 days into a 21-day window beats 9 days into a 56-day one",
+  );
+});
+
+test("a more pressing clock wins regardless of which is nearer", () => {
+  // May is a SPOT-check — it covers sample only, so the last full screen
+  // stays January and the quarterly clock keeps running.
+  const st = standingScreen(
+    [screen("2026-01-01", FULL), screen("2026-05-01", { [SQ.L]: "bad", [SQ.R]: "good" })],
+    PAIR,
+  );
+  const plan = retestPlan(st, "2026-05-05", PAIR);
+  assert.equal(plan.spot!.state, "not-due", "spot-checked four days ago");
+  assert.equal(plan.full.state, "overdue", "but the full screen is four months old");
+  assert.equal(leadClock(plan.full, plan.spot).kind, "full");
+});
+
+/*
+ * Where the two rules pull apart. A full screen at the very end of its window
+ * has been waiting far longer in absolute days than a spot-check one day past
+ * its own — but "overdue" outranks "due", and the spot-check is the thing
+ * that has actually been missed.
+ */
+test("overdue beats due even when the other clock has waited longer", () => {
+  const st = standingScreen(
+    [
+      screen("2026-01-01", BAD),
+      screen("2026-02-25", { [SQ.L]: "bad", [SQ.R]: "good" }),
+    ],
+    PAIR,
+  );
+  const plan = retestPlan(st, "2026-03-26", PAIR);
+  assert.equal(plan.full.state, "due", "84 days — the last day of the window");
+  assert.equal(plan.spot!.state, "overdue", "29 days — one past its own");
+  assert.equal(leadClock(plan.full, plan.spot).kind, "spot");
+});
+
+test("an athlete with nothing to fix has only the one clock", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  const plan = retestPlan(st, "2026-02-01", PAIR);
+  assert.equal(leadClock(plan.full, plan.spot).kind, "full");
 });
 
 test("due states sort most pressing first", () => {

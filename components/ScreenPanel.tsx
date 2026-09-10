@@ -7,12 +7,14 @@ import { fetcher } from "@/lib/fetcher";
 import {
   SCREEN_GROUPS,
   SCREEN_TESTS,
-  dueRank,
+  asymmetryReport,
+  leadClock,
   retestPlan,
   screenReport,
   sidesOf,
   standingScreen,
   type Deviation,
+  type GapTrend,
   type ReportReading,
   type TestReport,
   type Trend,
@@ -49,10 +51,17 @@ function rowTrend(work: ReportReading[]): Trend | null {
 
 const GROUP_TITLE = new Map(SCREEN_GROUPS.map((g) => [g.id, g.title]));
 
+const GAP_LABEL: Record<GapTrend, string> = {
+  new: "New",
+  narrowed: "Closing",
+  widened: "Widening",
+  unchanged: "Same",
+  changed: "Changed",
+};
+
 /** The nearer of the two clocks, in a sentence. */
 function nextUp(plan: ReturnType<typeof retestPlan>): string {
-  const { full, spot } = plan;
-  const lead = spot && dueRank(spot.state) > dueRank(full.state) ? spot : full;
+  const lead = leadClock(plan.full, plan.spot);
   const what =
     lead.kind === "spot"
       ? `spot-check (${lead.tests.length} ${lead.tests.length === 1 ? "test" : "tests"})`
@@ -136,6 +145,13 @@ export default function ScreenPanel({
   const painful = reports.filter((r) => r.status === "alert");
   const cleared = reports.flatMap((r) => r.cleared);
   const carried = reports.flatMap((r) => r.unchecked);
+  const gaps = useMemo(
+    () =>
+      screen
+        ? asymmetryReport(standing.results, standing.previous)
+        : { standing: [], closed: [] },
+    [screen, standing],
+  );
 
   /*
    * There is no single "previous screen" any more — each test compares
@@ -253,6 +269,42 @@ export default function ScreenPanel({
                 .filter(Boolean)
                 .join(" · ") || "Nothing moved."}
             </p>
+          )}
+
+          {(gaps.standing.length > 0 || gaps.closed.length > 0) && (
+            <div className="sc-gaps">
+              <div className="eyebrow sc-h">Side to side</div>
+              {gaps.standing.map((g) => (
+                <div className="sc-gap" key={`${g.test.key}.${g.subTest.key}`}>
+                  <div className="sc-gap-head">
+                    <b>{g.test.label}</b>
+                    {g.trend && (
+                      <span className={`sc-trend t-${g.trend}`}>
+                        {GAP_LABEL[g.trend]}
+                      </span>
+                    )}
+                  </div>
+                  <span className="cz-note">{g.subTest.label}</span>
+                  <div className="sc-gap-sides">
+                    {g.sides.map((side) => (
+                      <span
+                        key={side.side}
+                        className={side.side === g.worseSide ? "worse" : ""}
+                      >
+                        <em>{side.label}</em>
+                        {side.finding.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {gaps.closed.length > 0 && (
+                <p className="sc-note-good">
+                  <b>Levelled up since the last check:</b>{" "}
+                  {gaps.closed.map((g) => g.test.label).join(", ")}
+                </p>
+              )}
+            </div>
           )}
 
           {work.length > 0 ? (
