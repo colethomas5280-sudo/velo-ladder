@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { RECENT_DAYS, STALE_DAYS, type DashboardData } from "@/lib/dashboard";
+import type { DashboardData } from "@/lib/dashboard";
+import { RECENT_DAYS, STALE_DAYS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import { fmt, fmtDate, TRACKERS } from "@/lib/velo";
 import CustomizeDashboard, {

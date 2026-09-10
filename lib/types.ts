@@ -98,6 +98,21 @@ export interface MovementScreen {
   notes: string;
 }
 
+/*
+ * Dashboard windows.
+ *
+ * Here rather than beside the query that uses them, because the dashboard's
+ * own module imports `pg`: a client component reading a constant out of it
+ * drags a Postgres driver into the browser bundle and the build stops. They
+ * are part of the contract between the two sides, which is what this file is.
+ */
+
+/** No session in this many days puts an athlete on "needs attention". */
+export const STALE_DAYS = 14;
+
+/** How far back "this week" and "recent PRs" look. */
+export const RECENT_DAYS = 7;
+
 /**
  * One athlete's line on the Tests roster. `summary` is null until screened.
  *
