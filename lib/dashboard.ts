@@ -1,6 +1,6 @@
 import { sql } from "@/lib/db";
 import { isoDate, listOpenSetbacks } from "@/lib/data";
-import type { TrackerId, Throws } from "@/lib/types";
+import { RECENT_DAYS, STALE_DAYS, type TrackerId, type Throws } from "@/lib/types";
 import { TRACKERS, TRACKER_IDS, sBestG, todayISO } from "@/lib/velo";
 
 /* ------------------------------------------------------------------ *
@@ -61,8 +61,6 @@ export interface DashboardData {
   };
 }
 
-export const STALE_DAYS = 14;
-export const RECENT_DAYS = 7;
 
 function daysAgo(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);

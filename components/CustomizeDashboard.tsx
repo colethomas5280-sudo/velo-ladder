@@ -1,6 +1,6 @@
 "use client";
 
-import { RECENT_DAYS, STALE_DAYS } from "@/lib/dashboard";
+import { RECENT_DAYS, STALE_DAYS } from "@/lib/types";
 
 import { useEffect, useSyncExternalStore } from "react";
 import { readLocal, subscribeLocal, writeLocal } from "@/lib/localStore";

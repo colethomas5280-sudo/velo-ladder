@@ -4,8 +4,6 @@
  * Three-theme token pattern (bare :root, prefers-color-scheme, [data-theme]).
  * ------------------------------------------------------------------ */
 
-*,
-*::before,
 *::after {
   box-sizing: border-box;
 }
@@ -88,8 +86,6 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
-h1,
-h2,
 h3 {
   margin: 0;
   font-family: var(--font-display), var(--font-body), sans-serif;
@@ -107,8 +103,6 @@ button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
-input,
-select,
 textarea {
   font: inherit;
   color: inherit;
@@ -171,10 +165,6 @@ a {
   white-space: nowrap;
 }
 
-select,
-.tin,
-input[type="date"],
-input[type="email"],
 textarea {
   border: 1px solid var(--line);
   background: var(--panel-2);
@@ -476,7 +466,6 @@ select {
   z-index: 5;
   box-shadow: 0 4px 12px -4px rgba(20, 18, 12, 0.4);
 }
-.lane-rec .s[data-date]:hover::after,
 .lane-rec .s[data-date]:focus-visible::after {
   opacity: 1;
 }
@@ -702,16 +691,6 @@ canvas {
   vertical-align: middle;
   margin-right: 5px;
 }
-.chart-legend .l-best {
-  border-top-width: 3px;
-  color: var(--accent);
-}
-.chart-legend .l-avg {
-  color: var(--chalk);
-}
-.chart-legend .l-floor {
-  color: var(--good);
-}
 
 /* ---------- history ---------- */
 .hist-card {
@@ -725,7 +704,6 @@ table {
   width: 100%;
   font-size: 13px;
 }
-th,
 td {
   padding: 8px 10px;
   text-align: center;
@@ -798,14 +776,6 @@ tr.sess.open .caret {
   transform: rotate(90deg);
 }
 
-/* ---------- track-together ---------- */
-.group-pick {
-  margin-top: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
 .tabstrip {
   display: flex;
   flex-wrap: wrap;
@@ -878,7 +848,6 @@ tr.sess.open .caret {
   background: transparent;
   border-color: transparent;
 }
-.roster .r .tin:hover,
 .roster .r .tin:focus {
   border-color: var(--line);
   background: var(--panel-2);
@@ -888,15 +857,6 @@ tr.sess.open .caret {
 }
 .roster .r select {
   min-width: 64px;
-}
-.roster .r .linked {
-  font-size: 10px;
-  color: var(--good);
-  font-weight: 600;
-}
-.roster .r .unlinked {
-  font-size: 10px;
-  color: var(--ink-faint);
 }
 
 /* ---------- misc ---------- */
@@ -912,23 +872,6 @@ tr.sess.open .caret {
   color: var(--ink-dim);
   max-width: 46ch;
   margin: 0 auto 20px;
-}
-.addrow {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-.addrow .tin {
-  min-width: 190px;
-}
-.banner {
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  border-radius: 9px;
-  padding: 10px 14px;
-  font-size: 13px;
-  margin-bottom: 18px;
 }
 .toast {
   position: fixed;
@@ -1064,18 +1007,9 @@ table.roster-table {
   width: 100%;
   min-width: 120px;
 }
-.roster-table .cell-edit .tin:hover,
 .roster-table .cell-edit .tin:focus {
   border-color: var(--line);
   background: var(--panel);
-}
-.add-athlete {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 14px 12px;
-  border-top: 1px solid var(--line);
-  background: var(--panel-2);
 }
 .select-bar {
   position: fixed;
@@ -1099,18 +1033,6 @@ table.roster-table {
   border-color: color-mix(in srgb, var(--bg) 35%, transparent);
 }
 
-/* ---------- group entry ---------- */
-.group-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-.group-bar b {
-  font-family: var(--font-display), sans-serif;
-  font-size: 20px;
-}
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1802,27 +1724,6 @@ table.roster-table {
   font-size: 10.5px;
   color: var(--ink-faint);
 }
-.ci-scale {
-  display: flex;
-  gap: 5px;
-  margin-left: auto;
-}
-.ci-dot {
-  width: 38px;
-  height: 34px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--ink-dim);
-  font-variant-numeric: tabular-nums;
-}
-.ci-dot[aria-pressed="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-}
 .ci-extra {
   margin-bottom: 0;
 }
@@ -1989,47 +1890,6 @@ table.roster-table {
   max-width: 40ch;
 }
 
-/* arm status question */
-.arm-q {
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--line-soft);
-}
-.arm-opts {
-  display: flex;
-  gap: 7px;
-  margin-top: 9px;
-}
-.arm-opt {
-  flex: 1;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  border-radius: 9px;
-  padding: 9px 6px;
-  text-align: center;
-}
-.arm-opt b {
-  display: block;
-  font-size: 14px;
-}
-.arm-opt span {
-  display: block;
-  font-size: 10px;
-  color: var(--ink-faint);
-  margin-top: 2px;
-  line-height: 1.3;
-}
-.arm-opt[aria-pressed="true"].good {
-  background: color-mix(in srgb, var(--good) 14%, var(--panel));
-  border-color: var(--good);
-}
-.arm-opt[aria-pressed="true"].sore {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-.arm-opt[aria-pressed="true"].pain {
-  background: color-mix(in srgb, var(--bad) 12%, var(--panel));
-  border-color: var(--bad);
-}
 
 .g-band {
   display: flex;
@@ -2070,19 +1930,6 @@ table.roster-table {
   color: var(--ink-faint);
   font-weight: 500;
   line-height: 1.4;
-}
-.ci-scale.derived .ci-dot {
-  opacity: 1;
-  cursor: default;
-}
-.ci-scale.derived .ci-dot[aria-pressed="true"] {
-  background: var(--chalk);
-  border-color: var(--chalk);
-  color: var(--on-accent);
-}
-.ci-scale.derived .ci-dot:not([aria-pressed="true"]) {
-  color: var(--ink-faint);
-  background: var(--panel-2);
 }
 
 .wl-row {
@@ -2137,7 +1984,6 @@ table.roster-table {
 .wt-move.down { color: var(--accent); }
 .wt-move.flat { color: var(--ink-faint); }
 
-.wl-select:invalid,
 .wl-select option[value=""] {
   color: var(--ink-faint);
 }
@@ -2324,8 +2170,6 @@ table.roster-table {
 }
 .pf-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pf-row .ci-label { width: 170px; flex: 0 0 auto; }
-.pf-row input,
-.pf-row select,
 .pf-row textarea {
   flex: 1 1 220px;
   min-width: 0;
@@ -2346,7 +2190,6 @@ table.roster-table {
 }
 .pf-locked span { color: var(--ink-faint); font-size: 12px; margin-left: 8px; }
 .pf-unit { font-size: 12.5px; color: var(--ink-faint); }
-.pf-prov { font-size: 12.5px; color: var(--ink-faint); margin-top: 2px; }
 .pf-missing {
   font-family: var(--font-mono), monospace;
   font-size: 10px;
@@ -2360,11 +2203,6 @@ table.roster-table {
   white-space: nowrap;
 }
 
-.mast-actions {
-  display: flex;
-  gap: 18px;
-  flex-wrap: wrap;
-}
 
 /* ---------- movement screen: recording ---------- */
 .ms {
@@ -2466,6 +2304,15 @@ table.roster-table {
   border-radius: 50%;
   border: 1.5px solid var(--line);
   background: transparent;
+}
+/*
+ * The unmarked dot. It looks exactly like the base `.ms-dot`, and is named so
+ * the markup can say "no colour yet" rather than say nothing — which also
+ * keeps every class the components ask for defined somewhere.
+ */
+.ms-dot.none {
+  background: transparent;
+  border-color: var(--line);
 }
 .ms-dot.green {
   background: var(--good);
@@ -2735,7 +2582,6 @@ table.roster-table {
   color: var(--good);
   border-color: color-mix(in srgb, var(--good) 35%, var(--line));
 }
-.sc-trend.t-worsened,
 .sc-trend.t-new {
   color: var(--bad);
   border-color: color-mix(in srgb, var(--bad) 35%, var(--line));
@@ -2888,7 +2734,6 @@ table.roster-table {
   font-size: 11.5px;
   color: var(--ink-faint);
 }
-.tr-work.dim,
 .tr-when.dim {
   color: var(--ink-faint);
 }
@@ -3028,7 +2873,6 @@ table.roster-table {
   color: var(--good);
   border-color: color-mix(in srgb, var(--good) 35%, var(--line));
 }
-.sc-trend.t-widened,
 .sc-trend.t-new {
   color: var(--bad);
   border-color: color-mix(in srgb, var(--bad) 35%, var(--line));
@@ -3295,8 +3139,6 @@ table.roster-table {
   }
 }
 @media print {
-  .appbar,
-  .tests-head .back-link,
   .sr-lede {
     display: none;
   }

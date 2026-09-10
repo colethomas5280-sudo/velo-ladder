@@ -367,7 +367,7 @@ function TestCard({
 
   return (
     <section className={`ms-test${isOpen ? " open" : ""}`}>
-      <div className="ms-test-head">
+      <div>
         <button
           className="ms-test-toggle"
           aria-expanded={isOpen}
