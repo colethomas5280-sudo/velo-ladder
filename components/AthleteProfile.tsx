@@ -291,7 +291,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         onChanged={() => mutateRecovery()}
       />
 
-      <ScreenLink athleteId={athleteId} />
+      <ScreenLink athleteId={athleteId} hand={athlete.hand} />
 
       {sessionsLoading ? (
         <div

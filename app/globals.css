@@ -3039,3 +3039,15 @@ table.roster-table {
     gap: 6px;
   }
 }
+/* A gap worth knowing about rather than chasing — see `throwingArmOnly`. */
+.sc-gap.optional {
+  border-left-color: var(--line);
+  background: var(--panel-2);
+}
+.sc-gap.optional .sc-gap-head b {
+  color: var(--ink-dim);
+}
+.sc-gap.optional .sc-gap-sides span.worse {
+  border-color: var(--line-soft);
+  background: var(--panel);
+}

@@ -76,6 +76,20 @@ export interface ScreenTest {
   key: string;
   label: string;
   group: string;
+  /**
+   * Symmetry here is nice to have, not a prerequisite for performance.
+   *
+   * Cole's call on the three arm tests: what throws the baseball is the
+   * throwing arm, and a non-dominant shoulder that doesn't match it has never
+   * cost anyone velocity. The gap is still reported — it is real, and it is
+   * worth watching — but it isn't work, and it doesn't belong in the count a
+   * roster leads with.
+   *
+   * Graded left/right rather than by dominance, so applying this needs the
+   * athlete's throwing hand. Without it the caveat can't be placed, and
+   * nothing is claimed either way.
+   */
+  throwingArmOnly?: boolean;
   subTests: SubTest[];
 }
 
@@ -577,6 +591,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   },
   {
     key: "shoulder-90-90",
+    throwingArmOnly: true,
     label: "Shoulder 90/90",
     group: "arms",
     subTests: [
@@ -597,6 +612,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   },
   {
     key: "windshield-wiper",
+    throwingArmOnly: true,
     label: "Windshield Wiper Test",
     group: "arms",
     subTests: [
@@ -624,6 +640,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   },
   {
     key: "forearm-80-80",
+    throwingArmOnly: true,
     label: "Forearm 80/80 Test",
     group: "arms",
     subTests: [
@@ -1081,8 +1098,10 @@ export interface ScreenSummary {
   work: number;
   /** Their keys, so a caller can date them without rebuilding the report. */
   failing: string[];
-  /** Sided readings whose two sides disagree. */
+  /** Sided readings whose two sides disagree and are worth chasing. */
   asymmetries: number;
+  /** Gaps reported but not counted as work — see `throwingArmOnly`. */
+  optionalAsymmetries: number;
   /** Tests flagged painful — counted separately, since pain isn't a rank. */
   painful: number;
   clean: number;
@@ -1099,13 +1118,16 @@ export interface ScreenSummary {
 export function screenSummary(
   results: Results,
   tests: ScreenTest[] = SCREEN_TESTS,
+  hand?: Hand | null,
 ): ScreenSummary {
   const reports = screenReport(results, null, tests);
+  const gaps = asymmetries(results, tests, hand);
   return {
     worst: reports[0]?.status ?? "skipped",
     work: reports.filter((r) => r.work.length).length,
     failing: reports.filter((r) => r.work.length).map((r) => r.test.key),
-    asymmetries: asymmetries(results, tests).length,
+    asymmetries: gaps.filter((a) => !a.optional).length,
+    optionalAsymmetries: gaps.filter((a) => a.optional).length,
     painful: reports.filter((r) => r.status === "alert").length,
     clean: reports.filter((r) => r.status === "clean").length,
     skipped: reports.filter((r) => r.status === "skipped").length,
@@ -1133,7 +1155,16 @@ export interface Asymmetry {
   gap: number | null;
   /** The side that came off worse, or null when they rank level. */
   worseSide: string | null;
+  /**
+   * A gap worth knowing about but not worth chasing: an arm test where the
+   * non-throwing side is the weaker one. False whenever the throwing hand
+   * isn't known, because then this is a guess rather than a caveat.
+   */
+  optional: boolean;
 }
+
+/** Which hand an athlete throws with — the dominant arm, for these purposes. */
+export type Hand = "R" | "L";
 
 /**
  * Every sided reading whose two sides disagree.
@@ -1146,6 +1177,7 @@ export interface Asymmetry {
 export function asymmetries(
   results: Results,
   tests: ScreenTest[] = SCREEN_TESTS,
+  hand?: Hand | null,
 ): Asymmetry[] {
   const out: Asymmetry[] = [];
   for (const test of tests) {
@@ -1187,7 +1219,17 @@ export function asymmetries(
           ? read[ranks[0] > ranks[1] ? 0 : 1].side
           : null;
 
-      out.push({ test, subTest, sides: read, gap, worseSide });
+      /*
+       * Only when the weaker side IS the non-throwing arm. A throwing
+       * shoulder that lags its partner is the same problem it always was.
+       */
+      const optional =
+        !!test.throwingArmOnly &&
+        !!hand &&
+        worseSide !== null &&
+        worseSide !== hand;
+
+      out.push({ test, subTest, sides: read, gap, worseSide, optional });
     }
   }
   return out;
@@ -1213,9 +1255,10 @@ export function asymmetryReport(
   results: Results,
   previous: Results | null = null,
   tests: ScreenTest[] = SCREEN_TESTS,
+  hand?: Hand | null,
 ): AsymmetryReport {
-  const now = asymmetries(results, tests);
-  const before = previous ? asymmetries(previous, tests) : [];
+  const now = asymmetries(results, tests, hand);
+  const before = previous ? asymmetries(previous, tests, hand) : [];
   const key = (a: Asymmetry) => `${a.test.key}.${a.subTest.key}`;
   const beforeBy = new Map(before.map((a) => [key(a), a]));
   const nowKeys = new Set(now.map(key));
@@ -1227,8 +1270,20 @@ export function asymmetryReport(
       if (!was) return { ...a, trend: "new" as GapTrend, beforeGap: null };
       if (a.gap === null || was.gap === null)
         return { ...a, trend: "changed" as GapTrend, beforeGap: was.gap };
+      /*
+       * Equal magnitude is not necessarily no change: a gap that stayed two
+       * steps wide but swapped which arm is weaker has moved a great deal,
+       * and calling that "unchanged" is the sort of thing you notice six
+       * months later when nobody acted on it.
+       */
       const trend: GapTrend =
-        a.gap < was.gap ? "narrowed" : a.gap > was.gap ? "widened" : "unchanged";
+        a.gap < was.gap
+          ? "narrowed"
+          : a.gap > was.gap
+            ? "widened"
+            : a.worseSide === was.worseSide
+              ? "unchanged"
+              : "changed";
       return { ...a, trend, beforeGap: was.gap };
     }),
     closed: before.filter((a) => !nowKeys.has(key(a))),

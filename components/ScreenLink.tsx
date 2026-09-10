@@ -14,7 +14,13 @@ import { fmtDate } from "@/lib/velo";
  * about it invites the reading that this athlete has never been screened.
  * One line, and a way through.
  */
-export default function ScreenLink({ athleteId }: { athleteId: string }) {
+export default function ScreenLink({
+  athleteId,
+  hand,
+}: {
+  athleteId: string;
+  hand: string | null;
+}) {
   const { data } = useSWR<MovementScreen[]>(
     `/api/athletes/${athleteId}/screens`,
     fetcher,
@@ -22,7 +28,9 @@ export default function ScreenLink({ athleteId }: { athleteId: string }) {
   // The standing picture, not the latest row: a spot-check covers a few tests
   // and the rest are still true.
   const standing = standingScreen(data ?? []);
-  const summary = standing.last ? screenSummary(standing.results) : null;
+  const summary = standing.last
+    ? screenSummary(standing.results, undefined, hand === "R" || hand === "L" ? hand : null)
+    : null;
 
   return (
     <Link href={`/tests/${athleteId}`} className="card pad screen-link">
