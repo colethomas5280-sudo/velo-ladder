@@ -6,12 +6,10 @@ import useSWR from "swr";
 import type { Athlete, ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
-  IN_SEASON,
+  clocksFor,
   dueRank,
-  leadClock,
   retestState,
   statusRank,
-  type DueState,
   type ReportStatus,
   type RetestKind,
 } from "@/lib/screen";
@@ -106,19 +104,8 @@ const KIND_LABEL: Record<RetestKind, string> = {
  * Elapsed days are computed against today in the browser rather than on the
  * server, so a coach travelling doesn't see yesterday's answer.
  */
-function schedule(row: ScreenOverviewRow, today: string) {
-  const scheduled = retestState("full", row.lastFull, today);
-  // In-season the full sheet isn't scheduled at all — see IN_SEASON.
-  const full =
-    row.phase === IN_SEASON
-      ? { ...scheduled, state: "paused" as DueState }
-      : scheduled;
-  const spot = row.spotTests ? retestState("spot", row.spotSince, today) : null;
-  const trigger = row.called
-    ? retestState("trigger", row.called.since, today)
-    : null;
-  return { full, spot, trigger, lead: leadClock(full, spot, trigger) };
-}
+const schedule = (row: ScreenOverviewRow, today: string) =>
+  clocksFor(row, today);
 
 /** "due in 12–26 days" / "3–4 week spot-check" — the clock in words. */
 function describe(due: ReturnType<typeof retestState>): string {

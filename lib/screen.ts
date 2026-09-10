@@ -1582,6 +1582,52 @@ export function retestPlan(
   };
 }
 
+/**
+ * Both clocks and any standing call, from what a roster row carries.
+ *
+ * Takes the dates rather than a Standing, so the server can ship a summary
+ * and the browser can work out the elapsed days against its own today. One
+ * copy, because the roster and the daily prompt disagreeing about who is due
+ * would be the sort of bug nobody reports — they'd just stop trusting it.
+ */
+export function clocksFor(
+  row: {
+    lastFull: string | null;
+    spotSince: string | null;
+    spotTests: number;
+    called: RescreenCall | null;
+    phase: string | null;
+  },
+  today: string,
+  tests: ScreenTest[] = SCREEN_TESTS,
+): { full: RetestDue; spot: RetestDue | null; trigger: RetestDue | null; lead: RetestDue } {
+  const scheduled = retestState("full", row.lastFull, today);
+  const full: RetestDue = {
+    ...scheduled,
+    state: row.phase === IN_SEASON ? "paused" : scheduled.state,
+    tests,
+  };
+  /*
+   * A roster row carries how MANY tests are failing, not which — the server
+   * ships a summary, not a screen. So the spot clock built from one leaves
+   * `tests` empty rather than claiming the whole sheet: "spot-check, 16
+   * tests" is a worse answer than no answer, and it is what this said first.
+   * Callers wanting the count read `spotTests` off the row they already hold.
+   */
+  const spot: RetestDue | null = row.spotTests
+    ? { ...retestState("spot", row.spotSince, today), tests: [] }
+    : null;
+  const trigger: RetestDue | null = row.called
+    ? { ...retestState("trigger", row.called.since, today), tests }
+    : null;
+  return { full, spot, trigger, lead: leadClock(full, spot, trigger) };
+}
+
+/** Is anything actually asked of this athlete right now? */
+export function needsScreening(lead: RetestDue): boolean {
+  return lead.state === "due" || lead.state === "overdue";
+}
+
 /** Where a due state sorts on the roster — most pressing first. */
 export function dueRank(state: DueState): number {
   if (state === "paused") return -1; // below "not yet": it isn't coming.

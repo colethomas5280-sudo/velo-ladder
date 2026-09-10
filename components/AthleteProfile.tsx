@@ -34,6 +34,7 @@ import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
 import ScreenLink from "./ScreenLink";
+import { AthleteRetestPrompt } from "./RetestPrompt";
 import GuidanceCard from "./GuidanceCard";
 import ProfileSummary from "./ProfileSummary";
 
@@ -243,6 +244,9 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
 
   return (
     <>
+      {/* Their own landing page — a coach gets the roster-wide one instead. */}
+      {isSelf && <AthleteRetestPrompt athleteId={athleteId} />}
+
       <Masthead
         athlete={athlete}
         sessions={allSessions}

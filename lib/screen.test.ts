@@ -23,6 +23,8 @@ import {
   sessionsOn,
   statusRank,
   retestPlan,
+  clocksFor,
+  needsScreening,
   rescreenStanding,
   IN_SEASON,
   leadClock,
@@ -1617,6 +1619,95 @@ test("the phase Cole pauses on is one the profile actually offers", () => {
     (PHASES as readonly string[]).includes(IN_SEASON),
     "IN_SEASON must match a real phase or nothing will ever pause",
   );
+});
+
+/* ------------------------------------------------------------------ *
+ * The clocks, from a roster row
+ * ------------------------------------------------------------------ */
+
+const row = (over: Partial<Parameters<typeof clocksFor>[0]> = {}) => ({
+  lastFull: null,
+  spotSince: null,
+  spotTests: 0,
+  called: null,
+  phase: null,
+  ...over,
+});
+
+/*
+ * One rule, shared. The roster and the daily prompt disagreeing about who is
+ * due would be the sort of bug nobody reports — they'd just stop trusting it.
+ */
+test("a row's clocks match the plan built from its screens", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const plan = retestPlan(st, "2026-02-15", PAIR);
+  const clocks = clocksFor(
+    row({ lastFull: st.lastFull, spotSince: st.from["smp"], spotTests: 1 }),
+    "2026-02-15",
+    PAIR,
+  );
+  assert.equal(clocks.full.state, plan.full.state);
+  assert.equal(clocks.spot!.state, plan.spot!.state);
+  assert.equal(clocks.lead.kind, "spot");
+});
+
+/*
+ * A row knows the count, not the list. Claiming the full sheet made the daily
+ * prompt offer a "spot-check · 16 tests", which is the whole battery under
+ * the name of the thing that is meant to avoid it.
+ */
+test("a row's spot clock doesn't claim tests it can't name", () => {
+  const clocks = clocksFor(
+    row({ lastFull: "2026-01-01", spotSince: "2026-01-01", spotTests: 2 }),
+    "2026-02-15",
+    PAIR,
+  );
+  assert.deepEqual(clocks.spot!.tests, []);
+  assert.equal(clocks.full.tests.length, PAIR.length, "the full sheet still knows");
+});
+
+test("a row in-season has its full clock paused", () => {
+  const clocks = clocksFor(
+    row({ lastFull: "2026-01-01", phase: IN_SEASON }),
+    "2026-04-11",
+    PAIR,
+  );
+  assert.equal(clocks.full.state, "paused");
+  assert.equal(clocks.lead.state, "paused");
+});
+
+test("a called re-screen leads a row, whatever the clocks say", () => {
+  const clocks = clocksFor(
+    row({ lastFull: "2026-04-10", called: { since: "2026-04-11", reason: "x" } }),
+    "2026-04-11",
+    PAIR,
+  );
+  assert.equal(clocks.lead.kind, "trigger");
+});
+
+/* The prompt only opens on this, so a false positive is a modal for nothing. */
+test("only a due or overdue clock asks anything of anybody", () => {
+  const fresh = clocksFor(row({ lastFull: "2026-04-10" }), "2026-04-11", PAIR);
+  assert.equal(needsScreening(fresh.lead), false, "screened yesterday");
+
+  const paused = clocksFor(
+    row({ lastFull: "2026-01-01", phase: IN_SEASON }),
+    "2026-04-11",
+    PAIR,
+  );
+  assert.equal(needsScreening(paused.lead), false, "in-season and quiet");
+
+  const stale = clocksFor(row({ lastFull: "2026-01-01" }), "2026-04-11", PAIR);
+  assert.equal(needsScreening(stale.lead), true);
+});
+
+/*
+ * An athlete nobody has ever screened has no lastFull, which reads as overdue
+ * — so the prompt greets a brand-new athlete asking to be screened. That is
+ * the right answer: they do need one.
+ */
+test("an athlete with no screen at all needs screening", () => {
+  assert.equal(needsScreening(clocksFor(row(), "2026-04-11", PAIR).lead), true);
 });
 
 test("due states sort most pressing first", () => {
