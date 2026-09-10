@@ -3167,3 +3167,238 @@ table.roster-table {
 .ms-video:hover {
   border-color: var(--accent);
 }
+
+/* ------------------------------------------------------------------ *
+ * Strength
+ * ------------------------------------------------------------------ */
+.st > .eyebrow {
+  margin: 22px 0 8px;
+}
+.st > .eyebrow:first-of-type {
+  margin-top: 16px;
+}
+
+/* The best-lift board. Each tile is also the chart's selector, so the
+   number an athlete is looking at is the one they tapped. */
+.st-bests {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+.st-best {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.st-best:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--panel-2);
+}
+.st-best[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.st-lift {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+.st-value {
+  font-family: var(--font-teko), system-ui, sans-serif;
+  font-size: 27px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+.st-value em {
+  font-family: inherit;
+  font-style: normal;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.st-best .st-when {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.st-chart {
+  margin-top: 16px;
+}
+
+.st-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.st-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.st-list li:last-child {
+  border-bottom: 0;
+}
+.st-note {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-style: italic;
+}
+.st-totals {
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}
+.st-totals em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.tr-due.t-pr {
+  color: var(--on-accent);
+  background: var(--good);
+}
+
+/* ---------- one lift's line ---------- */
+.lc {
+  margin-top: 4px;
+}
+.lc-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.lc-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.lc-dot {
+  fill: var(--accent);
+}
+/* A record gets a filled ring rather than a colour of its own: the line is
+   already the accent, and a second hue here would read as a second series. */
+.lc-dot.lc-rec {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+.lc-pr {
+  stroke: var(--line);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.lc-axis {
+  fill: var(--ink-faint);
+  font-size: 10px;
+}
+.lc-foot {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- logging a session ---------- */
+.lm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+.lm-lift {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--panel-2);
+}
+.lm-lift-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+.lm-help {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+/* What there is to beat. Kept above the inputs so it is read before the
+   first number is typed, not after. */
+.lm-target {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 7px 0 9px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+.lm-sets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.lm-set {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.lm-n {
+  width: 16px;
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: right;
+}
+.lm-set .tin {
+  width: 74px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+.lm-set .tin:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.lm-x {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.lm-add select {
+  max-width: 320px;
+}
+.lm-actions {
+  display: flex;
+  gap: 8px;
+}
+.lm-drop {
+  padding: 4px 9px;
+}

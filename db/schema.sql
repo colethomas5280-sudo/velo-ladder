@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 14). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 18). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -28,6 +28,9 @@ ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_lb numeric(5,1);
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_source text;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS weight_at date;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS bats text;
+-- Retired. Positions only ever held RHP/LHP, which the hand column already
+-- encodes — two columns for one fact, free to contradict each other. The column
+-- stays so fresh and existing databases keep the same shape; nothing reads it.
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS positions text;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS school text;
 ALTER TABLE athletes ADD COLUMN IF NOT EXISTS hs_grad_year int;
@@ -175,3 +178,82 @@ BEGIN
   END LOOP;
 END
 $mig$;
+
+-- v15: OnBaseU movement screens. Results are JSONB keyed by test.sub-test,
+-- with an :L / :R suffix where the sub-test is graded per side, so revising
+-- the battery is a config edit rather than a migration.
+-- v16: training phase, and the one flag every re-screen trigger writes to.
+-- rescreen_since is a date rather than a boolean so it can be compared
+-- against the last screen: a flag raised before the most recent screen has
+-- already been answered, and clears itself without anyone dismissing it.
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS phase text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS rescreen_since date;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS rescreen_reason text;
+
+CREATE TABLE IF NOT EXISTS movement_screens (
+  id          text PRIMARY KEY,
+  athlete_id  text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  date        date NOT NULL,
+  results     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  notes       text NOT NULL DEFAULT '',
+  created_by  text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- One screen per athlete per day, so re-saving a date replaces it rather than
+-- leaving two versions for the comparison view to disagree about.
+-- v17: Push-Off stopped being two tests, one per surface, and became one
+-- test that records which surface it was run on. An athlete only ever does
+-- one, so the other stayed permanently unscreened and no screen could ever
+-- be complete. Move whatever was recorded onto the merged keys.
+--
+-- Mound wins if a screen somehow carries both, which the old config allowed
+-- and nobody should have done. The transformation is idempotent on its own —
+-- a row with no old keys comes out unchanged — so the WHERE clause is there
+-- to stop a re-run rewriting every screen, not to make it safe.
+UPDATE movement_screens SET results =
+  (results - 'push-off-mound.planted' - 'push-off-mound.released'
+           - 'push-off-flat.planted'  - 'push-off-flat.released')
+  || (CASE
+        WHEN results ? 'push-off-mound.planted'
+          THEN jsonb_build_object('push-off.surface', 'mound',
+                                  'push-off.planted', results -> 'push-off-mound.planted')
+        WHEN results ? 'push-off-flat.planted'
+          THEN jsonb_build_object('push-off.surface', 'flat',
+                                  'push-off.planted', results -> 'push-off-flat.planted')
+        ELSE '{}'::jsonb
+      END)
+  || (CASE
+        WHEN results ? 'push-off-mound.released'
+          THEN jsonb_build_object('push-off.released', results -> 'push-off-mound.released')
+        WHEN results ? 'push-off-flat.released'
+          THEN jsonb_build_object('push-off.released', results -> 'push-off-flat.released')
+        ELSE '{}'::jsonb
+      END)
+WHERE results ?| array['push-off-mound.planted', 'push-off-mound.released',
+                       'push-off-flat.planted',  'push-off-flat.released'];
+
+CREATE UNIQUE INDEX IF NOT EXISTS ms_athlete_date_uidx
+  ON movement_screens(athlete_id, date);
+
+-- v18: strength. One lifting day per athlete per date, like the check-in and
+-- the screen — re-saving a date replaces it rather than leaving two versions
+-- of the same afternoon for the history to disagree about.
+--
+-- The lifts column is JSONB keyed by lift key -> the working sets in order,
+-- each {"w": pounds, "r": reps}: exactly the shape the entry form holds, and
+-- the same trick training_sessions.throws plays. Revising the lift menu is
+-- therefore a config edit, not a migration. Nothing here stores a lift's NAME.
+CREATE TABLE IF NOT EXISTS lift_sessions (
+  id         text PRIMARY KEY,
+  athlete_id text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  date       date NOT NULL,
+  lifts      jsonb NOT NULL DEFAULT '{}'::jsonb,
+  notes      text NOT NULL DEFAULT '',
+  level      text,
+  created_by text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS lift_athlete_date_uidx
+  ON lift_sessions(athlete_id, date);

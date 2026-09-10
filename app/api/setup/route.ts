@@ -1,5 +1,5 @@
 import { execScript, assertDbConfigured, sql } from "@/lib/db";
-import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION } from "@/lib/schema";
+import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
 import { json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +17,12 @@ export const runtime = "nodejs";
  * "every statement returned without error" is not the same claim as "the
  * tables are there" — and when those two came apart, the endpoint reporting
  * success was actively misleading.
+ *
+ * Read out of the schema rather than typed beside it. The typed list went a
+ * whole version without `lift_sessions`, which meant this endpoint would have
+ * reported a clean setup on a database that never got the table.
  */
-const EXPECTED_TABLES = [
-  "athletes",
-  "training_sessions",
-  "recovery_entries",
-  "setbacks",
-  "resources",
-  "movement_screens",
-] as const;
+const EXPECTED_TABLES = schemaTables();
 
 /** What actually exists, and where — the answer to "but setup said it worked". */
 async function verify() {
