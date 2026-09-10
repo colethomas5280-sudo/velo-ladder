@@ -1,3 +1,5 @@
+import type { ScreenSummary } from "./screen";
+
 export type TrackerId = "mound" | "pulldown";
 export type Hand = "" | "R" | "L";
 
@@ -89,6 +91,14 @@ export interface MovementScreen {
   date: string;
   results: Record<string, string>;
   notes: string;
+}
+
+/** One athlete's line on the Tests roster. `summary` is null until screened. */
+export interface ScreenOverviewRow {
+  athleteId: string;
+  name: string;
+  date: string | null;
+  summary: ScreenSummary | null;
 }
 
 export interface RecoveryEntry {

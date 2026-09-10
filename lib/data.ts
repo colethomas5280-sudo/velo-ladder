@@ -777,6 +777,42 @@ export function toScreen(r: Record<string, unknown>): MovementScreen {
   };
 }
 
+export interface LatestScreen {
+  athleteId: string;
+  name: string;
+  /** Null when this athlete has never been screened. */
+  date: string | null;
+  results: Record<string, string>;
+}
+
+/**
+ * The most recent screen per athlete, for the roster view.
+ *
+ * `notes` is deliberately not selected. The overview has no use for the
+ * coach's note, and a column that never leaves the database cannot leak from
+ * a route that forgets to strip it.
+ */
+export async function listLatestScreens(): Promise<LatestScreen[]> {
+  const rows = (await sql`
+    SELECT a.id AS athlete_id, a.name, s.date, s.results
+    FROM athletes a
+    LEFT JOIN LATERAL (
+      SELECT date, results FROM movement_screens m
+      WHERE m.athlete_id = a.id
+      ORDER BY m.date DESC
+      LIMIT 1
+    ) s ON true
+    WHERE a.archived = false
+    ORDER BY a.name
+  `) as Record<string, unknown>[];
+  return rows.map((r) => ({
+    athleteId: String(r.athlete_id),
+    name: String(r.name),
+    date: r.date ? isoDate(r.date) : null,
+    results: (r.results ?? {}) as Record<string, string>,
+  }));
+}
+
 export async function listScreens(athleteId: string): Promise<MovementScreen[]> {
   const rows = (await sql`
     SELECT * FROM movement_screens WHERE athlete_id = ${athleteId}

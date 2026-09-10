@@ -16,6 +16,8 @@ import {
   screenCounts,
   screenFields,
   screenReport,
+  screenSummary,
+  statusRank,
   fillNormal,
   testMark,
   alerts,
@@ -23,6 +25,7 @@ import {
   type Results,
   type Finding,
   type ScreenTest,
+  type ReportStatus,
 } from "@/lib/screen";
 
 const K = fieldKey;
@@ -896,6 +899,67 @@ test("an unrecorded screen is seventeen skipped tests, not seventeen passes", ()
     r.filter((x) => x.status !== "skipped").map((x) => x.test.key),
     [],
   );
+});
+
+/* ------------------------------------------------------------------ *
+ * One screen as a line on a roster
+ * ------------------------------------------------------------------ */
+
+test("a summary's worst is the head of the report, not a second opinion", () => {
+  const results: Results = { [SQ.L]: "mid", [SQ.R]: "good", "gtd.first": "fail" };
+  const report = screenReport(results, null, [sample, gated]);
+  const summary = screenSummary(results, [sample, gated]);
+  assert.equal(summary.worst, report[0].status, "the row and the panel must agree");
+  assert.equal(summary.worst, "red");
+});
+
+test("a summary counts the tests with work on them", () => {
+  const s = screenSummary({ [SQ.L]: "mid", "gtd.first": "fail" }, [sample, gated]);
+  assert.equal(s.work, 2);
+  assert.equal(s.clean, 0);
+});
+
+test("a clean screen summarises as clean, with nothing to work on", () => {
+  const s = screenSummary(fillNormal({}));
+  assert.equal(s.worst, "clean");
+  assert.equal(s.work, 0);
+  assert.equal(s.painful, 0);
+  assert.equal(s.clean, SCREEN_TESTS.length);
+});
+
+test("an athlete nobody has screened summarises as skipped, not clean", () => {
+  const s = screenSummary({});
+  assert.equal(s.worst, "skipped", "no data is not a pass");
+  assert.equal(s.clean, 0);
+  assert.equal(s.skipped, SCREEN_TESTS.length);
+  // Seventeen tests nobody ran is seventeen unknowns, not seventeen jobs.
+  assert.equal(s.work, 0, "an unscreened athlete has no work list, only no data");
+});
+
+/*
+ * Reachable only through a caller passing its own tests, which nothing does
+ * today — pinned so the fallback stays honest rather than becoming a "clean"
+ * that nobody notices.
+ */
+test("a summary of no tests at all is skipped, not clean", () => {
+  assert.equal(screenSummary({}, []).worst, "skipped");
+});
+
+/* Pain outranks every colour on a roster the same way it does on a test. */
+test("a painful reading takes the summary whatever else is on the screen", () => {
+  const results = fillNormal({});
+  results["hip-45.45-degree-angle:R"] = "less";
+  assert.equal(screenSummary(results).worst, "red");
+  results["toe-tap.hip-ir:L"] = PAINFUL;
+  const s = screenSummary(results);
+  assert.equal(s.worst, "alert");
+  assert.equal(s.painful, 1);
+});
+
+test("statuses sort worst first, and skipped sits below clean", () => {
+  const order: ReportStatus[] = ["skipped", "clean", "ungraded", "yellow", "red", "alert"];
+  const ranked = [...order].sort((a, b) => statusRank(b) - statusRank(a));
+  assert.deepEqual(ranked, ["alert", "red", "yellow", "ungraded", "clean", "skipped"]);
 });
 
 /* ------------------------------------------------------------------ *

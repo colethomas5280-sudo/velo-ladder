@@ -1067,6 +1067,43 @@ export function screenReport(
     .map(({ r }) => r);
 }
 
+/** Where a status sorts — worst first. Exported so a roster can share it. */
+export function statusRank(status: ReportStatus): number {
+  return STATUS_ORDER[status];
+}
+
+export interface ScreenSummary {
+  /** The worst standing status on the screen. */
+  worst: ReportStatus;
+  /** Tests with something to work on. */
+  work: number;
+  /** Tests flagged painful — counted separately, since pain isn't a rank. */
+  painful: number;
+  clean: number;
+  skipped: number;
+}
+
+/**
+ * One screen reduced to a line on a roster.
+ *
+ * `worst` comes off the head of the report rather than being recomputed,
+ * so a row's dot and the panel it opens can never disagree about which
+ * finding is the worst one.
+ */
+export function screenSummary(
+  results: Results,
+  tests: ScreenTest[] = SCREEN_TESTS,
+): ScreenSummary {
+  const reports = screenReport(results, null, tests);
+  return {
+    worst: reports[0]?.status ?? "skipped",
+    work: reports.filter((r) => r.work.length).length,
+    painful: reports.filter((r) => r.status === "alert").length,
+    clean: reports.filter((r) => r.status === "clean").length,
+    skipped: reports.filter((r) => r.status === "skipped").length,
+  };
+}
+
 /* ------------------------------------------------------------------ *
  * What an athlete may see
  * ------------------------------------------------------------------ */
