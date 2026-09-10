@@ -126,6 +126,24 @@ test("a linked video is a real, secure, absolute URL", () => {
   }
 });
 
+/*
+ * Share links arrive carrying YouTube's ?si= token, which identifies who did
+ * the sharing rather than what is being shared. The video id is the whole
+ * address, so it comes off — no sense handing every athlete a tracking
+ * parameter to follow a coaching video.
+ */
+test("no video link carries a tracking parameter", () => {
+  for (const t of SCREEN_TESTS) {
+    if (!t.video) continue;
+    assert.equal(new URL(t.video).search, "", `${t.key}: ${t.video} has a query string`);
+  }
+});
+
+test("no two tests point at the same video", () => {
+  const links = SCREEN_TESTS.filter((t) => t.video).map((t) => t.video);
+  assert.equal(new Set(links).size, links.length, "a link was pasted onto the wrong test");
+});
+
 test("every test says how to run it", () => {
   const silent = SCREEN_TESTS.filter((t) => !t.subTests.some((s) => s.help));
   assert.deepEqual(silent.map((t) => t.key), []);
