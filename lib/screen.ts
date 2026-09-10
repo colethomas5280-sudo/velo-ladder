@@ -1620,6 +1620,25 @@ export interface RescreenCall {
 }
 
 /**
+ * A call, from the two columns that store it.
+ *
+ * One function because two paths build it — the roster route from a row, the
+ * panel from an athlete — and they each carried their own copy of the
+ * fallback wording. The same athlete reading one thing on the roster and
+ * another on their own page is the failure that duplication invites.
+ *
+ * The fallback is for a `rescreen_since` written without a reason, which
+ * nothing does today; it exists so the shape is always complete rather than
+ * sometimes half-filled.
+ */
+export function rescreenCall(
+  since: string | null | undefined,
+  reason: string | null | undefined,
+): RescreenCall | null {
+  return since ? { since, reason: reason || "Re-screen called" } : null;
+}
+
+/**
  * Has a called re-screen been answered?
  *
  * Recording a screen clears the call outright — see `upsertScreen` — so this
