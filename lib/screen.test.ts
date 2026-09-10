@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseScreenInput } from "@/lib/screenInput";
+import { PHASES } from "@/lib/profile";
 import {
   SCREEN_GROUPS,
   SIDE_SETS,
@@ -23,6 +24,7 @@ import {
   statusRank,
   retestPlan,
   rescreenStanding,
+  IN_SEASON,
   leadClock,
   dueRank,
   RETEST_CADENCE,
@@ -1527,8 +1529,7 @@ test("no call, nothing standing", () => {
 test("a called re-screen is due the day it is raised, with no window", () => {
   const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
   const plan = retestPlan(st, "2026-02-01", PAIR, {
-    since: "2026-02-01",
-    reason: "Moved to In-season",
+    call: { since: "2026-02-01", reason: "Moved to In-season" },
   });
   assert.equal(plan.trigger!.state, "due", "raised today, due today");
   assert.equal(plan.trigger!.tests.length, PAIR.length, "and it runs the whole sheet");
@@ -1538,8 +1539,7 @@ test("a called re-screen is due the day it is raised, with no window", () => {
 test("a called re-screen leads even when neither clock is anywhere near due", () => {
   const st = standingScreen([screen("2026-01-25", FULL)], PAIR);
   const plan = retestPlan(st, "2026-02-01", PAIR, {
-    since: "2026-02-01",
-    reason: "Back from an injury flag",
+    call: { since: "2026-02-01", reason: "Back from an injury flag" },
   });
   assert.equal(plan.full.state, "not-due", "screened a week ago");
   assert.equal(
@@ -1552,6 +1552,71 @@ test("with nothing called, the clocks decide as before", () => {
   const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
   const plan = retestPlan(st, "2026-02-15", PAIR);
   assert.equal(leadClock(plan.full, plan.spot, plan.trigger).kind, "spot");
+});
+
+/* ------------------------------------------------------------------ *
+ * In-season: go light
+ * ------------------------------------------------------------------ */
+
+test("in-season the full sheet stops being scheduled", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  // 100 days: well past the 84-day window, so overdue in any other block.
+  assert.equal(retestPlan(st, "2026-04-11", PAIR).full.state, "overdue");
+  assert.equal(
+    retestPlan(st, "2026-04-11", PAIR, { phase: IN_SEASON }).full.state,
+    "paused",
+  );
+});
+
+test("the other blocks schedule it as normal", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  for (const phase of ["Off-season", "Build", null, undefined])
+    assert.equal(
+      retestPlan(st, "2026-04-11", PAIR, { phase }).full.state,
+      "overdue",
+      `${phase} should not pause it`,
+    );
+});
+
+/* Favour spot-checks over full screens: the corrective work carries on. */
+test("in-season the spot clock runs exactly as it always did", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const plan = retestPlan(st, "2026-02-15", PAIR, { phase: IN_SEASON });
+  assert.equal(plan.spot!.state, "overdue");
+  assert.equal(leadClock(plan.full, plan.spot, plan.trigger).kind, "spot");
+});
+
+test("a paused clock never leads, not even over nothing at all", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  const plan = retestPlan(st, "2026-04-11", PAIR, { phase: IN_SEASON });
+  assert.equal(plan.spot, null, "nothing flagged, so nothing to spot-check");
+  assert.equal(leadClock(plan.full, plan.spot, plan.trigger).state, "paused");
+  assert.ok(dueRank("paused") < dueRank("not-due"), "it isn't coming, so it sorts last");
+});
+
+/*
+ * In-season changes what gets SCHEDULED. A re-screen someone asked for is not
+ * scheduled, and a season is exactly when a mechanical change happens.
+ */
+test("a called re-screen still stands in-season", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  const plan = retestPlan(st, "2026-02-01", PAIR, {
+    phase: IN_SEASON,
+    call: { since: "2026-02-01", reason: "New arm slot" },
+  });
+  assert.equal(plan.full.state, "paused");
+  assert.equal(leadClock(plan.full, plan.spot, plan.trigger).kind, "trigger");
+});
+
+/*
+ * Which is where the next full sheet comes from: moving the phase stamps a
+ * call, so the season opens on a complete screen and closes with one.
+ */
+test("the phase Cole pauses on is one the profile actually offers", () => {
+  assert.ok(
+    (PHASES as readonly string[]).includes(IN_SEASON),
+    "IN_SEASON must match a real phase or nothing will ever pause",
+  );
 });
 
 test("due states sort most pressing first", () => {

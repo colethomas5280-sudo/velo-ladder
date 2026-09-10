@@ -66,6 +66,8 @@ const GAP_LABEL: Record<GapTrend, string> = {
 function nextUp(plan: ReturnType<typeof retestPlan>): string {
   const lead = leadClock(plan.full, plan.spot, plan.trigger);
   if (lead.kind === "trigger") return "Re-screen called — regardless of the clock";
+  if (lead.state === "paused")
+    return "In-season — full screens paused, spot-checks only";
   const what =
     lead.kind === "spot"
       ? `spot-check (${lead.tests.length} ${lead.tests.length === 1 ? "test" : "tests"})`
@@ -88,6 +90,7 @@ export default function ScreenPanel({
   athleteName,
   hand,
   call,
+  phase,
   isCoach,
   onCalled,
 }: {
@@ -97,6 +100,8 @@ export default function ScreenPanel({
   hand: Hand | null;
   /** A re-screen called by a trigger, if one is on the athlete's row. */
   call: RescreenCall | null;
+  /** Training block — in-season pauses the full-screen clock. */
+  phase: string | null;
   isCoach: boolean;
   onCalled?: () => void;
 }) {
@@ -139,8 +144,8 @@ export default function ScreenPanel({
     [screen, standing],
   );
   const plan = useMemo(
-    () => retestPlan(standing, todayISO(), undefined, call),
-    [standing, call],
+    () => retestPlan(standing, todayISO(), undefined, { call, phase }),
+    [standing, call, phase],
   );
   const standingCall = rescreenStanding(call, standing) ? call : null;
   // What this particular screen looked at, for the line that says so.

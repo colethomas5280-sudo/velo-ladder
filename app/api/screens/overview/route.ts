@@ -50,6 +50,7 @@ export async function GET() {
           spotSince: null,
           spotTests: 0,
           called,
+          phase: a.phase,
         };
 
       const summary = screenSummary(standing.results, undefined, hand);
@@ -72,6 +73,7 @@ export async function GET() {
         spotSince: failing[0] ?? null,
         spotTests: summary.failing.length,
         called,
+        phase: a.phase,
       };
     });
     return json(out);
