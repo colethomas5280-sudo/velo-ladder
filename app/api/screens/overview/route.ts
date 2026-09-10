@@ -1,6 +1,6 @@
 import { getScope } from "@/lib/scope";
-import { listLatestScreens } from "@/lib/data";
-import { screenSummary } from "@/lib/screen";
+import { listAllScreens } from "@/lib/data";
+import { screenSummary, standingScreen } from "@/lib/screen";
 import type { ScreenOverviewRow } from "@/lib/types";
 import { json, unauthorized, forbidden, guard } from "@/lib/http";
 
@@ -8,15 +8,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Every athlete's latest screen, reduced to a line each.
+ * Every athlete's standing screen, reduced to a line each.
  *
  * Coach-only, and not because the findings are secret — an athlete sees their
  * own on their own page. It is cross-athlete, and the leaderboard is the only
  * cross-athlete read this app offers. Widening that is a product decision, not
  * a convenience for a roster view.
  *
- * The summary is computed here rather than shipped as raw findings, so a page
- * that only needs a dot and a count is not handed a whole screen to render it.
+ * It ships the DATES both clocks run from rather than how due they are. The
+ * elapsed days get worked out in the browser, so a coach who has travelled
+ * isn't reading an answer computed in a server's timezone yesterday.
  */
 export async function GET() {
   const scope = await getScope();
@@ -24,13 +25,40 @@ export async function GET() {
   if (scope.role !== "coach") return forbidden();
 
   return guard(async () => {
-    const rows = await listLatestScreens();
-    const out: ScreenOverviewRow[] = rows.map((r) => ({
-      athleteId: r.athleteId,
-      name: r.name,
-      date: r.date,
-      summary: r.date ? screenSummary(r.results) : null,
-    }));
+    const out: ScreenOverviewRow[] = (await listAllScreens()).map((a) => {
+      const standing = standingScreen(a.screens);
+      if (!standing.last)
+        return {
+          athleteId: a.athleteId,
+          name: a.name,
+          last: null,
+          lastFull: null,
+          summary: null,
+          spotSince: null,
+          spotTests: 0,
+        };
+
+      const summary = screenSummary(standing.results);
+      /*
+       * The spot clock runs from the OLDEST failing test — rechecking the one
+       * you just did must not reset the clock on the one you have been
+       * avoiding. Mirrors `retestPlan`, which the panel uses.
+       */
+      const failing = Object.entries(standing.from)
+        .filter(([key]) => summary.failing.includes(key))
+        .map(([, date]) => date)
+        .sort();
+
+      return {
+        athleteId: a.athleteId,
+        name: a.name,
+        last: standing.last,
+        lastFull: standing.lastFull,
+        summary,
+        spotSince: failing[0] ?? null,
+        spotTests: summary.failing.length,
+      };
+    });
     return json(out);
   }, "Loading the screen overview failed");
 }

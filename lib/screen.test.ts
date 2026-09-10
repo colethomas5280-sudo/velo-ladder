@@ -18,10 +18,12 @@ import {
   screenReport,
   screenSummary,
   statusRank,
-  retestBand,
-  retestStatus,
+  retestPlan,
   dueRank,
   RETEST_CADENCE,
+  standingScreen,
+  covers,
+  isFullScreen,
   fillNormal,
   testMark,
   alerts,
@@ -917,10 +919,17 @@ test("a summary's worst is the head of the report, not a second opinion", () => 
   assert.equal(summary.worst, "red");
 });
 
-test("a summary counts the tests with work on them", () => {
+test("a summary counts the tests with work on them, and names them", () => {
   const s = screenSummary({ [SQ.L]: "mid", "gtd.first": "fail" }, [sample, gated]);
   assert.equal(s.work, 2);
   assert.equal(s.clean, 0);
+  // Named so the roster can date each one without rebuilding the report,
+  // and in the report's order, so the worst is first here too.
+  assert.deepEqual(s.failing, ["gtd", "smp"]);
+});
+
+test("a clean summary names nothing as failing", () => {
+  assert.deepEqual(screenSummary(fillNormal({})).failing, []);
 });
 
 test("a clean screen summarises as clean, with nothing to work on", () => {
@@ -967,49 +976,191 @@ test("statuses sort worst first, and skipped sits below clean", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * When to screen again
+ * The standing picture
  * ------------------------------------------------------------------ */
 
-test("anything short of clean puts an athlete on the correcting clock", () => {
-  for (const worst of ["alert", "red", "yellow", "ungraded", "skipped"] as ReportStatus[])
-    assert.equal(retestBand(worst), "correcting", `${worst} is work in progress`);
-  assert.equal(retestBand("clean"), "maintaining");
+const screen = (date: string, results: Results) => ({ date, results });
+
+test("a test nobody looked at is not covered, however much else was recorded", () => {
+  assert.equal(covers({ [SQ.L]: "good", [SQ.R]: "good" }, sample), true);
+  assert.equal(covers({ "gtd.first": "pass" }, sample), false);
+});
+
+/* The coach saying "skipped" is the opposite of the coach having looked. */
+test("not-tested is not coverage", () => {
+  assert.equal(covers({ [SQ.L]: NOT_TESTED, [SQ.R]: NOT_TESTED }, sample), false);
+});
+
+test("a full screen is one that looked at every test", () => {
+  const both: Results = { [SQ.L]: "good", [SQ.R]: "good", "gtd.first": "pass", "gtd.second": "ok" };
+  assert.equal(isFullScreen(both, [sample, gated]), true);
+  assert.equal(isFullScreen({ [SQ.L]: "good" }, [sample, gated]), false, "gated untouched");
+});
+
+test("one screen stands on its own", () => {
+  const st = standingScreen([screen("2026-01-01", { [SQ.L]: "bad" })], [sample]);
+  assert.equal(st.results[SQ.L], "bad");
+  assert.equal(st.from["smp"], "2026-01-01");
+  assert.equal(st.last, "2026-01-01");
 });
 
 /*
- * A screen with nothing usable on it must not inherit the long clock. No
- * data is not evidence of nothing wrong, and 12 weeks is a long time to wait
- * to find that out.
+ * The reason any of this exists. A spot-check of one test must not erase the
+ * others — they were not looked at, which is not the same as not true.
  */
-test("a screen with no usable readings takes the short clock, not the long one", () => {
-  assert.equal(retestBand("skipped"), "correcting");
+test("a spot-check leaves the tests it didn't touch standing", () => {
+  const st = standingScreen(
+    [
+      screen("2026-01-01", { [SQ.L]: "good", [SQ.R]: "good", "gtd.first": "fail" }),
+      screen("2026-02-01", { "gtd.first": "pass", "gtd.second": "ok" }),
+    ],
+    [sample, gated],
+  );
+  assert.equal(st.results[SQ.L], "good", "January's sample reading still stands");
+  assert.equal(st.results["gtd.first"], "pass", "February's gated reading replaced it");
+  assert.equal(st.from["smp"], "2026-01-01");
+  assert.equal(st.from["gtd"], "2026-02-01");
 });
 
-test("the correcting window is 4-6 weeks, the maintaining window 8-12", () => {
-  assert.deepEqual(RETEST_CADENCE.correcting, { from: 28, to: 42 });
-  assert.deepEqual(RETEST_CADENCE.maintaining, { from: 56, to: 84 });
+test("the newest reading of a test wins, whatever order the screens arrive in", () => {
+  const rows = [
+    screen("2026-03-01", { [SQ.L]: "good" }),
+    screen("2026-01-01", { [SQ.L]: "bad" }),
+  ];
+  assert.equal(standingScreen(rows, [sample]).results[SQ.L], "good");
+  assert.equal(standingScreen([...rows].reverse(), [sample]).results[SQ.L], "good");
 });
 
-test("a window has three states: not yet, due, and past it", () => {
-  const at = (d: number) => retestStatus("red", d).state;
-  assert.equal(at(0), "not-due", "screened today");
-  assert.equal(at(27), "not-due", "the day before it opens");
-  assert.equal(at(28), "due", "4 weeks — the window opens");
-  assert.equal(at(42), "due", "6 weeks — still inside it");
-  assert.equal(at(43), "overdue", "the day after it closes");
+test("a retested test remembers what it said before", () => {
+  const st = standingScreen(
+    [screen("2026-01-01", { [SQ.L]: "bad" }), screen("2026-02-01", { [SQ.L]: "mid" })],
+    [sample],
+  );
+  assert.equal(st.results[SQ.L], "mid");
+  assert.equal(st.previous[SQ.L], "bad");
+  assert.equal(st.previousFrom["smp"], "2026-01-01");
 });
 
-test("a clean athlete's window is the later one, not the same one", () => {
-  const at = (d: number) => retestStatus("clean", d).state;
-  assert.equal(at(42), "not-due", "6 weeks is early for someone with nothing to fix");
-  assert.equal(at(56), "due");
-  assert.equal(at(84), "due");
-  assert.equal(at(85), "overdue");
+/*
+ * A spot-check is not the previous reading of a test it didn't cover. Taking
+ * "the screen before this one" would compare a hip against an ankle.
+ */
+test("a test's previous reading is its own, not whatever screen came before", () => {
+  const st = standingScreen(
+    [
+      screen("2026-01-01", { [SQ.L]: "bad", "gtd.first": "fail" }),
+      screen("2026-02-01", { "gtd.first": "pass", "gtd.second": "ok" }),
+      screen("2026-03-01", { [SQ.L]: "good" }),
+    ],
+    [sample, gated],
+  );
+  assert.equal(st.previous[SQ.L], "bad", "March compares against January, not February");
+  assert.equal(st.previousFrom["smp"], "2026-01-01");
 });
 
-test("the two clocks disagree about the same elapsed time", () => {
-  assert.equal(retestStatus("yellow", 45).state, "overdue");
-  assert.equal(retestStatus("clean", 45).state, "not-due");
+test("a screen that skipped a test doesn't count as its last full look", () => {
+  const st = standingScreen(
+    [
+      screen("2026-01-01", { [SQ.L]: "good", [SQ.R]: "good", "gtd.first": "pass", "gtd.second": "ok" }),
+      screen("2026-02-01", { [SQ.L]: "bad" }),
+    ],
+    [sample, gated],
+  );
+  assert.equal(st.lastFull, "2026-01-01");
+  assert.equal(st.last, "2026-02-01", "but it was still the last screen");
+});
+
+test("no screens at all leaves everything null, not empty-but-clean", () => {
+  const st = standingScreen([], [sample]);
+  assert.equal(st.last, null);
+  assert.equal(st.lastFull, null);
+  assert.deepEqual(st.results, {});
+});
+
+/* ------------------------------------------------------------------ *
+ * When to screen again
+ * ------------------------------------------------------------------ */
+
+const FULL: Results = { [SQ.L]: "good", [SQ.R]: "good", "gtd.first": "pass", "gtd.second": "ok" };
+const BAD: Results = { ...FULL, [SQ.L]: "bad" };
+const PAIR = [sample, gated];
+
+test("the full clock is 8-12 weeks, the spot clock 3-4", () => {
+  assert.deepEqual(RETEST_CADENCE.full, { from: 56, to: 84 });
+  assert.deepEqual(RETEST_CADENCE.spot, { from: 21, to: 28 });
+});
+
+test("a clean athlete has a full clock and no spot clock", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  const plan = retestPlan(st, "2026-02-01", PAIR);
+  assert.equal(plan.spot, null, "nothing to spot-check");
+  assert.equal(plan.full.state, "not-due");
+});
+
+test("the full window opens at 8 weeks and closes at 12", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  const at = (d: string) => retestPlan(st, d, PAIR).full.state;
+  assert.equal(at("2026-02-25"), "not-due", "55 days");
+  assert.equal(at("2026-02-26"), "due", "56 days");
+  assert.equal(at("2026-03-26"), "due", "84 days");
+  assert.equal(at("2026-03-27"), "overdue", "85 days");
+});
+
+test("the spot window opens at 3 weeks and closes at 4", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const at = (d: string) => retestPlan(st, d, PAIR).spot!.state;
+  assert.equal(at("2026-01-21"), "not-due", "20 days");
+  assert.equal(at("2026-01-22"), "due", "21 days");
+  assert.equal(at("2026-01-29"), "due", "28 days");
+  assert.equal(at("2026-01-30"), "overdue", "29 days");
+});
+
+/* The common case, and the reason the clocks are independent. */
+test("an athlete can be mid-quarter and overdue a spot-check", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const plan = retestPlan(st, "2026-02-15", PAIR);
+  assert.equal(plan.full.state, "not-due", "45 days into a 56-day window");
+  assert.equal(plan.spot!.state, "overdue", "but 45 days on a 28-day one");
+});
+
+test("a spot-check covers the failing tests, not the whole sheet", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const plan = retestPlan(st, "2026-02-01", PAIR);
+  assert.deepEqual(plan.spot!.tests.map((t) => t.key), ["smp"]);
+  assert.deepEqual(plan.full.tests.map((t) => t.key), ["smp", "gtd"]);
+});
+
+/*
+ * The one that decides whether the spot clock is useful. Rechecking the thing
+ * you just did must not reset the clock on the thing you have been avoiding.
+ */
+test("the spot clock runs from the oldest failing test, not the newest", () => {
+  const st = standingScreen(
+    [
+      screen("2026-01-01", { ...FULL, [SQ.L]: "bad", "gtd.first": "fail" }),
+      screen("2026-02-15", { "gtd.first": "fail" }),
+    ],
+    PAIR,
+  );
+  const plan = retestPlan(st, "2026-02-20", PAIR);
+  assert.equal(plan.spot!.since, "2026-01-01", "the sample test is the stale one");
+  assert.equal(plan.spot!.state, "overdue");
+});
+
+test("an athlete who has never had a full screen is overdue one", () => {
+  const st = standingScreen([screen("2026-01-01", { [SQ.L]: "good" })], PAIR);
+  const plan = retestPlan(st, "2026-01-02", PAIR);
+  assert.equal(plan.full.state, "overdue", "never done is not 'not yet'");
+  assert.equal(plan.full.since, null);
+  assert.equal(plan.full.days, null);
+});
+
+test("a spot-check that clears the last deviation retires the spot clock", () => {
+  const st = standingScreen(
+    [screen("2026-01-01", BAD), screen("2026-02-01", { [SQ.L]: "good", [SQ.R]: "good" })],
+    PAIR,
+  );
+  assert.equal(retestPlan(st, "2026-03-01", PAIR).spot, null);
 });
 
 test("due states sort most pressing first", () => {

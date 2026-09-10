@@ -93,12 +93,23 @@ export interface MovementScreen {
   notes: string;
 }
 
-/** One athlete's line on the Tests roster. `summary` is null until screened. */
+/**
+ * One athlete's line on the Tests roster. `summary` is null until screened.
+ *
+ * Carries the dates both clocks run from rather than how due they are: the
+ * elapsed days are worked out in the browser against the viewer's own today.
+ */
 export interface ScreenOverviewRow {
   athleteId: string;
   name: string;
-  date: string | null;
+  /** The most recent screen of any kind. */
+  last: string | null;
+  /** The most recent one that covered every test — what the full clock runs from. */
+  lastFull: string | null;
   summary: ScreenSummary | null;
+  /** The oldest failing test's last look — what the spot clock runs from. */
+  spotSince: string | null;
+  spotTests: number;
 }
 
 export interface RecoveryEntry {
