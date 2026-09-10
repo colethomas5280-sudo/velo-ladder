@@ -2316,6 +2316,35 @@ for (const [testKey, moves] of ANKLE) {
       assert.equal(testMark(t(), { ...allGood, [g]: "limited-bilateral" }), null);
     });
 
+    /*
+     * The two branches used to say the same thing two ways — "Holding the
+     * knee restored it" against "Normal eversion when holding the knees" —
+     * so a coach reading down the form had to work out they were one finding.
+     */
+    test(`${testKey} (${move}): both branches name the movement the same way`, () => {
+      const label = (sub: string, key: string) =>
+        t()
+          .subTests.find((x) => x.key === sub)!
+          .findings.find((f) => f.key === key)!.label;
+
+      for (const [sub, keys] of [
+        [`${move}-held-one`, ["fixed", "still-limited"]],
+        [`${move}-held-both`, ["normal", "still-right", "still-left", "still-both"]],
+      ] as [string, string[]][])
+        for (const k of keys)
+          assert.match(
+            label(sub, k),
+            new RegExp(move),
+            `${sub}.${k} doesn't say which movement it's about`,
+          );
+
+      assert.equal(
+        label(`${move}-held-one`, "fixed").replace("that knee", "the knees"),
+        label(`${move}-held-both`, "normal"),
+        "the one-sided and bilateral yellows should read alike",
+      );
+    });
+
     test(`${testKey} (${move}): pain flags the test`, () => {
       assert.equal(testMark(t(), { ...allGood, [g]: PAINFUL }), "alert");
     });
