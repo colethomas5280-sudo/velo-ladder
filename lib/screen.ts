@@ -148,6 +148,8 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
      */
     key: "surface",
     label: "Where was this tested?",
+    help:
+      "The test runs the same either way. Record which, so a later comparison is like for like.",
     diagnostic: true,
     findings: [
       { key: "mound", label: "On the mound" },
@@ -157,6 +159,8 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
   {
     key: "planted",
     label: "How far did they step with their back foot planted?",
+    help:
+      "Back foot next to the rubber and perpendicular to it. Stride directly sideways as far as possible, that foot staying parallel to the rubber and on the ground. Measure front of the rubber to the striding toe, in their own foot lengths.",
     findings: [
       { key: "gt-6", label: "Greater than 6 foot lengths", normal: true },
       { key: "5-to-6", label: "5-6 foot lengths", normal: true },
@@ -166,6 +170,8 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
   {
     key: "released",
     label: "How far did they step with the back foot released?",
+    help:
+      "The same stride again, but driving off the back foot as they would pitching and letting it drag. Measure the gain over the planted stride — half a foot length is the mark. This half is hip mobility, ankle plantarflexion and groin flexibility.",
     dependsOn: { subTest: "planted", findings: ["gt-6", "5-to-6"] },
     findings: [
       { key: "gt-half", label: "Greater than half a foot length increase", normal: true, severity: "green" },
@@ -187,6 +193,15 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
  * The grading rule is the same down every branch: if holding the knees
  * restores the movement it is a yellow, and anything still limited is a red.
  */
+/**
+ * What holding the knees tells you, which is the same on all four movements
+ * and is the reason the follow-up exists at all.
+ */
+const ANKLE_HELD_HELP =
+  "Hold the knees to stabilise them and repeat. Restored when held is a stability " +
+  "problem; still limited when held — or knees that keep moving anyway — is mobility " +
+  "in the ankle itself.";
+
 function ankleSubTests(spec: {
   /** Stable key stem — never change it, it is in the database. */
   key: string;
@@ -194,12 +209,15 @@ function ankleSubTests(spec: {
   question: string;
   /** The movement as an answer names it, e.g. "eversion". */
   noun: string;
+  /** How to run it and what range to expect. */
+  help: string;
 }): SubTest[] {
-  const { key, question, noun } = spec;
+  const { key, question, noun, help } = spec;
   return [
     {
       key,
       label: `How was ${question} without holding the knees?`,
+      help,
       findings: [
         { key: "good-bilateral", label: `Good ${noun} bilaterally`, normal: true, severity: "green" },
         { key: "limited-right", label: `Limited ${noun} on the right` },
@@ -211,6 +229,7 @@ function ankleSubTests(spec: {
       // One side was limited, so the question is only about that side.
       key: `${key}-held-one`,
       label: "Did holding the knee fix that side?",
+      help: ANKLE_HELD_HELP,
       dependsOn: { subTest: key, findings: ["limited-right", "limited-left"] },
       /*
        * Worded to match the bilateral branch below. The two used to say the
@@ -235,6 +254,7 @@ function ankleSubTests(spec: {
       // Both sides were limited, so holding can fix both, one, or neither.
       key: `${key}-held-both`,
       label: `How was ${noun} when holding the knees?`,
+      help: ANKLE_HELD_HELP,
       dependsOn: { subTest: key, findings: ["limited-bilateral"] },
       findings: [
         { key: "normal", label: `Normal ${noun} when holding the knees`, severity: "yellow" },
@@ -403,6 +423,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "45-degree-angle",
         label: "45 Degree Angle",
         sides: "lr",
+        help:
+          "Feet at 45 degrees to each other — home plate works as a guide. Hands on the hips, all the weight on the loaded leg, that foot planted firmly. Rotate the pelvis as far as possible towards the unloaded foot, so the turn happens around the loaded leg alone. It should pass the 45-degree mark. Repeat on the other leg and compare.",
         findings: [
           { key: "greater", label: "Greater than 45\u00b0", normal: true, severity: "green" },
           { key: "equal", label: "Equal to 45\u00b0", severity: "yellow" },
@@ -452,6 +474,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         // Graded once — the athlete steps one way, so there is no side to split.
         key: "distance",
         label: "How far did the athlete side step?",
+        help:
+          "Lying face up, place one ball outside the heel and another outside the shoulder. Without moving the balls, have them stand, line one foot up with a ball, then walk out towards the other as far as they can without moving that foot. Compare where the walking foot finishes against the second ball.",
         findings: [
           { key: "greater", label: "Greater than the ball", normal: true, severity: "green" },
           { key: "equal", label: "Equal to the ball", severity: "yellow" },
@@ -510,8 +534,20 @@ export const SCREEN_TESTS: ScreenTest[] = [
     label: "Ankle Rocking Test",
     group: "stride",
     subTests: [
-      ...ankleSubTests({ key: "eversion", question: "seated eversion (rolling in)", noun: "eversion" }),
-      ...ankleSubTests({ key: "inversion", question: "seated inversion (rolling out)", noun: "inversion" }),
+      ...ankleSubTests({
+        key: "eversion",
+        question: "seated eversion (rolling in)",
+        noun: "eversion",
+        help:
+          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Roll both ankles in. Pass or fail rather than measured, but the range to expect is about 20 degrees.",
+      }),
+      ...ankleSubTests({
+        key: "inversion",
+        question: "seated inversion (rolling out)",
+        noun: "inversion",
+        help:
+          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Roll both ankles out. Pass or fail rather than measured, but the range to expect is about 30 degrees.",
+      }),
     ],
   },
   {
@@ -524,11 +560,15 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "lateral",
         question: "seated lateral (turning out) tibial rotation",
         noun: "lateral rotation",
+        help:
+          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Turn both feet outwards, knees still and flexed. Measured rather than pass or fail: expect about 40 degrees.",
       }),
       ...ankleSubTests({
         key: "medial",
         question: "seated medial (turning in) tibial rotation",
         noun: "medial rotation",
+        help:
+          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Turn both feet inwards, knees still and flexed. Measured rather than pass or fail: expect about 20 degrees.",
       }),
     ],
   },
@@ -544,6 +584,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "stability",
         label: "How was their half-kneeling stability?",
+        help:
+          "Half-kneeling with both feet and knees in a straight line — a foul line is ideal — and the back foot laces down. Three seconds to find balance, then hold it solidly for three more with tall posture, without using the back foot to steady themselves. Any loss of balance or posture is a fail; it should look completely still.",
         findings: [
           { key: "stable", label: "Stable bilaterally", normal: true, severity: "green" },
           /*
@@ -576,6 +618,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "starting-position",
         label: "Could they get into their starting position?",
         sides: "dominance",
+        help:
+          "Balls placed outside the heel and the shoulder while lying face up, then stand without moving them. Wide lunge with the front foot inside the top ball, the back heel inside the bottom one, and the front knee over the back of that heel. Arms overhead into full shoulder flexion, elbows locked out. Arms that can't start in full flexion mean the test is already dysfunctional — go through the motion only to check for pain.",
         findings: [
           { key: "good", label: "Good starting position", normal: true, severity: "green" },
           { key: "limited-stride", label: "Limited stride", severity: "yellow" },
@@ -587,6 +631,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "extension",
         label: "How was their lunge with extension?",
         sides: "dominance",
+        help:
+          "From that position, bend backwards as far as possible looking up towards the hands, with the front knee unmoved. Full shoulder flexion held throughout — the arm covers the ear — and the shoulders should cross the line bisecting the back hamstring.",
         findings: [
           { key: "good", label: "Good spine or hip extension (past mid-knee)", normal: true, severity: "green" },
           { key: "limited", label: "Limited spine or hip extension", severity: "red" },
@@ -638,6 +684,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "external-rotation",
         label: "How far does the shoulder externally rotate?",
         sides: "lr",
+        help:
+          "Standing tall, arm out to the side at 90 degrees of abduction and 90 at the elbow. Rotate the hand up and back as far as the posture allows — no arching the back, no bending the torso backwards. Grade the forearm against their spine angle. Stop at any pain or discomfort.",
         findings: [
           { key: "greater", label: "Greater than spine angle", normal: true, severity: "green" },
           { key: "equal", label: "Equal to spine angle", severity: "yellow" },
@@ -658,6 +706,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "arm-front",
         label: "How far does the shoulder internally rotate with the arm out front?",
         sides: "lr",
+        help:
+          "Ball in the hand, feet pelvic width, arm straight out in front at shoulder height, palm facing the ground. Keeping the shoulder at 90 degrees, rotate the thumb down as far as it goes — 90 degrees is the thumb pointing straight down.",
         findings: [
           { key: "gte-90", label: "Equal to or greater than 90\u00b0", normal: true, severity: "green" },
           { key: "lt-90", label: "Less than 90\u00b0", severity: "red" },
@@ -667,6 +717,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "arm-side",
         label: "How far does the shoulder internally rotate with the arm out to the side?",
         sides: "lr",
+        help:
+          "The same rotation with the arm straight out to the side instead, hand in line with the trunk and the palm starting face-down. Again the thumb should reach vertical.",
         findings: [
           { key: "gte-90", label: "Equal to or greater than 90\u00b0", normal: true, severity: "green" },
           { key: "lt-90", label: "Less than 90\u00b0", severity: "red" },
@@ -686,6 +738,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "supination",
         label: "How far does the forearm supinate?",
         sides: "lr",
+        help:
+          "Standing, holding a ball with the shoulder at 90 degrees, the elbow at 90 and the palm facing forward. Turn the ball and palm towards their own head — the curveball direction — looking for a full 80 degrees.",
         findings: [
           { key: "gte-80", label: "80\u00b0 or more of supination", normal: true, severity: "green" },
           { key: "lt-80", label: "Less than 80\u00b0 of supination", severity: "red" },
@@ -695,6 +749,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "pronation",
         label: "How far does the forearm pronate?",
         sides: "lr",
+        help:
+          "From the same position, turn the ball away from the head — the change-up direction — again looking for 80 degrees. Restricted forearm with a good shoulder loads the shoulder; a restricted shoulder with a good forearm loads the elbow.",
         findings: [
           { key: "gte-80", label: "80\u00b0 or more of pronation", normal: true, severity: "green" },
           { key: "lt-80", label: "Less than 80\u00b0 of pronation", severity: "red" },

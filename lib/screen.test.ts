@@ -108,6 +108,25 @@ test("no finding key collides with the not-tested sentinel", () => {
         assert.notEqual(x.key, NOT_TESTED, `${t.key}.${s.key} shadows the sentinel`);
 });
 
+/*
+ * Ten of the sixteen had no procedure text at all, which was fine while Cole
+ * was the only person running the sheet and stopped being fine the moment it
+ * wasn't. A test whose setup lives only in someone's head is a test that gets
+ * run differently in six months.
+ */
+test("every test says how to run it", () => {
+  const silent = SCREEN_TESTS.filter((t) => !t.subTests.some((s) => s.help));
+  assert.deepEqual(silent.map((t) => t.key), []);
+});
+
+test("the questions that carry help are the ones a coach acts on", () => {
+  // Gates and follow-ups need it; a diagnostic note doesn't describe a movement.
+  for (const t of SCREEN_TESTS)
+    for (const s of t.subTests)
+      if (s.help)
+        assert.ok(s.help.length > 40, `${t.key}.${s.key}: help too thin to be worth reading`);
+});
+
 test("every sub-test offers at least two findings", () => {
   for (const t of SCREEN_TESTS)
     for (const s of t.subTests)
