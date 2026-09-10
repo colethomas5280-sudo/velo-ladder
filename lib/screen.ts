@@ -276,6 +276,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "pelvic-tilt",
     label: "Pelvic Tilt",
+    video: "https://youtu.be/ExJ-mlPGUDE",
     group: "core",
     subTests: [
       {
@@ -383,6 +384,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "toe-tap",
     label: "Toe Tap Test",
+    video: "https://youtu.be/52hGSNI7zXc",
     group: "rotation",
     subTests: [
       {
@@ -422,6 +424,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "hip-45",
     label: "Hip 45 Test",
+    video: "https://youtu.be/BvfUSddHpnk",
     group: "rotation",
     subTests: [
       {
@@ -442,6 +445,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "seated-trunk-rotation",
     label: "Seated Trunk Rotation",
+    video: "https://youtu.be/8umY_AfFof0",
     group: "rotation",
     subTests: [
       {
