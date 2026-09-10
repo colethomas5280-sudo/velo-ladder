@@ -3051,3 +3051,39 @@ table.roster-table {
   border-color: var(--line-soft);
   background: var(--panel);
 }
+/* A re-screen called by a trigger, rather than one a window came round to. */
+.tr-due.t-called {
+  color: var(--on-accent);
+  background: var(--chalk);
+}
+.sc-called {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-radius: 0 8px 8px 0;
+  background: var(--panel-2);
+  border-left: 3px solid var(--chalk);
+  font-size: 13.5px;
+  color: var(--ink-dim);
+}
+.sc-called .eyebrow {
+  display: block;
+  color: var(--chalk);
+  margin-bottom: 3px;
+}
+.sc-call {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1 1 260px;
+}
+.sc-call-why {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.sc-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}

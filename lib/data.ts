@@ -13,6 +13,7 @@ import type {
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
 import { joinName, splitName } from "./profile";
+import { todayISO } from "./velo";
 import type { LeaderboardAthlete } from "./leaderboard";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
@@ -38,6 +39,9 @@ function toAthlete(r: Record<string, unknown>): Athlete {
     hsGradYear: r.hs_grad_year == null ? null : Number(r.hs_grad_year),
     collegeGradYear: r.college_grad_year == null ? null : Number(r.college_grad_year),
     status: (r.status as string | null) ?? null,
+    phase: (r.phase as string | null) ?? null,
+    rescreenSince: r.rescreen_since ? isoDate(r.rescreen_since) : null,
+    rescreenReason: (r.rescreen_reason as string | null) ?? null,
     guardianName: (r.guardian_name as string | null) ?? null,
     guardianPhone: (r.guardian_phone as string | null) ?? null,
     emergencyContact: (r.emergency_contact as string | null) ?? null,
@@ -146,6 +150,7 @@ export const PROFILE_COLUMNS = {
   hsGradYear: "hs_grad_year",
   collegeGradYear: "college_grad_year",
   status: "status",
+  phase: "phase",
   guardianName: "guardian_name",
   guardianPhone: "guardian_phone",
   emergencyContact: "emergency_contact",
@@ -229,6 +234,21 @@ export async function updateAthlete(
     const v = (patch as Record<string, unknown>)[key];
     if (v !== undefined) set(col, v);
   }
+  /*
+   * A phase change earns a re-screen regardless of the clock. Stamped here,
+   * in the single write path, so it can't be forgotten by whichever screen
+   * the coach happens to change it from — and only on a real move, so
+   * re-saving a profile doesn't raise a flag nobody asked for.
+   */
+  if (
+    patch.phase !== undefined &&
+    patch.phase !== null &&
+    patch.phase !== cur.phase
+  ) {
+    set("rescreen_since", todayISO());
+    set("rescreen_reason", `Moved to ${patch.phase}`);
+  }
+
   if (patch.archived !== undefined) set("archived", patch.archived);
   if (patch.cnsThresholdPct !== undefined)
     set("cns_threshold_pct", patch.cnsThresholdPct);
@@ -254,6 +274,25 @@ export async function updateAthlete(
  * rewritten, so moving an athlete from Youth to High School leaves his old
  * marks where they were and only new sessions get the new level.
  */
+/**
+ * Call for a re-screen, from any of the things that earn one.
+ *
+ * A date rather than a boolean, so it answers itself: a flag raised before
+ * the athlete's most recent screen has already been acted on, and stops
+ * showing without anyone having to dismiss it. Nothing here needs a
+ * "clear flag" button that someone will click to make the roster tidy.
+ */
+export async function callRescreen(
+  athleteId: string,
+  reason: string,
+  on: string = todayISO(),
+): Promise<void> {
+  await sql`
+    UPDATE athletes SET rescreen_since = ${on}, rescreen_reason = ${reason}
+    WHERE id = ${athleteId}
+  `;
+}
+
 export async function stampUnleveledSessions(
   athleteId: string,
   level: string | null,
@@ -669,7 +708,19 @@ export async function resolveSetback(
     WHERE id = ${id} AND resolved_on IS NULL
     RETURNING *
   `) as Record<string, unknown>[];
-  return rows[0] ? toSetback(rows[0]) : null;
+  if (!rows[0]) return null;
+  const setback = toSetback(rows[0]);
+
+  /*
+   * Coming back from an injury earns a re-screen. Only injury: soreness and
+   * CNS flags open and close themselves off the daily data, several times a
+   * month, and hanging a re-screen on those would raise a flag so often it
+   * stopped meaning anything.
+   */
+  if (setback.kind === "injury")
+    await callRescreen(setback.athleteId, "Back from an injury flag");
+
+  return setback;
 }
 
 /**
@@ -782,6 +833,9 @@ export interface AthleteScreens {
   name: string;
   /** Throwing hand — which arm the arm-test caveat applies to. */
   hand: string;
+  /** A re-screen called by any trigger, and why. */
+  rescreenSince: string | null;
+  rescreenReason: string | null;
   screens: { date: string; results: Record<string, string> }[];
 }
 
@@ -798,7 +852,8 @@ export interface AthleteScreens {
  */
 export async function listAllScreens(): Promise<AthleteScreens[]> {
   const rows = (await sql`
-    SELECT a.id AS athlete_id, a.name, a.hand, m.date, m.results
+    SELECT a.id AS athlete_id, a.name, a.hand,
+           a.rescreen_since, a.rescreen_reason, m.date, m.results
     FROM athletes a
     LEFT JOIN movement_screens m ON m.athlete_id = a.id
     WHERE a.archived = false
@@ -810,7 +865,14 @@ export async function listAllScreens(): Promise<AthleteScreens[]> {
     const id = String(r.athlete_id);
     let entry = byAthlete.get(id);
     if (!entry) {
-      entry = { athleteId: id, name: String(r.name), hand: String(r.hand ?? ""), screens: [] };
+      entry = {
+        athleteId: id,
+        name: String(r.name),
+        hand: String(r.hand ?? ""),
+        rescreenSince: r.rescreen_since ? isoDate(r.rescreen_since) : null,
+        rescreenReason: (r.rescreen_reason as string | null) ?? null,
+        screens: [],
+      };
       byAthlete.set(id, entry);
     }
     // The LEFT JOIN gives one null row for an athlete with no screens at all.
@@ -858,6 +920,16 @@ export async function upsertScreen(
       updated_at = now()
     RETURNING *
   `) as Record<string, unknown>[];
+  /*
+   * Recording a screen answers whatever re-screen was called — that is what
+   * the call was asking for. Cleared on the write rather than inferred from
+   * dates, because a screen and a call on the same day are indistinguishable
+   * by date and the guess went the wrong way.
+   */
+  await sql`
+    UPDATE athletes SET rescreen_since = NULL, rescreen_reason = NULL
+    WHERE id = ${athleteId} AND rescreen_since IS NOT NULL
+  `;
   return toScreen(rows[0]);
 }
 

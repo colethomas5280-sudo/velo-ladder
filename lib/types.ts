@@ -36,6 +36,11 @@ export interface Athlete {
   hsGradYear: number | null;
   collegeGradYear: number | null;
   status: string | null;
+  /** Training block — see PHASES. */
+  phase: string | null;
+  /** Date a re-screen was called for, by any trigger. Null when none stands. */
+  rescreenSince: string | null;
+  rescreenReason: string | null;
   guardianName: string | null;
   guardianPhone: string | null;
   emergencyContact: string | null;
@@ -110,6 +115,8 @@ export interface ScreenOverviewRow {
   /** The oldest failing test's last look — what the spot clock runs from. */
   spotSince: string | null;
   spotTests: number;
+  /** A called re-screen that no screen has answered yet, and why. */
+  called: { since: string; reason: string } | null;
 }
 
 export interface RecoveryEntry {
