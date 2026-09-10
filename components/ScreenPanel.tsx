@@ -6,8 +6,12 @@ import type { MovementScreen } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
   SCREEN_GROUPS,
+  SCREEN_TESTS,
+  dueRank,
+  retestPlan,
   screenReport,
   sidesOf,
+  standingScreen,
   type Deviation,
   type ReportReading,
   type TestReport,
@@ -44,6 +48,20 @@ function rowTrend(work: ReportReading[]): Trend | null {
 }
 
 const GROUP_TITLE = new Map(SCREEN_GROUPS.map((g) => [g.id, g.title]));
+
+/** The nearer of the two clocks, in a sentence. */
+function nextUp(plan: ReturnType<typeof retestPlan>): string {
+  const { full, spot } = plan;
+  const lead = spot && dueRank(spot.state) > dueRank(full.state) ? spot : full;
+  const what =
+    lead.kind === "spot"
+      ? `spot-check (${lead.tests.length} ${lead.tests.length === 1 ? "test" : "tests"})`
+      : "full screen";
+  if (lead.days === null) return "No full screen on record yet";
+  if (lead.state === "not-due")
+    return `Next ${what} in ${Math.max(1, lead.from - lead.days)}–${lead.to - lead.days} days`;
+  return `${lead.state === "overdue" ? "Overdue" : "Due"}: ${what}`;
+}
 
 /** "Left" / "Dominant", or nothing on a test graded once. */
 function sideLabel(reading: { field: ReportReading["field"] }): string | null {
@@ -83,11 +101,33 @@ export default function ScreenPanel({
     pickedDate ? ordered.findIndex((s) => s.date === pickedDate) : 0,
   );
   const screen = ordered[index] ?? null;
-  const previous = ordered[index + 1] ?? null;
 
+  /*
+   * The standing picture as of the screen being viewed, assembled per test
+   * from every screen up to and including it. A spot-check covers three
+   * tests; the other fourteen are still true, and reading one row would drop
+   * them. `previous` is likewise each test's own last reading, not whatever
+   * screen happens to sit before this one in the list.
+   */
+  const standing = useMemo(
+    () => standingScreen(screens.filter((s) => !screen || s.date <= screen.date)),
+    [screens, screen],
+  );
   const reports = useMemo(
-    () => (screen ? screenReport(screen.results, previous?.results ?? null) : []),
-    [screen, previous],
+    () => (screen ? screenReport(standing.results, standing.previous) : []),
+    [screen, standing],
+  );
+  const plan = useMemo(
+    () => (screen ? retestPlan(standing, todayISO()) : null),
+    [screen, standing],
+  );
+  // What this particular screen looked at, for the line that says so.
+  const covered = useMemo(
+    () =>
+      screen
+        ? Object.entries(standing.from).filter(([, d]) => d === screen.date).length
+        : 0,
+    [screen, standing],
   );
 
   const work = reports.filter((r) => r.work.length);
@@ -97,20 +137,27 @@ export default function ScreenPanel({
   const cleared = reports.flatMap((r) => r.cleared);
   const carried = reports.flatMap((r) => r.unchecked);
 
+  /*
+   * There is no single "previous screen" any more — each test compares
+   * against its own last reading, which may have come from a different day.
+   * So the question is whether ANY test has a reading behind it.
+   */
+  const hasPrevious = Object.keys(standing.previousFrom).length > 0;
+
   const moved = useMemo(() => {
-    if (!previous) return null;
+    if (!hasPrevious) return null;
     const cleared = reports.reduce((n, r) => n + r.cleared.length, 0);
     const unchecked = reports.reduce((n, r) => n + r.unchecked.length, 0);
     const appeared = reports.reduce(
       (n, r) => n + r.work.filter((w) => w.trend === "new").length,
       0,
     );
-    const standing = reports.reduce(
+    const still = reports.reduce(
       (n, r) => n + r.work.filter((w) => w.trend && w.trend !== "new").length,
       0,
     );
-    return { cleared, unchecked, appeared, standing };
-  }, [reports, previous]);
+    return { cleared, unchecked, appeared, standing: still };
+  }, [reports, hasPrevious]);
 
   const toggle = (key: string) =>
     setOpen((prev) => {
@@ -178,18 +225,25 @@ export default function ScreenPanel({
               </span>
             </div>
             <div className="sc-meta">
-              <span className="sc-when">Screened {fmtDate(screen.date)}</span>
+              <span className="sc-when">
+                {covered === SCREEN_TESTS.length
+                  ? "Full screen"
+                  : `Spot-check · ${covered} ${covered === 1 ? "test" : "tests"}`}
+                {" · "}
+                {fmtDate(screen.date)}
+              </span>
               <span className="cz-note">
                 {clean.length} clean
                 {skipped.length > 0 && ` · ${skipped.length} not screened`}
                 {painful.length > 0 && ` · ${painful.length} flagged painful`}
               </span>
+              {plan && <span className="cz-note">{nextUp(plan)}</span>}
             </div>
           </div>
 
-          {moved && previous && (
+          {moved && (
             <p className="sc-moved">
-              <span className="eyebrow">Since {fmtDate(previous.date)}</span>
+              <span className="eyebrow">Since each test was last checked</span>
               {[
                 moved.cleared > 0 ? `${moved.cleared} cleared` : null,
                 moved.appeared > 0 ? `${moved.appeared} new` : null,
@@ -230,17 +284,13 @@ export default function ScreenPanel({
             * nobody re-screened: it sits under a test marked "not screened",
             * where an athlete would never find it.
             */}
-          {previous && (
+          {hasPrevious && (
             <>
+              <CarryBlock title="Cleared since the last check" list={cleared} good />
               <CarryBlock
-                title={`Cleared since ${fmtDate(previous.date)}`}
-                list={cleared}
-                good
-              />
-              <CarryBlock
-                title={`Still open from ${fmtDate(previous.date)}`}
+                title="Left blank this time"
                 list={carried}
-                note="Not re-screened this time, so nothing here has been shown to have changed either way."
+                note="Recorded as a deviation before, and this screen opened the test but left the reading empty — so nothing here has been shown to have changed either way."
               />
             </>
           )}
@@ -329,7 +379,7 @@ function ReportRow({
                   <b>{w.finding.label}</b>
                 </div>
                 {w.before && (
-                  <span className="cz-note">Last screen: {w.before.label}</span>
+                  <span className="cz-note">Previously: {w.before.label}</span>
                 )}
               </li>
             ))}

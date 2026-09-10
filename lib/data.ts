@@ -777,40 +777,48 @@ export function toScreen(r: Record<string, unknown>): MovementScreen {
   };
 }
 
-export interface LatestScreen {
+export interface AthleteScreens {
   athleteId: string;
   name: string;
-  /** Null when this athlete has never been screened. */
-  date: string | null;
-  results: Record<string, string>;
+  screens: { date: string; results: Record<string, string> }[];
 }
 
 /**
- * The most recent screen per athlete, for the roster view.
+ * Every athlete with every screen they have, for the Tests roster.
  *
- * `notes` is deliberately not selected. The overview has no use for the
- * coach's note, and a column that never leaves the database cannot leak from
- * a route that forgets to strip it.
+ * All of them rather than the latest, because a spot-check only covers the
+ * tests it rechecked — the standing picture is assembled per test across
+ * screens, so one row is no longer enough to build it from.
+ *
+ * `notes` is deliberately not selected. The roster has no use for the coach's
+ * note, and a column that never leaves the database cannot leak from a route
+ * that forgets to strip it.
  */
-export async function listLatestScreens(): Promise<LatestScreen[]> {
+export async function listAllScreens(): Promise<AthleteScreens[]> {
   const rows = (await sql`
-    SELECT a.id AS athlete_id, a.name, s.date, s.results
+    SELECT a.id AS athlete_id, a.name, m.date, m.results
     FROM athletes a
-    LEFT JOIN LATERAL (
-      SELECT date, results FROM movement_screens m
-      WHERE m.athlete_id = a.id
-      ORDER BY m.date DESC
-      LIMIT 1
-    ) s ON true
+    LEFT JOIN movement_screens m ON m.athlete_id = a.id
     WHERE a.archived = false
-    ORDER BY a.name
+    ORDER BY a.name, m.date
   `) as Record<string, unknown>[];
-  return rows.map((r) => ({
-    athleteId: String(r.athlete_id),
-    name: String(r.name),
-    date: r.date ? isoDate(r.date) : null,
-    results: (r.results ?? {}) as Record<string, string>,
-  }));
+
+  const byAthlete = new Map<string, AthleteScreens>();
+  for (const r of rows) {
+    const id = String(r.athlete_id);
+    let entry = byAthlete.get(id);
+    if (!entry) {
+      entry = { athleteId: id, name: String(r.name), screens: [] };
+      byAthlete.set(id, entry);
+    }
+    // The LEFT JOIN gives one null row for an athlete with no screens at all.
+    if (r.date)
+      entry.screens.push({
+        date: isoDate(r.date),
+        results: (r.results ?? {}) as Record<string, string>,
+      });
+  }
+  return [...byAthlete.values()];
 }
 
 export async function listScreens(athleteId: string): Promise<MovementScreen[]> {

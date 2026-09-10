@@ -4,7 +4,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { MovementScreen } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
-import { screenSummary } from "@/lib/screen";
+import { screenSummary, standingScreen } from "@/lib/screen";
 import { fmtDate } from "@/lib/velo";
 
 /**
@@ -19,8 +19,10 @@ export default function ScreenLink({ athleteId }: { athleteId: string }) {
     `/api/athletes/${athleteId}/screens`,
     fetcher,
   );
-  const latest = data?.length ? data[data.length - 1] : null;
-  const summary = latest ? screenSummary(latest.results) : null;
+  // The standing picture, not the latest row: a spot-check covers a few tests
+  // and the rest are still true.
+  const standing = standingScreen(data ?? []);
+  const summary = standing.last ? screenSummary(standing.results) : null;
 
   return (
     <Link href={`/tests/${athleteId}`} className="card pad screen-link">
@@ -33,7 +35,9 @@ export default function ScreenLink({ athleteId }: { athleteId: string }) {
               : "Nothing flagged"
             : "No screen recorded yet"}
         </b>
-        {latest && <span className="cz-note">Screened {fmtDate(latest.date)}</span>}
+        {standing.last && (
+          <span className="cz-note">Screened {fmtDate(standing.last)}</span>
+        )}
       </div>
       <span className="sl-go">Open tests →</span>
     </Link>

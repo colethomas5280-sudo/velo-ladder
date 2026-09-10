@@ -7,12 +7,12 @@ import type { ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
   dueRank,
-  retestStatus,
+  retestState,
   statusRank,
-  type DueState,
   type ReportStatus,
+  type RetestKind,
 } from "@/lib/screen";
-import { daysBetween, todayISO } from "@/lib/velo";
+import { todayISO } from "@/lib/velo";
 import ScreenPanel from "./ScreenPanel";
 
 /* ------------------------------------------------------------------ *
@@ -85,21 +85,37 @@ function since(days: number): string {
   return `${Math.round(days / 30)} months ago`;
 }
 
-const DUE_LABEL: Record<DueState, string> = {
-  overdue: "Overdue",
-  due: "Due now",
-  "not-due": "",
+const KIND_LABEL: Record<RetestKind, string> = {
+  full: "Full screen",
+  spot: "Spot-check",
 };
 
 /**
  * A row's place in the queue.
  *
+ * Two clocks, and whichever is more pressing speaks for the row. An athlete
+ * mid-quarter with a spot-check three weeks late is a spot-check three weeks
+ * late — reporting the quarterly clock because it is the bigger job would
+ * bury the thing there is actually something to do about.
+ *
  * Elapsed days are computed against today in the browser rather than on the
  * server, so a coach travelling doesn't see yesterday's answer.
  */
 function schedule(row: ScreenOverviewRow, today: string) {
-  const days = daysBetween(row.date!, today);
-  return { days, ...retestStatus(row.summary!.worst, days) };
+  const full = retestState("full", row.lastFull, today);
+  const spot = row.spotTests
+    ? retestState("spot", row.spotSince, today)
+    : null;
+  const lead = spot && dueRank(spot.state) > dueRank(full.state) ? spot : full;
+  return { full, spot, lead };
+}
+
+/** "due in 12–26 days" / "3–4 week spot-check" — the clock in words. */
+function describe(due: ReturnType<typeof retestState>): string {
+  if (due.days === null) return "no full screen on record";
+  if (due.state === "not-due")
+    return `due in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`;
+  return due.kind === "spot" ? "3–4 week spot-check" : "8–12 week full screen";
 }
 
 function Roster() {
@@ -121,14 +137,14 @@ function Roster() {
   const screened = useMemo(
     () =>
       rows
-        .filter((r) => r.summary && r.date)
+        .filter((r) => r.summary && r.last)
         .map((r) => ({ row: r, due: schedule(r, today) }))
         .sort(
           (a, b) =>
-            dueRank(b.due.state) - dueRank(a.due.state) ||
+            dueRank(b.due.lead.state) - dueRank(a.due.lead.state) ||
             statusRank(b.row.summary!.worst) - statusRank(a.row.summary!.worst) ||
             // Then longest since screening, so the stalest sits above the fresh.
-            b.due.days - a.due.days,
+            (a.row.last ?? "").localeCompare(b.row.last ?? ""),
         ),
     [rows, today],
   );
@@ -162,9 +178,11 @@ function Roster() {
                 <span className={`ms-dot ${DOT[r.summary!.worst]}`} />
                 <span className="tr-name">
                   {r.name}
-                  {due.state !== "not-due" && (
-                    <em className={`tr-due t-${due.state}`}>
-                      {DUE_LABEL[due.state]}
+                  {due.lead.state !== "not-due" && (
+                    <em className={`tr-due t-${due.lead.state}`}>
+                      {due.lead.state === "overdue" ? "Overdue" : "Due"}
+                      {" · "}
+                      {KIND_LABEL[due.lead.kind]}
                     </em>
                   )}
                 </span>
@@ -180,12 +198,10 @@ function Roster() {
                   )}
                 </span>
                 <span className="tr-when">
-                  {since(due.days)}
-                  <em>
-                    {due.state === "not-due"
-                      ? `retest in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`
-                      : `${due.band === "correcting" ? "4–6" : "8–12"} week retest`}
-                  </em>
+                  {due.lead.days === null
+                    ? "never"
+                    : since(due.lead.days)}
+                  <em>{describe(due.lead)}</em>
                 </span>
               </Link>
             </li>

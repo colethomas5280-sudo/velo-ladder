@@ -11,6 +11,8 @@
  * coach reads and may change freely — OnBaseU rewording a test costs nothing.
  * ------------------------------------------------------------------ */
 
+import { daysBetween } from "./velo";
+
 export type Severity = "green" | "yellow" | "red";
 
 /**
@@ -1077,6 +1079,8 @@ export interface ScreenSummary {
   worst: ReportStatus;
   /** Tests with something to work on. */
   work: number;
+  /** Their keys, so a caller can date them without rebuilding the report. */
+  failing: string[];
   /** Tests flagged painful — counted separately, since pain isn't a rank. */
   painful: number;
   clean: number;
@@ -1098,6 +1102,7 @@ export function screenSummary(
   return {
     worst: reports[0]?.status ?? "skipped",
     work: reports.filter((r) => r.work.length).length,
+    failing: reports.filter((r) => r.work.length).map((r) => r.test.key),
     painful: reports.filter((r) => r.status === "alert").length,
     clean: reports.filter((r) => r.status === "clean").length,
     skipped: reports.filter((r) => r.status === "skipped").length,
@@ -1105,55 +1110,178 @@ export function screenSummary(
 }
 
 /* ------------------------------------------------------------------ *
- * When to screen again
+ * The standing picture
  *
- * Two cadences, from Cole: an athlete you are working to correct gets
- * re-screened at 4-6 weeks, to see whether the work is moving anything. An
- * athlete who came back clean gets 8-12 weeks, to confirm nothing has
- * regressed.
+ * A screen stopped being the whole story the moment spot-checks existed. If
+ * a coach rechecks three tests at four weeks, the other fourteen did not stop
+ * being true — they were simply not looked at that day. So what an athlete
+ * "has" is assembled per TEST from the most recent screen that covered it,
+ * not read off the latest row.
  *
- * The band is set by the athlete's WORST standing status rather than per
- * test, because a re-screen runs the sheet — you don't retest one hip in
- * isolation. One red puts the whole athlete on the short clock.
+ * Per test rather than per reading, deliberately: you retest a test, not a
+ * field. Merging field by field would pair a fresh right hip with a stale
+ * left one and call the asymmetry between them real.
  * ------------------------------------------------------------------ */
 
-export type RetestBand = "correcting" | "maintaining";
+/** Did this screen actually look at this test? */
+export function covers(results: Results, test: ScreenTest): boolean {
+  return screenFields([test]).some((f) => findingFor(f, results) !== null);
+}
+
+/**
+ * A screen that looked at everything — the kind the quarterly clock counts.
+ *
+ * "Not tested" doesn't count as looking. It is the coach saying they skipped
+ * it, which is exactly the thing a full screen isn't.
+ */
+export function isFullScreen(results: Results, tests: ScreenTest[] = SCREEN_TESTS): boolean {
+  return tests.every((t) => covers(results, t));
+}
+
+export interface Standing {
+  /** Latest readings, per test, assembled across screens. */
+  results: Results;
+  /** The readings each test held before those. */
+  previous: Results;
+  /** testKey → the date its current readings came from. */
+  from: Record<string, string>;
+  /** testKey → the date the previous readings came from. */
+  previousFrom: Record<string, string>;
+  /** The most recent screen that covered every test. */
+  lastFull: string | null;
+  /** The most recent screen of any kind. */
+  last: string | null;
+}
+
+export function standingScreen(
+  screens: { date: string; results: Results }[],
+  tests: ScreenTest[] = SCREEN_TESTS,
+): Standing {
+  const standing: Standing = {
+    results: {},
+    previous: {},
+    from: {},
+    previousFrom: {},
+    lastFull: null,
+    last: null,
+  };
+  const ordered = [...screens].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (const screen of ordered) {
+    standing.last = screen.date;
+    if (isFullScreen(screen.results, tests)) standing.lastFull = screen.date;
+
+    for (const test of tests) {
+      // A screen that skipped this test leaves what was already known alone.
+      if (!covers(screen.results, test)) continue;
+      for (const field of screenFields([test])) {
+        const held = standing.results[field.key];
+        if (held !== undefined) standing.previous[field.key] = held;
+        else delete standing.previous[field.key];
+        const fresh = screen.results[field.key];
+        if (fresh !== undefined) standing.results[field.key] = fresh;
+        else delete standing.results[field.key];
+      }
+      if (standing.from[test.key])
+        standing.previousFrom[test.key] = standing.from[test.key];
+      standing.from[test.key] = screen.date;
+    }
+  }
+  return standing;
+}
+
+/* ------------------------------------------------------------------ *
+ * When to screen again
+ *
+ * Cole's cadence, and it is two clocks rather than one.
+ *
+ * The full sheet runs quarterly — 8-12 weeks lines up with training phases
+ * and gives adaptation time; running seventeen tests more often than that is
+ * chasing noise. What moves faster is the corrective work, so the tests an
+ * athlete actually failed get spot-checked at 3-4 weeks alongside it. That
+ * is the feedback loop: confirming the intervention is working without
+ * re-running the whole battery.
+ *
+ * The two are independent. An athlete can be mid-quarter and still overdue a
+ * spot-check, which is the common case and the whole point.
+ * ------------------------------------------------------------------ */
+
+export type RetestKind = "full" | "spot";
 
 /** Not yet, inside the window, or past the end of it. */
 export type DueState = "not-due" | "due" | "overdue";
 
-export const RETEST_CADENCE: Record<RetestBand, { from: number; to: number }> = {
-  correcting: { from: 28, to: 42 },
-  maintaining: { from: 56, to: 84 },
+export const RETEST_CADENCE: Record<RetestKind, { from: number; to: number }> = {
+  full: { from: 56, to: 84 },
+  spot: { from: 21, to: 28 },
 };
 
-/**
- * Which clock an athlete is on.
- *
- * Everything that isn't clean takes the short one. Pain is not a colour, but
- * it is certainly not "no work to do", so it lands here with the rest —
- * inventing a third cadence for it would be putting words in Cole's mouth.
- * A screen with no usable readings takes the short clock too: no data is not
- * evidence of nothing wrong.
- */
-export function retestBand(worst: ReportStatus): RetestBand {
-  return worst === "clean" ? "maintaining" : "correcting";
-}
-
-export interface RetestStatus {
-  band: RetestBand;
+export interface RetestDue {
+  kind: RetestKind;
   state: DueState;
-  /** The window, in days since the last screen. */
   from: number;
   to: number;
+  /** Days since the screen this clock runs from; null when there isn't one. */
+  days: number | null;
+  /** The date it runs from. */
+  since: string | null;
+  /** What this retest would cover. */
+  tests: ScreenTest[];
 }
 
-export function retestStatus(worst: ReportStatus, daysSince: number): RetestStatus {
-  const band = retestBand(worst);
-  const { from, to } = RETEST_CADENCE[band];
-  const state: DueState =
-    daysSince < from ? "not-due" : daysSince <= to ? "due" : "overdue";
-  return { band, state, from, to };
+function dueState(kind: RetestKind, days: number | null): DueState {
+  const { from, to } = RETEST_CADENCE[kind];
+  // Never done is not "not yet" — it is the most overdue thing there is.
+  if (days === null) return "overdue";
+  return days < from ? "not-due" : days <= to ? "due" : "overdue";
+}
+
+/**
+ * One clock, from the date it runs from.
+ *
+ * Split out so a roster can recompute against the viewer's own `today`. The
+ * server ships the dates; the elapsed days are worked out in the browser, so
+ * a coach who has travelled isn't reading yesterday's answer.
+ */
+export function retestState(
+  kind: RetestKind,
+  since: string | null,
+  today: string,
+): Omit<RetestDue, "tests"> {
+  const days = since === null ? null : daysBetween(since, today);
+  return { kind, state: dueState(kind, days), ...RETEST_CADENCE[kind], days, since };
+}
+
+/**
+ * Both clocks for one athlete.
+ *
+ * The spot clock runs from the OLDEST of the failing tests, not the newest.
+ * Rechecking the 90/90 a fortnight ago says nothing about a thoracic rotation
+ * nobody has touched in six weeks, and taking the newest date would let the
+ * one you just did hide the one you haven't.
+ */
+export function retestPlan(
+  standing: Standing,
+  today: string,
+  tests: ScreenTest[] = SCREEN_TESTS,
+): { full: RetestDue; spot: RetestDue | null } {
+  const full: RetestDue = {
+    ...retestState("full", standing.lastFull, today),
+    tests,
+  };
+
+  const failing = screenReport(standing.results, null, tests)
+    .filter((r) => r.work.length)
+    .map((r) => r.test);
+  if (!failing.length) return { full, spot: null };
+
+  const dated = failing
+    .map((t) => standing.from[t.key])
+    .filter((d): d is string => !!d)
+    .sort();
+  const since = dated[0] ?? null;
+
+  return { full, spot: { ...retestState("spot", since, today), tests: failing } };
 }
 
 /** Where a due state sorts on the roster — most pressing first. */
