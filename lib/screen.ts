@@ -1135,6 +1135,26 @@ export function screenSummary(
 }
 
 /* ------------------------------------------------------------------ *
+ * Screen when fresh
+ *
+ * Cole: screen fresh, not post-throwing. Shoulder and thoracic numbers in
+ * particular read low after a bullpen, and a screen taken then records a
+ * limitation the athlete doesn't have the rest of the week.
+ *
+ * The app knows the DAY a session was logged, not the hour, so this can only
+ * ever say "he threw that day" — which is why the warning it feeds asks the
+ * coach whether the screen came after, rather than telling them it did.
+ * ------------------------------------------------------------------ */
+
+/** Sessions logged on the day a screen is dated. */
+export function sessionsOn<T extends { date: string }>(
+  sessions: T[],
+  date: string,
+): T[] {
+  return sessions.filter((s) => s.date === date);
+}
+
+/* ------------------------------------------------------------------ *
  * Side to side
  *
  * In a rotational, single-side-dominant sport a lead-hip vs trail-hip or

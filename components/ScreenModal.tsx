@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { MovementScreen } from "@/lib/types";
-import { api, ApiError } from "@/lib/fetcher";
+import useSWR from "swr";
+import type { MovementScreen, TrainingSession } from "@/lib/types";
+import { api, ApiError, fetcher } from "@/lib/fetcher";
 import {
   NOT_TESTED,
   SCREEN_GROUPS,
@@ -12,6 +13,7 @@ import {
   isApplicable,
   screenCounts,
   screenFields,
+  sessionsOn,
   sidesOf,
   subTestFindings,
   testMark,
@@ -20,7 +22,7 @@ import {
   type SubTest,
   type TestMark,
 } from "@/lib/screen";
-import { todayISO, fmtDate } from "@/lib/velo";
+import { TRACKERS, todayISO, fmtDate } from "@/lib/velo";
 
 /* ------------------------------------------------------------------ *
  * Recording a movement screen
@@ -89,6 +91,23 @@ export default function ScreenModal({
       document.body.style.overflow = "";
     };
   }, [onClose]);
+
+  /*
+   * Screen fresh, not post-throwing: shoulder and thoracic readings sit low
+   * after a bullpen, and a screen taken then records a limitation the athlete
+   * doesn't have on Wednesday. Only the DAY is stored, never the hour, so the
+   * note asks rather than asserts — a screen taken that morning is fine.
+   */
+  const { data: sessionData } = useSWR<TrainingSession[]>(
+    `/api/athletes/${athleteId}/sessions`,
+    fetcher,
+  );
+  const threw = useMemo(() => {
+    const on = sessionsOn(sessionData ?? [], date);
+    // Two bullpens in a day shouldn't read "mound and mound".
+    const kinds = [...new Set(on.map((s) => s.type))];
+    return { count: on.length, kinds };
+  }, [sessionData, date]);
 
   const counts = useMemo(() => screenCounts(results), [results]);
   const flagged = useMemo(() => alerts(results), [results]);
@@ -222,6 +241,21 @@ export default function ScreenModal({
               </button>
             </p>
           )}
+          {threw.count > 0 && (
+            <p className="ms-note warn" role="status">
+              <b>
+                Threw on this date —{" "}
+                {threw.kinds
+                  .map((k) => TRACKERS[k].label.toLowerCase())
+                  .join(" and ")}
+                .
+              </b>{" "}
+              If the screen came after, the shoulder and thoracic readings will
+              sit low. Worth recording anyway — worth knowing it isn&rsquo;t a
+              fresh number.
+            </p>
+          )}
+
           {clash && (
             <p className="ms-note warn" role="status">
               A screen already exists for {fmtDate(date)}. Saving will replace it.
