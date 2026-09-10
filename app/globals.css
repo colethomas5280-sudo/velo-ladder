@@ -3141,3 +3141,167 @@ table.roster-table {
 .rp-actions .btn {
   text-decoration: none;
 }
+
+/* ---------- the screen reference ---------- */
+.sr-sub {
+  display: flex;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+}
+.sr-sub a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.sr-lede {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-dim);
+  max-width: 62ch;
+}
+.sr-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 14px;
+  font-size: 12px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.sr-tally b {
+  font-family: var(--font-display), sans-serif;
+  font-size: 22px;
+  letter-spacing: 0.01em;
+  margin-right: 5px;
+  color: var(--ink);
+}
+.sr-tally .green b {
+  color: var(--good);
+}
+.sr-tally .yellow b {
+  color: var(--warn);
+}
+.sr-tally .red b {
+  color: var(--bad);
+}
+.sr-group {
+  margin-top: 30px;
+}
+.sr-group > h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 26px;
+  margin: 0 0 10px;
+  letter-spacing: 0.02em;
+}
+.sr-test {
+  margin-bottom: 12px;
+}
+.sr-test-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.sr-test-head h4 {
+  margin: 0;
+  font-size: 17px;
+}
+.sr-test-head .pill {
+  margin-left: 0;
+}
+.sr-q {
+  padding-top: 14px;
+  margin-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.sr-q-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sr-q-head b {
+  font-size: 14.5px;
+}
+.sr-q-head .pill {
+  margin-left: 0;
+}
+.sr-help {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-faint);
+}
+.sr-answers {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.sr-answers li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 5px 0;
+  font-size: 14px;
+}
+/* Pain is offered everywhere, so it reads as boilerplate rather than a rule. */
+.sr-answers li.universal {
+  color: var(--ink-faint);
+}
+.sr-answer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sr-answer em {
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-left: 8px;
+}
+.sr-verdict {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: right;
+}
+.sr-verdict.v-green { color: var(--good); }
+.sr-verdict.v-yellow { color: var(--warn); }
+.sr-verdict.v-red { color: var(--bad); }
+.sr-verdict.v-alert { color: var(--ink); }
+.sr-verdict.v-gate {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-style: italic;
+}
+@media (max-width: 560px) {
+  .sr-answers li {
+    flex-wrap: wrap;
+  }
+  .sr-verdict {
+    width: 100%;
+    text-align: left;
+    padding-left: 20px;
+  }
+}
+@media print {
+  .appbar,
+  .tests-head .back-link,
+  .sr-lede {
+    display: none;
+  }
+  .card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+}
