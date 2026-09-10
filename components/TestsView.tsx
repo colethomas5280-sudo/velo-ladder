@@ -15,7 +15,7 @@ import {
 } from "@/lib/screen";
 import { todayISO } from "@/lib/velo";
 import ScreenPanel from "./ScreenPanel";
-import { handOf } from "./AthleteTests";
+import { handOf, callOf } from "./AthleteTests";
 
 /* ------------------------------------------------------------------ *
  * Tests
@@ -90,6 +90,7 @@ function since(days: number): string {
 const KIND_LABEL: Record<RetestKind, string> = {
   full: "Full screen",
   spot: "Spot-check",
+  trigger: "Re-screen",
 };
 
 /**
@@ -105,14 +106,16 @@ const KIND_LABEL: Record<RetestKind, string> = {
  */
 function schedule(row: ScreenOverviewRow, today: string) {
   const full = retestState("full", row.lastFull, today);
-  const spot = row.spotTests
-    ? retestState("spot", row.spotSince, today)
+  const spot = row.spotTests ? retestState("spot", row.spotSince, today) : null;
+  const trigger = row.called
+    ? retestState("trigger", row.called.since, today)
     : null;
-  return { full, spot, lead: leadClock(full, spot) };
+  return { full, spot, trigger, lead: leadClock(full, spot, trigger) };
 }
 
 /** "due in 12–26 days" / "3–4 week spot-check" — the clock in words. */
 function describe(due: ReturnType<typeof retestState>): string {
+  if (due.kind === "trigger") return "called, regardless of the clock";
   if (due.days === null) return "no full screen on record";
   if (due.state === "not-due")
     return `due in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`;
@@ -127,6 +130,7 @@ function MyTests({ athleteId }: { athleteId: string }) {
       athleteId={athleteId}
       athleteName={data?.name ?? ""}
       hand={handOf(data?.hand)}
+      call={callOf(data)}
       isCoach={false}
     />
   );
@@ -193,10 +197,14 @@ function Roster() {
                 <span className="tr-name">
                   {r.name}
                   {due.lead.state !== "not-due" && (
-                    <em className={`tr-due t-${due.lead.state}`}>
-                      {due.lead.state === "overdue" ? "Overdue" : "Due"}
-                      {" · "}
-                      {KIND_LABEL[due.lead.kind]}
+                    <em
+                      className={`tr-due t-${
+                        due.lead.kind === "trigger" ? "called" : due.lead.state
+                      }`}
+                    >
+                      {due.lead.kind === "trigger"
+                        ? "Re-screen called"
+                        : `${due.lead.state === "overdue" ? "Overdue" : "Due"} · ${KIND_LABEL[due.lead.kind]}`}
                     </em>
                   )}
                 </span>
@@ -219,7 +227,7 @@ function Roster() {
                   {due.lead.days === null
                     ? "never"
                     : since(due.lead.days)}
-                  <em>{describe(due.lead)}</em>
+                  <em>{r.called ? r.called.reason : describe(due.lead)}</em>
                 </span>
               </Link>
             </li>

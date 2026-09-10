@@ -50,6 +50,15 @@ export const PROFILE_SECTIONS: { id: ProfileField["section"]; title: string }[] 
 ];
 
 export const STATUSES = ["On-Site", "Remote"] as const;
+
+/**
+ * Training block. Cole's three, in the order an athlete moves through them.
+ *
+ * Changing this is one of the things that earns a re-screen regardless of the
+ * clock: a new block is a new set of demands, and a limitation that didn't
+ * matter in the off-season can matter the week live BP starts.
+ */
+export const PHASES = ["Off-season", "Build", "In-season"] as const;
 export const BATS = ["R", "L", "S"] as const;
 
 export const PROFILE_FIELDS: ProfileField[] = [
@@ -84,6 +93,8 @@ export const PROFILE_FIELDS: ProfileField[] = [
     athleteCanSee: true, athleteCanEdit: true, required: true, options: LEVELS },
   { key: "status", label: "Training", kind: "select", section: "identity",
     athleteCanSee: true, athleteCanEdit: true, options: STATUSES },
+  { key: "phase", label: "Phase", kind: "select", section: "identity",
+    athleteCanSee: true, athleteCanEdit: false, options: PHASES },
 
   // physical
   { key: "heightIn", label: "Height", kind: "number", section: "physical",

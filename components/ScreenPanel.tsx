@@ -3,12 +3,13 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import type { MovementScreen } from "@/lib/types";
-import { fetcher } from "@/lib/fetcher";
+import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
   SCREEN_GROUPS,
   SCREEN_TESTS,
   asymmetryReport,
   leadClock,
+  rescreenStanding,
   retestPlan,
   screenReport,
   sidesOf,
@@ -16,6 +17,7 @@ import {
   type Deviation,
   type GapTrend,
   type Hand,
+  type RescreenCall,
   type ReportReading,
   type TestReport,
   type Trend,
@@ -62,7 +64,8 @@ const GAP_LABEL: Record<GapTrend, string> = {
 
 /** The nearer of the two clocks, in a sentence. */
 function nextUp(plan: ReturnType<typeof retestPlan>): string {
-  const lead = leadClock(plan.full, plan.spot);
+  const lead = leadClock(plan.full, plan.spot, plan.trigger);
+  if (lead.kind === "trigger") return "Re-screen called — regardless of the clock";
   const what =
     lead.kind === "spot"
       ? `spot-check (${lead.tests.length} ${lead.tests.length === 1 ? "test" : "tests"})`
@@ -84,13 +87,18 @@ export default function ScreenPanel({
   athleteId,
   athleteName,
   hand,
+  call,
   isCoach,
+  onCalled,
 }: {
   athleteId: string;
   athleteName: string;
   /** Throwing hand, for the arm-test caveat. Null when it isn't on file. */
   hand: Hand | null;
+  /** A re-screen called by a trigger, if one is on the athlete's row. */
+  call: RescreenCall | null;
   isCoach: boolean;
+  onCalled?: () => void;
 }) {
   const { data, mutate, isLoading } = useSWR<MovementScreen[]>(
     `/api/athletes/${athleteId}/screens`,
@@ -131,9 +139,10 @@ export default function ScreenPanel({
     [screen, standing],
   );
   const plan = useMemo(
-    () => (screen ? retestPlan(standing, todayISO()) : null),
-    [screen, standing],
+    () => retestPlan(standing, todayISO(), undefined, call),
+    [standing, call],
   );
+  const standingCall = rescreenStanding(call, standing) ? call : null;
   // What this particular screen looked at, for the line that says so.
   const covered = useMemo(
     () =>
@@ -257,9 +266,18 @@ export default function ScreenPanel({
                 {skipped.length > 0 && ` · ${skipped.length} not screened`}
                 {painful.length > 0 && ` · ${painful.length} flagged painful`}
               </span>
-              {plan && <span className="cz-note">{nextUp(plan)}</span>}
+              <span className="cz-note">{nextUp(plan)}</span>
             </div>
           </div>
+
+          {standingCall && (
+            <p className="sc-called" role="status">
+              <span className="eyebrow">Re-screen called</span>
+              {standingCall.reason} · {fmtDate(standingCall.since)}. Regardless
+              of the clock — a new block or a new movement pattern can expose or
+              resolve a limitation, so the whole sheet is worth re-asking.
+            </p>
+          )}
 
           {moved && (
             <p className="sc-moved">
@@ -384,6 +402,14 @@ export default function ScreenPanel({
               <button className="btn sm ghost" onClick={() => setEditing(screen)}>
                 Edit this screen
               </button>
+              <CallRescreen
+                athleteId={athleteId}
+                standing={!!standingCall}
+                onCalled={() => {
+                  onCalled?.();
+                  show("Re-screen called");
+                }}
+              />
             </div>
           )}
         </>
@@ -407,6 +433,76 @@ export default function ScreenPanel({
 
       {toast && <div className="toast">{toast}</div>}
     </section>
+  );
+}
+
+/**
+ * The third trigger, which has no data behind it: a mechanical change with the
+ * pitching coach is a conversation. Free text, because "we changed his glove
+ * side" is not a value anyone would have put in a list.
+ */
+function CallRescreen({
+  athleteId,
+  standing,
+  onCalled,
+}: {
+  athleteId: string;
+  standing: boolean;
+  onCalled: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (standing)
+    return <span className="cz-note">A re-screen is already called.</span>;
+
+  if (!open)
+    return (
+      <button className="btn sm ghost" onClick={() => setOpen(true)}>
+        Call a re-screen
+      </button>
+    );
+
+  return (
+    <div className="sc-call">
+      <input
+        className="tin sc-call-why"
+        placeholder="Why — e.g. new arm slot with Cole"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+      />
+      <button
+        className="btn sm primary"
+        disabled={busy || !reason.trim()}
+        onClick={async () => {
+          setBusy(true);
+          setErr(null);
+          try {
+            await api(`/api/athletes/${athleteId}/rescreen`, "POST", {
+              reason: reason.trim(),
+            });
+            setOpen(false);
+            setReason("");
+            onCalled();
+          } catch (e) {
+            setErr(e instanceof ApiError ? e.message : "Couldn't call that.");
+          }
+          setBusy(false);
+        }}
+      >
+        {busy ? "Calling…" : "Call it"}
+      </button>
+      <button className="btn sm ghost" onClick={() => setOpen(false)}>
+        Cancel
+      </button>
+      {err && (
+        <span className="form-error" role="alert">
+          {err}
+        </span>
+      )}
+    </div>
   );
 }
 

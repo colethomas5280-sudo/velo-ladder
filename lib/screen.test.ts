@@ -22,6 +22,7 @@ import {
   sessionsOn,
   statusRank,
   retestPlan,
+  rescreenStanding,
   leadClock,
   dueRank,
   RETEST_CADENCE,
@@ -1468,6 +1469,77 @@ test("an athlete with nothing to fix has only the one clock", () => {
   const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
   const plan = retestPlan(st, "2026-02-01", PAIR);
   assert.equal(leadClock(plan.full, plan.spot).kind, "full");
+});
+
+/* ------------------------------------------------------------------ *
+ * Re-screens called regardless of the clock
+ * ------------------------------------------------------------------ */
+
+test("a called re-screen stands until a screen answers it", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  assert.equal(rescreenStanding({ since: "2026-02-01", reason: "x" }, st), true);
+});
+
+/*
+ * The reason it is a date. A flag raised before the last screen has already
+ * been acted on, so it clears itself and nobody has to dismiss anything.
+ */
+test("a call already answered by a later screen doesn't stand", () => {
+  const st = standingScreen([screen("2026-03-01", FULL)], PAIR);
+  assert.equal(rescreenStanding({ since: "2026-02-01", reason: "x" }, st), false);
+});
+
+/*
+ * A screen this morning and a call this afternoon read identically by date.
+ * Calling that answered swallows a call the coach deliberately made — which
+ * is what it did the first time this ran, and the call simply vanished.
+ */
+test("a call on the day of a screen still stands", () => {
+  const st = standingScreen([screen("2026-02-01", FULL)], PAIR);
+  assert.equal(rescreenStanding({ since: "2026-02-01", reason: "x" }, st), true);
+});
+
+test("a call on an athlete nobody has screened stands", () => {
+  assert.equal(
+    rescreenStanding({ since: "2026-02-01", reason: "x" }, standingScreen([], PAIR)),
+    true,
+  );
+});
+
+test("no call, nothing standing", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  assert.equal(rescreenStanding(null, st), false);
+  assert.equal(retestPlan(st, "2026-02-01", PAIR).trigger, null);
+});
+
+test("a called re-screen is due the day it is raised, with no window", () => {
+  const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
+  const plan = retestPlan(st, "2026-02-01", PAIR, {
+    since: "2026-02-01",
+    reason: "Moved to In-season",
+  });
+  assert.equal(plan.trigger!.state, "due", "raised today, due today");
+  assert.equal(plan.trigger!.tests.length, PAIR.length, "and it runs the whole sheet");
+});
+
+/* "Regardless of the clock" is the point: it replaces them, not competes. */
+test("a called re-screen leads even when neither clock is anywhere near due", () => {
+  const st = standingScreen([screen("2026-01-25", FULL)], PAIR);
+  const plan = retestPlan(st, "2026-02-01", PAIR, {
+    since: "2026-02-01",
+    reason: "Back from an injury flag",
+  });
+  assert.equal(plan.full.state, "not-due", "screened a week ago");
+  assert.equal(
+    leadClock(plan.full, plan.spot, plan.trigger).kind,
+    "trigger",
+  );
+});
+
+test("with nothing called, the clocks decide as before", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  const plan = retestPlan(st, "2026-02-15", PAIR);
+  assert.equal(leadClock(plan.full, plan.spot, plan.trigger).kind, "spot");
 });
 
 test("due states sort most pressing first", () => {

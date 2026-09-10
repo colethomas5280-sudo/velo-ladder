@@ -1,6 +1,11 @@
 import { getScope } from "@/lib/scope";
 import { listAllScreens } from "@/lib/data";
-import { screenSummary, standingScreen, type Hand } from "@/lib/screen";
+import {
+  rescreenStanding,
+  screenSummary,
+  standingScreen,
+  type Hand,
+} from "@/lib/screen";
 import type { ScreenOverviewRow } from "@/lib/types";
 import { json, unauthorized, forbidden, guard } from "@/lib/http";
 
@@ -27,6 +32,12 @@ export async function GET() {
   return guard(async () => {
     const out: ScreenOverviewRow[] = (await listAllScreens()).map((a) => {
       const standing = standingScreen(a.screens);
+      const call =
+        a.rescreenSince !== null
+          ? { since: a.rescreenSince, reason: a.rescreenReason ?? "Re-screen called" }
+          : null;
+      // A call already answered by a later screen is not reported at all.
+      const called = rescreenStanding(call, standing) ? call : null;
       // Only "R" or "L" places the arm-test caveat; anything else waives nothing.
       const hand = a.hand === "R" || a.hand === "L" ? (a.hand as Hand) : null;
       if (!standing.last)
@@ -38,6 +49,7 @@ export async function GET() {
           summary: null,
           spotSince: null,
           spotTests: 0,
+          called,
         };
 
       const summary = screenSummary(standing.results, undefined, hand);
@@ -59,6 +71,7 @@ export async function GET() {
         summary,
         spotSince: failing[0] ?? null,
         spotTests: summary.failing.length,
+        called,
       };
     });
     return json(out);

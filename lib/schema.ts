@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 15;
+export const SCHEMA_VERSION = 16;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -188,6 +188,14 @@ $mig$;
 -- v15: OnBaseU movement screens. Results are JSONB keyed by test.sub-test,
 -- with an :L / :R suffix where the sub-test is graded per side, so revising
 -- the battery is a config edit rather than a migration.
+-- v16: training phase, and the one flag every re-screen trigger writes to.
+-- rescreen_since is a date rather than a boolean so it can be compared
+-- against the last screen: a flag raised before the most recent screen has
+-- already been answered, and clears itself without anyone dismissing it.
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS phase text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS rescreen_since date;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS rescreen_reason text;
+
 CREATE TABLE IF NOT EXISTS movement_screens (
   id          text PRIMARY KEY,
   athlete_id  text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,

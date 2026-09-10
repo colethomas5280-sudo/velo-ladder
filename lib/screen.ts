@@ -1407,7 +1407,7 @@ export function standingScreen(
  * spot-check, which is the common case and the whole point.
  * ------------------------------------------------------------------ */
 
-export type RetestKind = "full" | "spot";
+export type RetestKind = "full" | "spot" | "trigger";
 
 /** Not yet, inside the window, or past the end of it. */
 export type DueState = "not-due" | "due" | "overdue";
@@ -1415,6 +1415,12 @@ export type DueState = "not-due" | "due" | "overdue";
 export const RETEST_CADENCE: Record<RetestKind, { from: number; to: number }> = {
   full: { from: 56, to: 84 },
   spot: { from: 21, to: 28 },
+  /*
+   * A called re-screen has no window. It is due the day it is raised, which
+   * is what "regardless of the clock" means — a phase change or a return from
+   * injury doesn't wait for a quarter to elapse.
+   */
+  trigger: { from: 0, to: 0 },
 };
 
 export interface RetestDue {
@@ -1461,20 +1467,57 @@ export function retestState(
  * nobody has touched in six weeks, and taking the newest date would let the
  * one you just did hide the one you haven't.
  */
+export interface RescreenCall {
+  since: string;
+  reason: string;
+}
+
+/**
+ * Has a called re-screen been answered?
+ *
+ * Recording a screen clears the call outright — see `upsertScreen` — so this
+ * is a backstop rather than the mechanism, and it deliberately treats a
+ * SAME-DAY screen as not having answered.
+ *
+ * Dates are day-granular and the ambiguity is real: a screen this morning and
+ * a call this afternoon are indistinguishable from the reverse. Choosing
+ * "answered" swallows a call the coach deliberately made, which is exactly
+ * what it did the first time this ran. Choosing "standing" leaves a flag up
+ * until the next screen, which is the direction that fails safely — and the
+ * next screen is precisely what a standing call is asking for.
+ */
+export function rescreenStanding(
+  call: RescreenCall | null,
+  standing: Standing,
+): boolean {
+  if (!call) return false;
+  return !(standing.last && standing.last > call.since);
+}
+
 export function retestPlan(
   standing: Standing,
   today: string,
   tests: ScreenTest[] = SCREEN_TESTS,
-): { full: RetestDue; spot: RetestDue | null } {
+  call: RescreenCall | null = null,
+): { full: RetestDue; spot: RetestDue | null; trigger: RetestDue | null } {
   const full: RetestDue = {
     ...retestState("full", standing.lastFull, today),
     tests,
   };
 
+  /*
+   * A called re-screen runs the whole sheet: the point of one is that the
+   * demands changed, so the tests that were clean under the old ones are
+   * exactly the tests worth re-asking.
+   */
+  const trigger: RetestDue | null = rescreenStanding(call, standing)
+    ? { ...retestState("trigger", call!.since, today), tests }
+    : null;
+
   const failing = screenReport(standing.results, null, tests)
     .filter((r) => r.work.length)
     .map((r) => r.test);
-  if (!failing.length) return { full, spot: null };
+  if (!failing.length) return { full, spot: null, trigger };
 
   const dated = failing
     .map((t) => standing.from[t.key])
@@ -1482,7 +1525,11 @@ export function retestPlan(
     .sort();
   const since = dated[0] ?? null;
 
-  return { full, spot: { ...retestState("spot", since, today), tests: failing } };
+  return {
+    full,
+    spot: { ...retestState("spot", since, today), tests: failing },
+    trigger,
+  };
 }
 
 /** Where a due state sorts on the roster — most pressing first. */
@@ -1501,7 +1548,11 @@ export function dueRank(state: DueState): number {
 export function leadClock<T extends { state: DueState; days: number | null; from: number }>(
   full: T,
   spot: T | null,
+  trigger?: T | null,
 ): T {
+  // Cole's words: re-screen at phase changes REGARDLESS of the clock. So a
+  // called re-screen doesn't compete with the windows, it replaces them.
+  if (trigger) return trigger;
   if (!spot) return full;
   const rank = dueRank(spot.state) - dueRank(full.state);
   if (rank !== 0) return rank > 0 ? spot : full;
