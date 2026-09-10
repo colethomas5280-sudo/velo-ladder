@@ -8,6 +8,22 @@ const HIP = fieldKey("hip-45", "45-degree-angle", "L");
 const ok = (over: Record<string, unknown> = {}) =>
   parseScreenInput({ date: TODAY, results: { [HIP]: "greater" }, ...over }, TODAY);
 
+/*
+ * The same defect this file's date check used to carry: a shape-only regex
+ * let "2026-02-30" through to Postgres, which answered with a 500 instead of
+ * the 400 that names the problem.
+ */
+test("a screen dated to a day that doesn't exist is refused", () => {
+  const results = { "hip-45.45-degree-angle:L": "greater" };
+  for (const bad of ["2026-02-30", "2026-13-45", "2025-02-29"])
+    assert.equal(parseScreenInput({ date: bad, results }, "2026-09-10").ok, false, bad);
+  assert.equal(
+    parseScreenInput({ date: "2024-02-29", results }, "2026-09-10").ok,
+    true,
+    "a real leap day is fine",
+  );
+});
+
 test("a well-formed screen is accepted", () => {
   const r = ok();
   assert.equal(r.ok, true);

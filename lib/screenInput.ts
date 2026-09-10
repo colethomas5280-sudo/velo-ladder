@@ -1,3 +1,4 @@
+import { isCalendarDate } from "./velo";
 import {
   NOT_TESTED,
   SCREEN_TESTS,
@@ -32,8 +33,8 @@ export function parseScreenInput(
   const b = body as Record<string, unknown>;
 
   const date = String(b.date ?? "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
-    return { ok: false, error: "date must be YYYY-MM-DD" };
+  if (!isCalendarDate(date))
+    return { ok: false, error: "date must be a real day, as YYYY-MM-DD" };
   if (date > today) return { ok: false, error: "date can't be in the future" };
 
   if (b.results !== undefined && (typeof b.results !== "object" || b.results === null))
