@@ -19,6 +19,7 @@ import {
   screenSummary,
   asymmetries,
   asymmetryReport,
+  sessionsOn,
   statusRank,
   retestPlan,
   leadClock,
@@ -976,6 +977,39 @@ test("statuses sort worst first, and skipped sits below clean", () => {
   const order: ReportStatus[] = ["skipped", "clean", "ungraded", "yellow", "red", "alert"];
   const ranked = [...order].sort((a, b) => statusRank(b) - statusRank(a));
   assert.deepEqual(ranked, ["alert", "red", "yellow", "ungraded", "clean", "skipped"]);
+});
+
+/* ------------------------------------------------------------------ *
+ * Screen when fresh
+ * ------------------------------------------------------------------ */
+
+test("sessions on the screen's own day are the ones that matter", () => {
+  const sessions = [
+    { date: "2026-09-08", type: "mound" },
+    { date: "2026-09-10", type: "mound" },
+    { date: "2026-09-10", type: "pulldown" },
+    { date: "2026-09-11", type: "mound" },
+  ];
+  assert.equal(sessionsOn(sessions, "2026-09-10").length, 2);
+  assert.deepEqual(
+    sessionsOn(sessions, "2026-09-10").map((s) => s.type),
+    ["mound", "pulldown"],
+  );
+});
+
+test("a day with nothing logged raises nothing", () => {
+  assert.deepEqual(sessionsOn([{ date: "2026-09-08" }], "2026-09-10"), []);
+  assert.deepEqual(sessionsOn([], "2026-09-10"), []);
+});
+
+/*
+ * Deliberately same-day only. The app stores the day a session was logged,
+ * not the hour, so the neighbouring days are a guess — and a warning that
+ * fires on a screen taken two mornings later teaches the coach to dismiss it.
+ */
+test("the day either side is not the screen's day", () => {
+  const sessions = [{ date: "2026-09-09" }, { date: "2026-09-11" }];
+  assert.deepEqual(sessionsOn(sessions, "2026-09-10"), []);
 });
 
 /* ------------------------------------------------------------------ *
