@@ -2,7 +2,7 @@ import { getScope, canSeeAthlete } from "@/lib/scope";
 import { listScreens, upsertScreen, deleteScreen } from "@/lib/data";
 import { visibleScreen } from "@/lib/screen";
 import { parseScreenInput } from "@/lib/screenInput";
-import { todayISO } from "@/lib/velo";
+import { isCalendarDate, todayISO } from "@/lib/velo";
 import { json, unauthorized, forbidden, badRequest, guard } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -58,7 +58,7 @@ export async function DELETE(
   if (!scope) return unauthorized();
   if (scope.role !== "coach") return forbidden();
   const date = new URL(request.url).searchParams.get("date") || "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return badRequest("date required");
+  if (!isCalendarDate(date)) return badRequest("date required");
   return guard(async () => {
     await deleteScreen(id, date);
     return json({ ok: true });

@@ -101,9 +101,51 @@ export function fmt(v: number | null | undefined): string {
   const r = Math.round(v * 10) / 10;
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
+/**
+ * True iff `value` is a real `YYYY-MM-DD` calendar day.
+ *
+ * A shape-only regex is not enough. `2026-02-30` matches it, passes every
+ * validator that only checks the shape, and dies in Postgres as
+ * "date/time field value out of range" — a 500 where a 400 naming the problem
+ * belongs. The round-trip through UTC is what catches a day that doesn't
+ * exist: February 30th comes back out as March 2nd.
+ *
+ * Says nothing about whether the date is sensible — too old, in the future —
+ * because those bounds differ per field. Callers add their own.
+ */
+export function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  /*
+   * A full round-trip, and each part earns its place differently.
+   *
+   * The YEAR check is the only thing that catches a two-digit year: JS maps
+   * 0-99 to 1900+, so `0099-06-15` comes back as 1999 with the month and day
+   * intact. That is the half-typed year a native date input emits while
+   * someone is still typing.
+   *
+   * Month and day catch everything else, and they are redundant with EACH
+   * OTHER: an overflowing day rolls into the next month, and an overflowing
+   * month rolls the year. Either one alone would do alongside the year check.
+   * Both are kept because a round-trip that compares two thirds of a date is
+   * something the next reader has to reason about rather than read.
+   */
+  return (
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() === mo - 1 &&
+    dt.getUTCDate() === d
+  );
+}
+
 export function fmtDate(iso: string): string {
-  const p = (iso || "").split("-");
-  if (p.length !== 3) return iso || "";
+  // Anything that isn't a real day goes back out as it came in. It used to
+  // count hyphens and hand the pieces to Date, so "a-b-c" printed on screen
+  // as the words "Invalid Date".
+  if (!isCalendarDate(iso)) return iso || "";
+  const p = iso.split("-");
   return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -111,8 +153,8 @@ export function fmtDate(iso: string): string {
   });
 }
 export function fmtDateShort(iso: string): string {
-  const p = (iso || "").split("-");
-  if (p.length !== 3) return iso || "";
+  if (!isCalendarDate(iso)) return iso || "";
+  const p = iso.split("-");
   return `${+p[1]}/${+p[2]}`;
 }
 /**
@@ -328,7 +370,8 @@ export function validateSessionInput(input: unknown): {
   const type = o.type as TrackerId;
 
   const date = String(o.date || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "date must be YYYY-MM-DD" };
+  if (!isCalendarDate(date))
+    return { ok: false, error: "date must be a real day, as YYYY-MM-DD" };
 
   const notes = typeof o.notes === "string" ? o.notes.slice(0, 2000) : "";
 

@@ -1,5 +1,5 @@
 import type { TrainingSession, TrackerId } from "./types";
-import { TRACKERS, sBestG } from "./velo";
+import { TRACKERS, isCalendarDate, sBestG } from "./velo";
 
 /* ------------------------------------------------------------------ *
  * Leaderboard bands
@@ -62,21 +62,12 @@ export function ageOn(birthDate: string, onDate: string): number {
 const EARLIEST_BIRTH_YEAR = 1900;
 
 export function isValidBirthDate(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return false;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
+  // The calendar-day part lives in `isCalendarDate` now — it is the same
+  // question every date field asks, and it was being answered twice.
+  if (!isCalendarDate(value)) return false;
+  const [y, mo, d] = value.split("-").map(Number);
   if (y < EARLIEST_BIRTH_YEAR) return false;
   const dt = new Date(Date.UTC(y, mo - 1, d));
-  // round-trips only if the day actually exists (rejects 2009-02-30, 2009-99-99)
-  if (
-    dt.getUTCFullYear() !== y ||
-    dt.getUTCMonth() !== mo - 1 ||
-    dt.getUTCDate() !== d
-  )
-    return false;
   const now = new Date();
   const todayUTC = Date.UTC(
     now.getUTCFullYear(),

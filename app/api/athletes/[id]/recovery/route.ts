@@ -7,7 +7,7 @@ import {
 } from "@/lib/data";
 import type { ArmStatus } from "@/lib/types";
 import { PROFILE_FIELDS } from "@/lib/profile";
-import { todayISO } from "@/lib/velo";
+import { isCalendarDate, todayISO } from "@/lib/velo";
 import { json, unauthorized, forbidden, badRequest, guard } from "@/lib/http";
 
 // The profile and the check-in both write `athletes.weight_lb`; they must
@@ -67,7 +67,7 @@ export async function POST(
 
   const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
   const date = String(b.date || "");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
+  if (!isCalendarDate(date))
     return badRequest("date must be YYYY-MM-DD");
   // A future date is a typo. Left in, one mistyped year sets `weight_at` far
   // ahead and the `weight_at <= date` guard then blocks every real check-in
@@ -129,7 +129,7 @@ export async function DELETE(
   if (!scope) return unauthorized();
   if (!canSeeAthlete(scope, id)) return forbidden();
   const date = new URL(request.url).searchParams.get("date") || "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return badRequest("date required");
+  if (!isCalendarDate(date)) return badRequest("date required");
   await deleteRecovery(id, date);
   await reconcileSetbacks(id);
   return json({ ok: true });

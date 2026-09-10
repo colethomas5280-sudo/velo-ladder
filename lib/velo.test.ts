@@ -10,6 +10,7 @@ import {
   fmt,
   fmtDate,
   fmtDateShort,
+  isCalendarDate,
   sBest,
   sAvg,
   hundredsG,
@@ -86,6 +87,27 @@ test("fmt renders a missing velocity as the en-dash placeholder", () => {
  * Dates
  * ------------------------------------------------------------------ */
 
+test("isCalendarDate accepts real days and refuses the rest", () => {
+  for (const good of ["2026-08-05", "2024-02-29", "2026-12-31", "1900-01-01"])
+    assert.equal(isCalendarDate(good), true, good);
+  for (const bad of [
+    "2026-02-30", // February has never had 30 days
+    "2025-02-29", // 2025 is not a leap year
+    "2026-04-31", // April has 30
+    "2026-13-01", // no thirteenth month
+    "2026-00-01", // nor a zeroth
+    "0000-01-01", // JS reads years 0-99 as 1900+, so this is really 1900
+    "0099-06-15", // and this is 1999 — a year still being typed
+    "2026-08-5", // single digit
+    "2026/08/05", // wrong separator
+    "a-b-c",
+    "",
+    null,
+    20260805,
+  ])
+    assert.equal(isCalendarDate(bad), false, String(bad));
+});
+
 test("fmtDate keeps the calendar day it was given", () => {
   // Built in local time on purpose. Parsing as UTC and rendering locally is
   // how a session logged on the 5th starts displaying as the 4th.
@@ -101,14 +123,15 @@ test("fmtDate and fmtDateShort pass unparseable input straight through", () => {
   assert.equal(fmtDateShort("2026-08"), "2026-08");
 });
 
-test("a three-part non-numeric string renders as literal junk", () => {
-  // Documented, not endorsed. The guard counts hyphen-separated parts rather
-  // than checking they are numbers, so "a-b-c" gets past it and reaches the
-  // Date constructor. Unreachable through the app — every caller is fed a
-  // date column out of Postgres — but it is what these would print if one
-  // ever arrived.
-  assert.equal(fmtDate("a-b-c"), "Invalid Date");
-  assert.equal(fmtDateShort("a-b-c"), "NaN/NaN");
+/*
+ * These used to print "Invalid Date" and "NaN/NaN" on screen, because the
+ * guard counted hyphens rather than checking the pieces were a real day.
+ */
+test("anything that isn't a real day is passed through, not mangled", () => {
+  for (const junk of ["a-b-c", "2026-02-30", "2026-13-45", "20260805"]) {
+    assert.equal(fmtDate(junk), junk, junk);
+    assert.equal(fmtDateShort(junk), junk, junk);
+  }
 });
 
 test("fmtDateShort strips leading zeros", () => {
@@ -423,10 +446,14 @@ test("notes are capped rather than rejected", () => {
   assert.equal(ok({ notes: 12345 }).value!.notes, "");
 });
 
-test("the date check is format-only, not a calendar check", () => {
-  // Documented, not endorsed: "2026-13-45" is the right shape, so it passes
-  // here and is refused later by the date column in Postgres.
-  assert.equal(ok({ date: "2026-13-45" }).ok, true);
+/*
+ * This used to pass. The shape-only regex let "2026-02-30" through to die in
+ * Postgres as a 500, where a 400 naming the problem belonged.
+ */
+test("a date the calendar doesn't have is refused here, not by Postgres", () => {
+  for (const bad of ["2026-13-45", "2026-02-30", "2025-02-29", "2026-00-10", "2026-04-31"])
+    assert.equal(ok({ date: bad }).ok, false, bad);
+  assert.equal(ok({ date: "2024-02-29" }).ok, true, "a real leap day still passes");
 });
 
 /* ------------------------------------------------------------------ *
