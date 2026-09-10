@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -208,6 +208,37 @@ CREATE TABLE IF NOT EXISTS movement_screens (
 );
 -- One screen per athlete per day, so re-saving a date replaces it rather than
 -- leaving two versions for the comparison view to disagree about.
+-- v17: Push-Off stopped being two tests, one per surface, and became one
+-- test that records which surface it was run on. An athlete only ever does
+-- one, so the other stayed permanently unscreened and no screen could ever
+-- be complete. Move whatever was recorded onto the merged keys.
+--
+-- Mound wins if a screen somehow carries both, which the old config allowed
+-- and nobody should have done. The transformation is idempotent on its own —
+-- a row with no old keys comes out unchanged — so the WHERE clause is there
+-- to stop a re-run rewriting every screen, not to make it safe.
+UPDATE movement_screens SET results =
+  (results - 'push-off-mound.planted' - 'push-off-mound.released'
+           - 'push-off-flat.planted'  - 'push-off-flat.released')
+  || (CASE
+        WHEN results ? 'push-off-mound.planted'
+          THEN jsonb_build_object('push-off.surface', 'mound',
+                                  'push-off.planted', results -> 'push-off-mound.planted')
+        WHEN results ? 'push-off-flat.planted'
+          THEN jsonb_build_object('push-off.surface', 'flat',
+                                  'push-off.planted', results -> 'push-off-flat.planted')
+        ELSE '{}'::jsonb
+      END)
+  || (CASE
+        WHEN results ? 'push-off-mound.released'
+          THEN jsonb_build_object('push-off.released', results -> 'push-off-mound.released')
+        WHEN results ? 'push-off-flat.released'
+          THEN jsonb_build_object('push-off.released', results -> 'push-off-flat.released')
+        ELSE '{}'::jsonb
+      END)
+WHERE results ?| array['push-off-mound.planted', 'push-off-mound.released',
+                       'push-off-flat.planted',  'push-off-flat.released'];
+
 CREATE UNIQUE INDEX IF NOT EXISTS ms_athlete_date_uidx
   ON movement_screens(athlete_id, date);
 `;

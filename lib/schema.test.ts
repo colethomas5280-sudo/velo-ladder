@@ -217,6 +217,52 @@ test("the schema is safe to run twice", async () => {
   assert.equal((await tablesIn(db)).length, 6);
 });
 
+/*
+ * v17 merged the two Push-Off tests into one. Screens recorded before that
+ * hold the old keys, and losing them would quietly drop a reading from every
+ * screen Cole has already run.
+ */
+test("v17 moves an old Push-Off reading onto the merged keys", async () => {
+  const db = await freshDb();
+  await applyAsProduction(db, SCHEMA_SQL);
+  await db.query(`
+    INSERT INTO athletes (id, name) VALUES ('a1', 'Old Screen')
+  `);
+  await db.query(`
+    INSERT INTO movement_screens (id, athlete_id, date, results) VALUES
+      ('s1', 'a1', '2026-08-01', '{"push-off-mound.planted":"gt-6","push-off-mound.released":"gt-half","hip-45.45-degree-angle:L":"greater"}'),
+      ('s2', 'a1', '2026-08-02', '{"push-off-flat.planted":"5-to-6","push-off-flat.released":"none"}'),
+      ('s3', 'a1', '2026-08-03', '{"hip-45.45-degree-angle:L":"greater"}')
+  `);
+
+  await applyAsProduction(db, SCHEMA_SQL);
+  const rows = await db.query(
+    "SELECT id, results FROM movement_screens ORDER BY id",
+  );
+  const by = Object.fromEntries(
+    rows.rows.map((r: Record<string, unknown>) => [r.id, r.results as Record<string, string>]),
+  );
+
+  assert.deepEqual(by.s1, {
+    "push-off.surface": "mound",
+    "push-off.planted": "gt-6",
+    "push-off.released": "gt-half",
+    "hip-45.45-degree-angle:L": "greater",
+  });
+  assert.deepEqual(by.s2, {
+    "push-off.surface": "flat",
+    "push-off.planted": "5-to-6",
+    "push-off.released": "none",
+  });
+  assert.deepEqual(by.s3, { "hip-45.45-degree-angle:L": "greater" }, "untouched");
+
+  // Cole re-runs setup after every schema deploy, so a second pass must not
+  // undo or duplicate any of that.
+  await applyAsProduction(db, SCHEMA_SQL);
+  const again = await db.query("SELECT results FROM movement_screens WHERE id = 's1'");
+  assert.deepEqual(again.rows[0].results, by.s1);
+});
+
 test("the seed applies on top of a fresh schema", async () => {
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
