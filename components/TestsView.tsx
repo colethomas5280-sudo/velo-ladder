@@ -264,7 +264,15 @@ function Roster() {
                 <Link href={`/tests/${r.athleteId}`} className="tr-row">
                   <span className="ms-dot none" />
                   <span className="tr-name">{r.name}</span>
-                  <span className="tr-work dim">no screen on record</span>
+                  {/*
+                    * A re-screen can be called on someone never screened —
+                    * moving them to In-season, say. The row carried it and
+                    * threw it away, which lost the only reason attached to
+                    * an otherwise anonymous "record one".
+                    */}
+                  <span className="tr-work dim">
+                    {r.called ? r.called.reason : "no screen on record"}
+                  </span>
                   <span className="tr-when dim">Record one →</span>
                 </Link>
               </li>
