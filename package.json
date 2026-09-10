@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test --experimental-test-module-mocks \"lib/**/*.test.ts\""
+    "test": "node --import tsx --test --test-force-exit --experimental-test-module-mocks \"lib/**/*.test.ts\" \"components/**/*.test.tsx\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -20,12 +20,16 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/jsdom": "^27.0.0",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "jsdom": "^27.4.0",
     "tsx": "^4",
     "typescript": "^5"
   }
