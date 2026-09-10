@@ -7,6 +7,7 @@ import type { ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
   dueRank,
+  leadClock,
   retestState,
   statusRank,
   type ReportStatus,
@@ -106,8 +107,7 @@ function schedule(row: ScreenOverviewRow, today: string) {
   const spot = row.spotTests
     ? retestState("spot", row.spotSince, today)
     : null;
-  const lead = spot && dueRank(spot.state) > dueRank(full.state) ? spot : full;
-  return { full, spot, lead };
+  return { full, spot, lead: leadClock(full, spot) };
 }
 
 /** "due in 12–26 days" / "3–4 week spot-check" — the clock in words. */
@@ -190,6 +190,8 @@ function Roster() {
                   {r.summary!.work > 0
                     ? `${r.summary!.work} to work on`
                     : "nothing flagged"}
+                  {r.summary!.asymmetries > 0 &&
+                    ` · ${r.summary!.asymmetries} side gap${r.summary!.asymmetries === 1 ? "" : "s"}`}
                   {r.summary!.painful > 0 && (
                     <em>
                       {" · "}
