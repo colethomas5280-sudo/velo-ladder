@@ -33,7 +33,7 @@ import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
-import ScreenPanel from "./ScreenPanel";
+import ScreenLink from "./ScreenLink";
 import GuidanceCard from "./GuidanceCard";
 import ProfileSummary from "./ProfileSummary";
 
@@ -291,11 +291,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
         onChanged={() => mutateRecovery()}
       />
 
-      <ScreenPanel
-        athleteId={athleteId}
-        athleteName={athlete.name}
-        isCoach={!!canManage}
-      />
+      <ScreenLink athleteId={athleteId} />
 
       {sessionsLoading ? (
         <div

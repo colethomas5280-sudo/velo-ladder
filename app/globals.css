@@ -993,10 +993,22 @@ tr.sess.open .caret {
   text-decoration: none;
   color: var(--ink);
 }
+/*
+ * Wraps its own links rather than overflowing the bar. `.appbar` wraps too,
+ * but a nav that is one unshrinkable flex item just pushes past the viewport
+ * instead of breaking — which is what a fifth link did at 375px.
+ */
 .topnav {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 4px;
   margin-left: 6px;
+}
+@media (max-width: 420px) {
+  .topnav a {
+    padding: 6px 8px;
+  }
 }
 .topnav a {
   text-decoration: none;
@@ -2808,4 +2820,127 @@ table.roster-table {
 }
 .sc-block.sc-good li {
   color: var(--ink);
+}
+
+/* ---------- tests tab ---------- */
+.tests-head {
+  margin: 26px 0 14px;
+}
+.tests-head h2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 40px;
+  line-height: 1;
+  margin: 4px 0 0;
+  letter-spacing: 0.01em;
+}
+.tests-head .back-link {
+  display: inline-block;
+  margin: 0 0 8px -10px;
+}
+.tr-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tr-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--ink);
+  text-decoration: none;
+}
+.tr-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--panel-2);
+}
+.tr-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 15px;
+}
+.tr-work {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.tr-work em {
+  font-style: normal;
+  color: var(--bad);
+  font-weight: 600;
+}
+.tr-when {
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.tr-when em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.tr-work.dim,
+.tr-when.dim {
+  color: var(--ink-faint);
+}
+.tests-never {
+  margin-top: 22px;
+}
+.tests-never > .eyebrow {
+  margin-bottom: 8px;
+}
+.tests-card .sec-h .sub {
+  white-space: nowrap;
+}
+
+/* the pointer left on the athlete profile */
+.screen-link {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.screen-link:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.screen-link b {
+  display: block;
+  font-size: 16px;
+  margin-top: 2px;
+}
+.screen-link .cz-note {
+  display: block;
+  margin-top: 2px;
+}
+.sl-go {
+  margin-left: auto;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .tr-row {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+  .tr-name {
+    flex: 1 1 100%;
+    order: -1;
+  }
+  .tr-when {
+    margin-left: auto;
+    text-align: right;
+  }
 }
