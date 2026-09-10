@@ -195,13 +195,30 @@ export function todayISO(): string {
 export const BOXES_PER_SLOT = 5;
 export const BOX_INDEXES = [0, 1, 2, 3, 4] as const;
 
+/**
+ * How many boxes at the front of a slot are primers rather than scored throws.
+ *
+ * Box 0 is the 80% primer. Nothing scores it — not the PR, not the average,
+ * not the floor, and not the "did they enter a real throw" guard. It is the
+ * single most load-bearing rule in the velocity half of the app, and it was
+ * written three separate ways in this file: `slice(1)` twice and a loop
+ * starting at 1. Three copies of one decision is three places for it to stop
+ * agreeing.
+ */
+export const PRIMER_BOXES = 1;
+
+/** The scored throws in a slot — everything after the primer. */
+export function scoredBoxes<T>(slot: readonly T[]): T[] {
+  return slot.slice(PRIMER_BOXES);
+}
+
 function hundredsOfSlot(sessions: TrainingSession[], key: string): number[] {
   const out: number[] = [];
   for (const s of sessions) {
     const t = s.throws[key];
     if (!t) continue;
-    for (let i = 1; i < t.length; i++) {
-      const v = num(t[i]);
+    for (const box of scoredBoxes(t)) {
+      const v = num(box);
       if (v) out.push(v);
     }
   }
@@ -390,7 +407,7 @@ export function validateSessionInput(input: unknown): {
       return isFinite(n) && n > 0 && n <= 130 ? n : null;
     });
     if (arr.some((v) => v != null)) throws[k] = arr;
-    if (arr.slice(1).some((v) => v != null)) hasHundred = true;
+    if (scoredBoxes(arr).some((v) => v != null)) hasHundred = true;
   }
   if (!hasHundred) return { ok: false, error: "at least one 100% throw is required" };
 
@@ -413,7 +430,7 @@ export function throwsFromDraft(
     if (arr.some((v) => v != null)) throws[key] = arr;
   }
   const hasHundred = Object.values(throws).some((a) =>
-    a.slice(1).some((v) => v != null),
+    scoredBoxes(a).some((v) => v != null),
   );
   return { throws, hasHundred };
 }

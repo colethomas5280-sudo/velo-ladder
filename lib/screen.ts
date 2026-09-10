@@ -1524,8 +1524,8 @@ export function standingScreen(
 export type RetestKind = "full" | "spot" | "trigger";
 
 /**
- * Not yet, inside the window, past the end of it — or not being scheduled at
- * all, which is what the full sheet does in-season.
+ * Not yet, due today, past it — or not being scheduled at all, which is what
+ * the full sheet does in-season.
  */
 export type DueState = "not-due" | "due" | "overdue" | "paused";
 
@@ -1583,6 +1583,27 @@ export function retestState(
 ): Omit<RetestDue, "tests"> {
   const days = since === null ? null : daysBetween(since, today);
   return { kind, state: dueState(kind, days), every: RETEST_CADENCE[kind], days, since };
+}
+
+/**
+ * The date the spot clock runs from: the OLDEST last-look among the tests
+ * that are failing.
+ *
+ * Rechecking the 90/90 a fortnight ago says nothing about a thoracic rotation
+ * nobody has touched in six weeks, and taking the newest date would let the
+ * one you just did hide the one you haven't.
+ *
+ * Its own function because two callers need it — `retestPlan`, from a screen;
+ * and the roster route, from a summary — and they had grown separate copies
+ * that happened to agree.
+ */
+export function spotSince(standing: Standing, failing: string[]): string | null {
+  return (
+    failing
+      .map((key) => standing.from[key])
+      .filter((d): d is string => !!d)
+      .sort()[0] ?? null
+  );
 }
 
 /**
@@ -1670,11 +1691,7 @@ export function retestPlan(
     .map((r) => r.test);
   if (!failing.length) return { full, spot: null, trigger };
 
-  const dated = failing
-    .map((t) => standing.from[t.key])
-    .filter((d): d is string => !!d)
-    .sort();
-  const since = dated[0] ?? null;
+  const since = spotSince(standing, failing.map((t) => t.key));
 
   return {
     full,
@@ -1739,7 +1756,7 @@ export function dueRank(state: DueState): number {
  * Which of an athlete's two clocks speaks for them.
  *
  * The more pressing state wins. On a tie it is whichever opens sooner — an
- * athlete five days into a spot-check window is nearer a spot-check than a
+ * athlete five days into a spot-check interval is nearer a spot-check than a
  * full screen, and reporting the quarterly clock because it is the bigger job
  * tells them about the thing that ISN'T next.
  */
@@ -1749,7 +1766,7 @@ export function leadClock<T extends { state: DueState; days: number | null; ever
   trigger?: T | null,
 ): T {
   // Cole's words: re-screen at phase changes REGARDLESS of the clock. So a
-  // called re-screen doesn't compete with the windows, it replaces them.
+  // called re-screen doesn't compete with the clocks, it replaces them.
   if (trigger) return trigger;
   if (!spot) return full;
   const rank = dueRank(spot.state) - dueRank(full.state);

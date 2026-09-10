@@ -3,6 +3,7 @@ import { listAllScreens } from "@/lib/data";
 import {
   rescreenStanding,
   screenSummary,
+  spotSince,
   standingScreen,
   type Hand,
 } from "@/lib/screen";
@@ -54,15 +55,6 @@ export async function GET() {
         };
 
       const summary = screenSummary(standing.results, undefined, hand);
-      /*
-       * The spot clock runs from the OLDEST failing test — rechecking the one
-       * you just did must not reset the clock on the one you have been
-       * avoiding. Mirrors `retestPlan`, which the panel uses.
-       */
-      const failing = Object.entries(standing.from)
-        .filter(([key]) => summary.failing.includes(key))
-        .map(([, date]) => date)
-        .sort();
 
       return {
         athleteId: a.athleteId,
@@ -70,7 +62,7 @@ export async function GET() {
         last: standing.last,
         lastFull: standing.lastFull,
         summary,
-        spotSince: failing[0] ?? null,
+        spotSince: spotSince(standing, summary.failing),
         spotTests: summary.failing.length,
         called,
         phase: a.phase,

@@ -113,7 +113,7 @@ const KIND_LABEL: Record<RetestKind, string> = {
 const schedule = (row: ScreenOverviewRow, today: string) =>
   clocksFor(row, today);
 
-/** "due in 12–26 days" / "3–4 week spot-check" — the clock in words. */
+/** "due in 12 days" / "4-week spot-check" — the clock in words. */
 function describe(due: ReturnType<typeof retestState>): string {
   if (due.kind === "trigger") return "called, regardless of the clock";
   if (due.state === "paused") return "in-season · spot-checks only";
