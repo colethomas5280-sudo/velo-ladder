@@ -1359,20 +1359,19 @@ const BAD: Results = { ...FULL, [SQ.L]: "bad" };
 const PAIR = [sample, gated];
 
 /*
- * Both windows are whole weeks, because the roster prints them as weeks by
- * dividing by seven. A window of 30 days would render as "4.285714 weeks".
+ * Both intervals are whole weeks, because the roster prints them as weeks by
+ * dividing by seven. Thirty days would render as "4.285714 weeks".
  */
-test("the cadence windows divide into whole weeks", () => {
-  for (const [kind, w] of Object.entries(RETEST_CADENCE)) {
-    if (kind === "trigger") continue; // no window at all — due when raised
-    assert.equal(w.from % 7, 0, `${kind} opens mid-week`);
-    assert.equal(w.to % 7, 0, `${kind} closes mid-week`);
+test("the cadences divide into whole weeks", () => {
+  for (const [kind, every] of Object.entries(RETEST_CADENCE)) {
+    if (kind === "trigger") continue; // due when raised, no interval at all
+    assert.equal(every % 7, 0, `${kind} lands mid-week`);
   }
 });
 
-test("the full clock is 8-12 weeks, the spot clock 3-4", () => {
-  assert.deepEqual(RETEST_CADENCE.full, { from: 56, to: 84 });
-  assert.deepEqual(RETEST_CADENCE.spot, { from: 21, to: 28 });
+test("the full clock is 8 weeks, the spot clock 4", () => {
+  assert.equal(RETEST_CADENCE.full, 56);
+  assert.equal(RETEST_CADENCE.spot, 28);
 });
 
 test("a clean athlete has a full clock and no spot clock", () => {
@@ -1382,20 +1381,22 @@ test("a clean athlete has a full clock and no spot clock", () => {
   assert.equal(plan.full.state, "not-due");
 });
 
-test("the full window opens at 8 weeks and closes at 12", () => {
+/*
+ * An exact interval means there is no grace period to sit inside: due on the
+ * day, late after it. That is what picking one number buys.
+ */
+test("the full clock is due on day 56 and late after it", () => {
   const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
   const at = (d: string) => retestPlan(st, d, PAIR).full.state;
   assert.equal(at("2026-02-25"), "not-due", "55 days");
   assert.equal(at("2026-02-26"), "due", "56 days");
-  assert.equal(at("2026-03-26"), "due", "84 days");
-  assert.equal(at("2026-03-27"), "overdue", "85 days");
+  assert.equal(at("2026-02-27"), "overdue", "57 days");
 });
 
-test("the spot window opens at 3 weeks and closes at 4", () => {
+test("the spot clock is due on day 28 and late after it", () => {
   const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
   const at = (d: string) => retestPlan(st, d, PAIR).spot!.state;
-  assert.equal(at("2026-01-21"), "not-due", "20 days");
-  assert.equal(at("2026-01-22"), "due", "21 days");
+  assert.equal(at("2026-01-28"), "not-due", "27 days");
   assert.equal(at("2026-01-29"), "due", "28 days");
   assert.equal(at("2026-01-30"), "overdue", "29 days");
 });
@@ -1474,23 +1475,30 @@ test("a more pressing clock wins regardless of which is nearer", () => {
 });
 
 /*
- * Where the two rules pull apart. A full screen at the very end of its window
- * has been waiting far longer in absolute days than a spot-check one day past
- * its own — but "overdue" outranks "due", and the spot-check is the thing
- * that has actually been missed.
+ * Where the two rules pull apart, now that intervals are exact.
+ *
+ * They agree on every live clock: a due one sits at zero days remaining and
+ * an overdue one goes negative, so "most pressing" and "soonest" say the same
+ * thing. A PAUSED clock is the exception — it can be a hundred days past an
+ * interval it is no longer counting, which reads as the most urgent thing on
+ * the page unless the state is checked first.
  */
-test("overdue beats due even when the other clock has waited longer", () => {
+test("a paused clock loses to a live one it has 'waited' longer than", () => {
   const st = standingScreen(
     [
       screen("2026-01-01", BAD),
-      screen("2026-02-25", { [SQ.L]: "bad", [SQ.R]: "good" }),
+      screen("2026-04-05", { [SQ.L]: "bad", [SQ.R]: "good" }),
     ],
     PAIR,
   );
-  const plan = retestPlan(st, "2026-03-26", PAIR);
-  assert.equal(plan.full.state, "due", "84 days — the last day of the window");
-  assert.equal(plan.spot!.state, "overdue", "29 days — one past its own");
-  assert.equal(leadClock(plan.full, plan.spot).kind, "spot");
+  const plan = retestPlan(st, "2026-04-11", PAIR, { phase: IN_SEASON });
+  assert.equal(plan.full.state, "paused", "100 days, and not being counted");
+  assert.equal(plan.spot!.state, "not-due", "spot-checked six days ago");
+  assert.equal(
+    leadClock(plan.full, plan.spot, plan.trigger).kind,
+    "spot",
+    "the one that is actually coming",
+  );
 });
 
 test("an athlete with nothing to fix has only the one clock", () => {

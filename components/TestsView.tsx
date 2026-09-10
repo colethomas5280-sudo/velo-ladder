@@ -88,10 +88,9 @@ function since(days: number): string {
   return `${Math.round(days / 30)} months ago`;
 }
 
-/** A cadence window in weeks, from the config that enforces it. */
-function weeks(kind: "full" | "spot"): string {
-  const { from, to } = RETEST_CADENCE[kind];
-  return `${from / 7}–${to / 7}`;
+/** A cadence in whole weeks, from the config that enforces it. */
+function weeks(kind: "full" | "spot"): number {
+  return RETEST_CADENCE[kind] / 7;
 }
 
 const KIND_LABEL: Record<RetestKind, string> = {
@@ -120,8 +119,10 @@ function describe(due: ReturnType<typeof retestState>): string {
   if (due.state === "paused") return "in-season · spot-checks only";
   if (due.days === null) return "no full screen on record";
   if (due.state === "not-due")
-    return `due in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`;
-  return due.kind === "spot" ? "3–4 week spot-check" : "8–12 week full screen";
+    return `due in ${due.every - due.days} days`;
+  return due.kind === "spot"
+    ? `${RETEST_CADENCE.spot / 7}-week spot-check`
+    : `${RETEST_CADENCE.full / 7}-week full screen`;
 }
 
 /** An athlete's own tests. Fetches their row for the throwing hand. */
@@ -182,7 +183,8 @@ function Roster() {
             * three commits after that cadence was replaced.
             */}
           <span>
-            Full screen {weeks("full")} weeks · spot-check {weeks("spot")}
+            Full screen every {weeks("full")} weeks · spot-check every{" "}
+            {weeks("spot")}
           </span>
           <Link href="/tests/reference">What each test grades →</Link>
         </div>
