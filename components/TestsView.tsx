@@ -6,6 +6,7 @@ import useSWR from "swr";
 import type { Athlete, ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
+  RETEST_CADENCE,
   clocksFor,
   dueRank,
   retestState,
@@ -85,6 +86,12 @@ function since(days: number): string {
   if (days < 14) return `${days} days ago`;
   if (days < 60) return `${Math.round(days / 7)} weeks ago`;
   return `${Math.round(days / 30)} months ago`;
+}
+
+/** A cadence window in weeks, from the config that enforces it. */
+function weeks(kind: "full" | "spot"): string {
+  const { from, to } = RETEST_CADENCE[kind];
+  return `${from / 7}–${to / 7}`;
 }
 
 const KIND_LABEL: Record<RetestKind, string> = {
@@ -168,7 +175,17 @@ function Roster() {
     <section className="card pad tests-card">
       <div className="sec-h">
         <h3>Movement screen</h3>
-        <span className="sub">Retest 4–6 weeks correcting · 8–12 weeks clean</span>
+        <div className="sub sr-sub">
+          {/*
+            * Read off RETEST_CADENCE rather than typed. The line that used to
+            * sit here was typed, and went on describing the first cadence for
+            * three commits after that cadence was replaced.
+            */}
+          <span>
+            Full screen {weeks("full")} weeks · spot-check {weeks("spot")}
+          </span>
+          <Link href="/tests/reference">What each test grades →</Link>
+        </div>
       </div>
 
       {isLoading && <p className="widget-empty">Loading…</p>}

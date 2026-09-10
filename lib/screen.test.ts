@@ -1358,6 +1358,18 @@ const FULL: Results = { [SQ.L]: "good", [SQ.R]: "good", "gtd.first": "pass", "gt
 const BAD: Results = { ...FULL, [SQ.L]: "bad" };
 const PAIR = [sample, gated];
 
+/*
+ * Both windows are whole weeks, because the roster prints them as weeks by
+ * dividing by seven. A window of 30 days would render as "4.285714 weeks".
+ */
+test("the cadence windows divide into whole weeks", () => {
+  for (const [kind, w] of Object.entries(RETEST_CADENCE)) {
+    if (kind === "trigger") continue; // no window at all — due when raised
+    assert.equal(w.from % 7, 0, `${kind} opens mid-week`);
+    assert.equal(w.to % 7, 0, `${kind} closes mid-week`);
+  }
+});
+
 test("the full clock is 8-12 weeks, the spot clock 3-4", () => {
   assert.deepEqual(RETEST_CADENCE.full, { from: 56, to: 84 });
   assert.deepEqual(RETEST_CADENCE.spot, { from: 21, to: 28 });
