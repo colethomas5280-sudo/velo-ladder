@@ -90,6 +90,12 @@ export interface ScreenTest {
    * nothing is claimed either way.
    */
   throwingArmOnly?: boolean;
+  /**
+   * Cole's own demonstration of the test, linked from the form and the
+   * reference. Written text can only get a remote athlete so far — the point
+   * of a screen is a position, and a position is easier watched than read.
+   */
+  video?: string;
   subTests: SubTest[];
 }
 
@@ -149,7 +155,7 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
     key: "surface",
     label: "Where was this tested?",
     help:
-      "The test runs the same either way. Record which, so a later comparison is like for like.",
+      "The test is the same on both. Record which one, so the next comparison is like for like.",
     diagnostic: true,
     findings: [
       { key: "mound", label: "On the mound" },
@@ -160,7 +166,7 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
     key: "planted",
     label: "How far did they step with their back foot planted?",
     help:
-      "Back foot next to the rubber and perpendicular to it. Stride directly sideways as far as possible, that foot staying parallel to the rubber and on the ground. Measure front of the rubber to the striding toe, in their own foot lengths.",
+      "Stand with your back foot beside the rubber, pointing straight out from it. Step sideways as far as you can, keeping that back foot flat on the ground and parallel to the rubber. Measure from the front of the rubber to the toe of the stepping foot, counting in your own foot lengths.",
     findings: [
       { key: "gt-6", label: "Greater than 6 foot lengths", normal: true },
       { key: "5-to-6", label: "5-6 foot lengths", normal: true },
@@ -171,7 +177,7 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
     key: "released",
     label: "How far did they step with the back foot released?",
     help:
-      "The same stride again, but driving off the back foot as they would pitching and letting it drag. Measure the gain over the planted stride — half a foot length is the mark. This half is hip mobility, ankle plantarflexion and groin flexibility.",
+      "The same step again, but this time push off the back foot the way you would on a pitch and let it drag. Measure how much further you got — half a foot length is the target. This half is about hip mobility, ankle flexibility and the groin.",
     dependsOn: { subTest: "planted", findings: ["gt-6", "5-to-6"] },
     findings: [
       { key: "gt-half", label: "Greater than half a foot length increase", normal: true, severity: "green" },
@@ -198,9 +204,9 @@ const PUSH_OFF_SUBTESTS: SubTest[] = [
  * and is the reason the follow-up exists at all.
  */
 const ANKLE_HELD_HELP =
-  "Hold the knees to stabilise them and repeat. Restored when held is a stability " +
-  "problem; still limited when held — or knees that keep moving anyway — is mobility " +
-  "in the ankle itself.";
+  "Have someone hold your knees steady, then try again. If holding fixes it, the " +
+  "problem is stability. If it's still limited when held — or the knees keep moving " +
+  "anyway — the limit is in the ankle itself.";
 
 function ankleSubTests(spec: {
   /** Stable key stem — never change it, it is in the database. */
@@ -280,7 +286,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "tilt",
         label: "Tilt",
-        help: "Athletic posture, arms crossed with hands resting on the shoulders. Tilt the pelvis forward to increase the arch, then back to flatten it. Expect minimal leg and knee movement and limited upper-body sway. Limitation can appear in one direction and not the other.",
+        help: "Stand in an athletic stance. Cross your arms and rest your hands on your shoulders. Tip your hips forward so your lower back arches, then tip them back so it flattens. Legs and knees should stay almost still and the upper body shouldn't sway much. One direction can be limited while the other is fine.",
         findings: [
           { key: "can-tilt-both", label: "Can tilt in both directions", normal: true, severity: "green" },
           { key: "cannot-arch", label: "Cannot arch the back", severity: "yellow" },
@@ -292,7 +298,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "quality-tilting",
         label: "Motion quality",
         dependsOn: { subTest: "tilt", findings: ["can-tilt-both"] },
-        help: "Watch the tilt itself rather than its range. Shaking through the movement suggests those muscles aren't used day to day.",
+        help: "Watch how the movement looks, not how far it goes. Shaking or juddering through it usually means those muscles don't get used day to day.",
         findings: [
           { key: "smooth", label: "Smooth motion", normal: true, severity: "green" },
           { key: "shake", label: "Shake and bake (vibration)", severity: "yellow" },
@@ -328,7 +334,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "rotation",
         label: "Rotation",
-        help: "Athletic posture, feet shoulder width, arms crossed with hands on the front of each shoulder. Rotate the belt and below back and forth without moving the upper body — it should look like the twist with no shoulder motion. Watch for the pelvis shifting sideways rather than turning, and for the legs straightening and bending.",
+        help: "Athletic stance, feet shoulder width. Cross your arms and rest your hands on the front of each shoulder. Turn your hips left and right while the upper body stays facing forward — like the twist, with no shoulder movement. Watch for hips sliding sideways instead of turning, and for knees straightening and bending.",
         findings: [
           { key: "good-bilateral", label: "Good bilateral without assistance", normal: true, severity: "green" },
           { key: "limited-bilateral", label: "Limited without assistance" },
@@ -340,7 +346,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "assist-bilateral",
         label: "With assistance",
         dependsOn: { subTest: "rotation", findings: ["limited-bilateral"] },
-        help: "Hold their upper body stable for them and have them rotate again. Improving on both sides is the best outcome here; improving on only one is not.",
+        help: "Have someone hold your upper body still, then turn the hips again. Improving on both sides is the result you want; improving on only one isn't.",
         findings: [
           { key: "improves-bilateral", label: "Improvement bilateral with assistance", severity: "yellow" },
           { key: "no-improvement", label: "No bilateral improvement with assistance", severity: "red" },
@@ -405,7 +411,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "With the pelvis held",
         sides: "lr",
         dependsOn: { subTest: "hip-ir", findings: ["short"] },
-        help: "Hold the pelvis steady and have them turn again. Reaching the bat now means the limit was stability; still coming up short means it is mobility.",
+        help: "Have someone hold your hips steady, then turn again. Reaching the bat now means the limit was stability. Still coming up short means it's mobility.",
         findings: [
           { key: "touches", label: "Touches the bat with the pelvis held", severity: "yellow" },
           { key: "still-short", label: "Still short with the pelvis held", severity: "red" },
@@ -424,7 +430,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "45 Degree Angle",
         sides: "lr",
         help:
-          "Feet at 45 degrees to each other — home plate works as a guide. Hands on the hips, all the weight on the loaded leg, that foot planted firmly. Rotate the pelvis as far as possible towards the unloaded foot, so the turn happens around the loaded leg alone. It should pass the 45-degree mark. Repeat on the other leg and compare.",
+          "Set your feet at 45 degrees to each other — the edges of home plate work as a guide. Hands on your hips. Put all your weight on one leg and keep that foot planted. Turn your hips as far as you can towards the other foot, so the turn happens around the weighted leg only. The hips should pass the 45-degree mark. Switch legs and compare.",
         findings: [
           { key: "greater", label: "Greater than 45\u00b0", normal: true, severity: "green" },
           { key: "equal", label: "Equal to 45\u00b0", severity: "yellow" },
@@ -457,7 +463,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "cervical",
         label: "Cervical rotation",
         sides: "lr",
-        help: "As they rotate the trunk, have them look back the other way — turning right, they look left. Watch whether the chin reaches the collarbone.",
+        help: "With the trunk turned, look back the other way — turning right, look left. Watch whether the chin reaches the collarbone.",
         findings: [
           { key: "touches", label: "Chin touches clavicle", normal: true, severity: "green" },
           { key: "short", label: "Chin short of clavicle", severity: "red" },
@@ -475,7 +481,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "distance",
         label: "How far did the athlete side step?",
         help:
-          "Lying face up, place one ball outside the heel and another outside the shoulder. Without moving the balls, have them stand, line one foot up with a ball, then walk out towards the other as far as they can without moving that foot. Compare where the walking foot finishes against the second ball.",
+          "Lie on your back. Put one ball on the floor just outside your heel and another just outside your shoulder. Stand up without moving either one. Line a foot up with one ball, then step sideways towards the other as far as you can without moving the planted foot. Compare where the stepping foot finishes against the second ball.",
         findings: [
           { key: "greater", label: "Greater than the ball", normal: true, severity: "green" },
           { key: "equal", label: "Equal to the ball", severity: "yellow" },
@@ -506,7 +512,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "height",
         label: "What was the height of their heel lift?",
         sides: "lr",
-        help: "Toes of the standing foot to the wall, the other foot behind it and then lifted clear. Balancing on the standing foot alone, lift that heel off the ground.",
+        help: "Stand with the toes of one foot against a wall and the other foot behind it, lifted off the floor. Balancing on the front foot alone, lift that heel as high as you can.",
         findings: [
           // A gate, like Push-Off's first stage: a good lift carries no colour
           // of its own and passes through to the quality question.
@@ -539,14 +545,14 @@ export const SCREEN_TESTS: ScreenTest[] = [
         question: "seated eversion (rolling in)",
         noun: "eversion",
         help:
-          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Roll both ankles in. Pass or fail rather than measured, but the range to expect is about 20 degrees.",
+          "Sit on a chair with your knees bent to a right angle and your legs apart. Move your ankles without letting your knees move. Roll both ankles inwards. Judged pass or fail rather than measured, but about 20 degrees is normal.",
       }),
       ...ankleSubTests({
         key: "inversion",
         question: "seated inversion (rolling out)",
         noun: "inversion",
         help:
-          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Roll both ankles out. Pass or fail rather than measured, but the range to expect is about 30 degrees.",
+          "Sit on a chair with your knees bent to a right angle and your legs apart. Move your ankles without letting your knees move. Roll both ankles outwards. Judged pass or fail rather than measured, but about 30 degrees is normal.",
       }),
     ],
   },
@@ -561,14 +567,14 @@ export const SCREEN_TESTS: ScreenTest[] = [
         question: "seated lateral (turning out) tibial rotation",
         noun: "lateral rotation",
         help:
-          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Turn both feet outwards, knees still and flexed. Measured rather than pass or fail: expect about 40 degrees.",
+          "Sit on a chair with your knees bent to a right angle and your legs apart. Move your ankles without letting your knees move. Turn both feet outwards, keeping the knees still and bent. This one is measured: about 40 degrees is normal.",
       }),
       ...ankleSubTests({
         key: "medial",
         question: "seated medial (turning in) tibial rotation",
         noun: "medial rotation",
         help:
-          "Seated, knees at 90 degrees and legs apart, moving the ankles without moving the knees. Turn both feet inwards, knees still and flexed. Measured rather than pass or fail: expect about 20 degrees.",
+          "Sit on a chair with your knees bent to a right angle and your legs apart. Move your ankles without letting your knees move. Turn both feet inwards, keeping the knees still and bent. This one is measured: about 20 degrees is normal.",
       }),
     ],
   },
@@ -585,7 +591,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "stability",
         label: "How was their half-kneeling stability?",
         help:
-          "Half-kneeling with both feet and knees in a straight line — a foul line is ideal — and the back foot laces down. Three seconds to find balance, then hold it solidly for three more with tall posture, without using the back foot to steady themselves. Any loss of balance or posture is a fail; it should look completely still.",
+          "Kneel on one knee with both feet and both knees on a straight line — a foul line is ideal — and the laces of the back foot flat on the ground. Take three seconds to find your balance, then hold dead still for three more, standing tall through the hips and back. Don't use the back foot to steady yourself. Any wobble or loss of posture is a fail.",
         findings: [
           { key: "stable", label: "Stable bilaterally", normal: true, severity: "green" },
           /*
@@ -619,7 +625,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "Could they get into their starting position?",
         sides: "dominance",
         help:
-          "Balls placed outside the heel and the shoulder while lying face up, then stand without moving them. Wide lunge with the front foot inside the top ball, the back heel inside the bottom one, and the front knee over the back of that heel. Arms overhead into full shoulder flexion, elbows locked out. Arms that can't start in full flexion mean the test is already dysfunctional — go through the motion only to check for pain.",
+          "Lie on your back and put one ball just outside your heel and another just outside your shoulder. Stand up without moving them. Step into a long lunge with the front foot inside the top ball, the back heel inside the bottom one, and the front knee over the back of that heel. Raise both arms straight overhead with the elbows locked. If the arms can't get fully overhead to start with, the test has already failed — go through the motion only to check for pain.",
         findings: [
           { key: "good", label: "Good starting position", normal: true, severity: "green" },
           { key: "limited-stride", label: "Limited stride", severity: "yellow" },
@@ -632,7 +638,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "How was their lunge with extension?",
         sides: "dominance",
         help:
-          "From that position, bend backwards as far as possible looking up towards the hands, with the front knee unmoved. Full shoulder flexion held throughout — the arm covers the ear — and the shoulders should cross the line bisecting the back hamstring.",
+          "From there, lean back as far as you can, looking up at your hands, without letting the front knee move. The arms stay fully overhead throughout — the upper arm should stay beside the ear. The shoulders should pass the line halfway down the back thigh.",
         findings: [
           { key: "good", label: "Good spine or hip extension (past mid-knee)", normal: true, severity: "green" },
           { key: "limited", label: "Limited spine or hip extension", severity: "red" },
@@ -653,7 +659,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
          */
         key: "arms-front",
         label: "How was their wide squat with arms out front?",
-        help: "Feet shoulder width, toes straight ahead, arms out in front. Descend as deeply as possible with the heels down and the chest forward, looking for the thighs to break parallel.",
+        help: "Feet shoulder width, toes pointing straight ahead, arms straight out in front. Squat as deep as you can with your heels down and your chest up. Look for the thighs to drop past parallel with the floor.",
         findings: [
           { key: "good", label: "Good squat", normal: true },
           { key: "limited", label: "Limited squat", severity: "red" },
@@ -663,7 +669,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         key: "arms-down",
         label: "How was the squat when lowering the arms?",
         dependsOn: { subTest: "arms-front", findings: ["good"] },
-        help: "From the bottom of the squat, lower the fists towards the floor inside the footprint and hold without losing control.",
+        help: "From the bottom of the squat, lower your fists towards the floor between your feet and hold there without losing balance.",
         findings: [
           { key: "maintained", label: "Maintained stable squat when lowering arms", normal: true, severity: "green" },
           { key: "lost", label: "Loses stable squat when lowering arms", severity: "red" },
@@ -685,7 +691,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "How far does the shoulder externally rotate?",
         sides: "lr",
         help:
-          "Standing tall, arm out to the side at 90 degrees of abduction and 90 at the elbow. Rotate the hand up and back as far as the posture allows — no arching the back, no bending the torso backwards. Grade the forearm against their spine angle. Stop at any pain or discomfort.",
+          "Stand tall. Raise one arm straight out to the side at shoulder height, then bend the elbow so the forearm points upwards — a right angle at both the shoulder and the elbow. Rotate the hand back as far as it goes without arching your back or leaning backwards. Compare the angle of the forearm against the line of your back. Stop at any pain.",
         findings: [
           { key: "greater", label: "Greater than spine angle", normal: true, severity: "green" },
           { key: "equal", label: "Equal to spine angle", severity: "yellow" },
@@ -707,7 +713,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "How far does the shoulder internally rotate with the arm out front?",
         sides: "lr",
         help:
-          "Ball in the hand, feet pelvic width, arm straight out in front at shoulder height, palm facing the ground. Keeping the shoulder at 90 degrees, rotate the thumb down as far as it goes — 90 degrees is the thumb pointing straight down.",
+          "Hold a ball, feet about hip width. Raise one arm straight out in front at shoulder height, palm facing the floor. Keeping the arm at shoulder height, rotate the thumb downwards as far as it goes. All the way is the thumb pointing straight at the floor.",
         findings: [
           { key: "gte-90", label: "Equal to or greater than 90\u00b0", normal: true, severity: "green" },
           { key: "lt-90", label: "Less than 90\u00b0", severity: "red" },
@@ -718,7 +724,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "How far does the shoulder internally rotate with the arm out to the side?",
         sides: "lr",
         help:
-          "The same rotation with the arm straight out to the side instead, hand in line with the trunk and the palm starting face-down. Again the thumb should reach vertical.",
+          "The same rotation with the arm straight out to the side instead, in line with your body, palm starting face down. Again the thumb should finish pointing straight at the floor.",
         findings: [
           { key: "gte-90", label: "Equal to or greater than 90\u00b0", normal: true, severity: "green" },
           { key: "lt-90", label: "Less than 90\u00b0", severity: "red" },
@@ -739,7 +745,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "How far does the forearm supinate?",
         sides: "lr",
         help:
-          "Standing, holding a ball with the shoulder at 90 degrees, the elbow at 90 and the palm facing forward. Turn the ball and palm towards their own head — the curveball direction — looking for a full 80 degrees.",
+          "Stand holding a ball with the arm out to the side at shoulder height, the elbow bent to a right angle and the palm facing forwards. Turn the ball and palm towards your own head — the curveball direction — as far as they'll go. 80 degrees is the target.",
         findings: [
           { key: "gte-80", label: "80\u00b0 or more of supination", normal: true, severity: "green" },
           { key: "lt-80", label: "Less than 80\u00b0 of supination", severity: "red" },
@@ -750,7 +756,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
         label: "How far does the forearm pronate?",
         sides: "lr",
         help:
-          "From the same position, turn the ball away from the head — the change-up direction — again looking for 80 degrees. Restricted forearm with a good shoulder loads the shoulder; a restricted shoulder with a good forearm loads the elbow.",
+          "From the same position, turn the ball away from your head — the change-up direction — again looking for 80 degrees. A stiff forearm with a good shoulder pushes the stress onto the shoulder; a stiff shoulder with a good forearm pushes it onto the elbow.",
         findings: [
           { key: "gte-80", label: "80\u00b0 or more of pronation", normal: true, severity: "green" },
           { key: "lt-80", label: "Less than 80\u00b0 of pronation", severity: "red" },
