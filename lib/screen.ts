@@ -1437,22 +1437,29 @@ export type RetestKind = "full" | "spot" | "trigger";
  */
 export type DueState = "not-due" | "due" | "overdue" | "paused";
 
-export const RETEST_CADENCE: Record<RetestKind, { from: number; to: number }> = {
-  full: { from: 56, to: 84 },
-  spot: { from: 21, to: 28 },
+/**
+ * Days between screens. One number each, not a window.
+ *
+ * Cole settled on exact intervals over ranges: four weeks on what you're
+ * correcting, eight on what came back clean. A range gave two dates to miss
+ * and a fortnight in which the answer to "is this due?" was "sort of".
+ */
+export const RETEST_CADENCE: Record<RetestKind, number> = {
+  full: 56,
+  spot: 28,
   /*
-   * A called re-screen has no window. It is due the day it is raised, which
-   * is what "regardless of the clock" means — a phase change or a return from
-   * injury doesn't wait for a quarter to elapse.
+   * A called re-screen is due the day it is raised, which is what "regardless
+   * of the clock" means — a phase change or a return from injury doesn't wait
+   * for an interval to elapse.
    */
-  trigger: { from: 0, to: 0 },
+  trigger: 0,
 };
 
 export interface RetestDue {
   kind: RetestKind;
   state: DueState;
-  from: number;
-  to: number;
+  /** Days between screens of this kind. */
+  every: number;
   /** Days since the screen this clock runs from; null when there isn't one. */
   days: number | null;
   /** The date it runs from. */
@@ -1462,10 +1469,12 @@ export interface RetestDue {
 }
 
 function dueState(kind: RetestKind, days: number | null): DueState {
-  const { from, to } = RETEST_CADENCE[kind];
+  const every = RETEST_CADENCE[kind];
   // Never done is not "not yet" — it is the most overdue thing there is.
   if (days === null) return "overdue";
-  return days < from ? "not-due" : days <= to ? "due" : "overdue";
+  // Due on the day, late after it. With an exact interval there is no grace
+  // period to sit inside, which is the point of picking one.
+  return days < every ? "not-due" : days === every ? "due" : "overdue";
 }
 
 /**
@@ -1481,7 +1490,7 @@ export function retestState(
   today: string,
 ): Omit<RetestDue, "tests"> {
   const days = since === null ? null : daysBetween(since, today);
-  return { kind, state: dueState(kind, days), ...RETEST_CADENCE[kind], days, since };
+  return { kind, state: dueState(kind, days), every: RETEST_CADENCE[kind], days, since };
 }
 
 /**
@@ -1642,7 +1651,7 @@ export function dueRank(state: DueState): number {
  * full screen, and reporting the quarterly clock because it is the bigger job
  * tells them about the thing that ISN'T next.
  */
-export function leadClock<T extends { state: DueState; days: number | null; from: number }>(
+export function leadClock<T extends { state: DueState; days: number | null; every: number }>(
   full: T,
   spot: T | null,
   trigger?: T | null,
@@ -1653,9 +1662,9 @@ export function leadClock<T extends { state: DueState; days: number | null; from
   if (!spot) return full;
   const rank = dueRank(spot.state) - dueRank(full.state);
   if (rank !== 0) return rank > 0 ? spot : full;
-  // Days until the window opens; already-open clocks go negative, which is
-  // the right direction — more overdue is more pressing.
-  const opens = (c: T) => (c.days === null ? -Infinity : c.from - c.days);
+  // Days until it comes round; already-past clocks go negative, which is the
+  // right direction — more overdue is more pressing.
+  const opens = (c: T) => (c.days === null ? -Infinity : c.every - c.days);
   return opens(spot) <= opens(full) ? spot : full;
 }
 

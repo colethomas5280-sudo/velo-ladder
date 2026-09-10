@@ -74,7 +74,7 @@ function nextUp(plan: ReturnType<typeof retestPlan>): string {
       : "full screen";
   if (lead.days === null) return "No full screen on record yet";
   if (lead.state === "not-due")
-    return `Next ${what} in ${Math.max(1, lead.from - lead.days)}–${lead.to - lead.days} days`;
+    return `Next ${what} in ${lead.every - lead.days} days`;
   return `${lead.state === "overdue" ? "Overdue" : "Due"}: ${what}`;
 }
 
