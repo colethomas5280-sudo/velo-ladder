@@ -47,7 +47,7 @@ export function ageOn(birthDate: string, onDate: string): number {
  * future. A shape-only regex (`/^\d{4}-\d{2}-\d{2}$/`) is not enough: it lets
  * `2009-99-99` through to die in Postgres, and `2103-06-15` through to a
  * negative age that lands an adult on the 12U board. One home for the date
- * semantics that both write paths (`/api/join`, `/api/athletes/[id]`) share.
+ * semantics that both write paths (`/api/join/[token]`, `/api/athletes/[id]`) share.
  */
 /**
  * Earliest birth year we will accept. Nobody training here was born before

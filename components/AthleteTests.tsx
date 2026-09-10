@@ -4,18 +4,14 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { Athlete } from "@/lib/types";
 import { fetcher, ApiError } from "@/lib/fetcher";
-import type { Hand, RescreenCall } from "@/lib/screen";
+import { rescreenCall, type Hand, type RescreenCall } from "@/lib/screen";
 import ScreenPanel from "./ScreenPanel";
 
 type Me = { role: "coach" | "athlete" | "none"; athleteId: string | null };
 
 /** The athlete's standing re-screen call, if their row carries one. */
 export function callOf(athlete?: Athlete | null): RescreenCall | null {
-  if (!athlete?.rescreenSince) return null;
-  return {
-    since: athlete.rescreenSince,
-    reason: athlete.rescreenReason ?? "Re-screen called",
-  };
+  return rescreenCall(athlete?.rescreenSince, athlete?.rescreenReason);
 }
 
 /** Only R or L places the arm-test caveat; anything else waives nothing. */

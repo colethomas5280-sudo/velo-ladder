@@ -1,6 +1,7 @@
 import { getScope } from "@/lib/scope";
 import { listAllScreens } from "@/lib/data";
 import {
+  rescreenCall,
   rescreenStanding,
   screenSummary,
   spotSince,
@@ -33,10 +34,7 @@ export async function GET() {
   return guard(async () => {
     const out: ScreenOverviewRow[] = (await listAllScreens()).map((a) => {
       const standing = standingScreen(a.screens);
-      const call =
-        a.rescreenSince !== null
-          ? { since: a.rescreenSince, reason: a.rescreenReason ?? "Re-screen called" }
-          : null;
+      const call = rescreenCall(a.rescreenSince, a.rescreenReason);
       // A call already answered by a later screen is not reported at all.
       const called = rescreenStanding(call, standing) ? call : null;
       // Only "R" or "L" places the arm-test caveat; anything else waives nothing.
