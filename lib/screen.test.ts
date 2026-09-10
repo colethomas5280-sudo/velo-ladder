@@ -24,6 +24,7 @@ import {
   statusRank,
   retestPlan,
   clocksFor,
+  spotSince,
   needsScreening,
   rescreenStanding,
   IN_SEASON,
@@ -1463,7 +1464,7 @@ test("the spot clock is due on day 28 and late after it", () => {
 test("an athlete can be mid-quarter and overdue a spot-check", () => {
   const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
   const plan = retestPlan(st, "2026-02-15", PAIR);
-  assert.equal(plan.full.state, "not-due", "45 days into a 56-day window");
+  assert.equal(plan.full.state, "not-due", "45 days against a 56-day interval");
   assert.equal(plan.spot!.state, "overdue", "but 45 days on a 28-day one");
 });
 
@@ -1472,6 +1473,31 @@ test("a spot-check covers the failing tests, not the whole sheet", () => {
   const plan = retestPlan(st, "2026-02-01", PAIR);
   assert.deepEqual(plan.spot!.tests.map((t) => t.key), ["smp"]);
   assert.deepEqual(plan.full.tests.map((t) => t.key), ["smp", "gtd"]);
+});
+
+/*
+ * The roster builds its spot clock from a summary and the panel builds one
+ * from a screen. They had separate copies of this that happened to agree; now
+ * they share one, and this pins them together.
+ */
+test("both callers date the spot clock the same way", () => {
+  const st = standingScreen(
+    [
+      screen("2026-01-01", { ...FULL, [SQ.L]: "bad", "gtd.first": "fail" }),
+      screen("2026-02-15", { "gtd.first": "fail" }),
+    ],
+    PAIR,
+  );
+  const viaPlan = retestPlan(st, "2026-02-20", PAIR).spot!.since;
+  const viaSummary = spotSince(st, screenSummary(st.results, PAIR).failing);
+  assert.equal(viaPlan, viaSummary);
+  assert.equal(viaPlan, "2026-01-01", "the stale one, not the one just done");
+});
+
+test("a failing test nobody has a date for is skipped, not null", () => {
+  const st = standingScreen([screen("2026-01-01", BAD)], PAIR);
+  assert.equal(spotSince(st, ["never-screened", "smp"]), "2026-01-01");
+  assert.equal(spotSince(st, ["never-screened"]), null, "nothing to date it from");
 });
 
 /*
@@ -1515,7 +1541,7 @@ test("the nearer clock speaks for an athlete when neither is due yet", () => {
   assert.equal(
     leadClock(plan.full, plan.spot).kind,
     "spot",
-    "9 days into a 21-day window beats 9 days into a 56-day one",
+    `9 days against ${RETEST_CADENCE.spot} beats 9 days against ${RETEST_CADENCE.full}`,
   );
 });
 
@@ -1640,7 +1666,7 @@ test("with nothing called, the clocks decide as before", () => {
 
 test("in-season the full sheet stops being scheduled", () => {
   const st = standingScreen([screen("2026-01-01", FULL)], PAIR);
-  // 100 days: well past the 84-day window, so overdue in any other block.
+  // 100 days: well past the 56-day interval, so overdue in any other block.
   assert.equal(retestPlan(st, "2026-04-11", PAIR).full.state, "overdue");
   assert.equal(
     retestPlan(st, "2026-04-11", PAIR, { phase: IN_SEASON }).full.state,

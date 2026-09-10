@@ -11,6 +11,8 @@ import {
   fmtDate,
   fmtDateShort,
   isCalendarDate,
+  scoredBoxes,
+  PRIMER_BOXES,
   sBest,
   sAvg,
   hundredsG,
@@ -86,6 +88,36 @@ test("fmt renders a missing velocity as the en-dash placeholder", () => {
 /* ------------------------------------------------------------------ *
  * Dates
  * ------------------------------------------------------------------ */
+
+/*
+ * The three places that used to decide independently that box 0 is a primer:
+ * the scoring, the client's "did they enter anything" guard, and the server's
+ * validator. One rule now, and this pins all three to it — a slot holding
+ * nothing but a primer is not a throw anybody scored, entered or may save.
+ */
+test("a primer alone is not a throw, on any of the three paths that ask", () => {
+  const primerOnly = { p1: [88, null, null, null, null] };
+  const session = {
+    id: "s", athleteId: "a", type: "pulldown" as const, date: "2026-09-01",
+    notes: "", throws: primerOnly, createdBy: null, level: null,
+  };
+  assert.deepEqual(hundredsG([session], ["p1"]), [], "not scored");
+  assert.equal(
+    throwsFromDraft({ p1: ["88", "", "", "", ""] }, ["p1"]).hasHundred,
+    false,
+    "not entered",
+  );
+  assert.equal(
+    validateSessionInput({ type: "pulldown", date: "2026-09-01", throws: primerOnly }).ok,
+    false,
+    "and not saveable",
+  );
+});
+
+test("scoredBoxes drops exactly the primer, and nothing else", () => {
+  assert.deepEqual(scoredBoxes([80, 91, 92, 93, 94]), [91, 92, 93, 94]);
+  assert.equal(PRIMER_BOXES, 1, "one primer at the front of every slot");
+});
 
 test("isCalendarDate accepts real days and refuses the rest", () => {
   for (const good of ["2026-08-05", "2024-02-29", "2026-12-31", "1900-01-01"])
