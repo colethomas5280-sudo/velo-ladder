@@ -20,6 +20,7 @@ export default function AppHeader({ email }: { email?: string }) {
         { href: "/", label: "Dashboard" },
         { href: "/athletes", label: "Athletes" },
         { href: "/tests", label: "Tests" },
+        { href: "/strength", label: "Strength" },
         { href: "/leaderboard", label: "Leaderboard" },
         { href: "/resources", label: "Resources" },
       ]
@@ -31,6 +32,7 @@ export default function AppHeader({ email }: { email?: string }) {
           },
           { href: "/profile", label: "My profile" },
           { href: "/tests", label: "Tests" },
+          { href: "/strength", label: "Strength" },
           { href: "/leaderboard", label: "Leaderboard" },
           { href: "/resources", label: "Resources" },
         ]

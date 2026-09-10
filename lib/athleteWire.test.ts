@@ -32,6 +32,10 @@ const OTHER_EMAIL = "other@wire.test";
 const COACH_NOTE = "SENTINEL-coach-note-6b1f4a";
 const OTHER_NOTE = "SENTINEL-other-athlete-note-91cc7d";
 const SCREEN_NOTE = "SENTINEL-screen-note-2ae503";
+/* An athlete's own lifting note — theirs to read, unlike the screen's. */
+const LIFT_NOTE = "SENTINEL-lift-note-4c8e21";
+/* Another athlete's. Nobody but them and the coach should ever see it. */
+const OTHER_LIFT_NOTE = "SENTINEL-other-lift-note-b73f09";
 const PASSWORD = "SENTINEL-password-plain-77d0b2";
 
 process.env.USE_PGLITE = "1";
@@ -102,6 +106,22 @@ async function seed(): Promise<Seeded> {
   await data.upsertScreen(
     athlete.id,
     { date: "2026-09-01", results: { "hip-45.45-degree-angle:L": "greater" }, notes: SCREEN_NOTE },
+    COACH_EMAIL,
+  );
+  /*
+   * A lifting day for each of them. The strength routes carry no coach-only
+   * field, so what this buys is the OTHER half of the sweep: a route that
+   * answers with an empty list is a route nothing was really run against, and
+   * the 500 check below is worth having only on a handler that did some work.
+   */
+  await data.upsertLiftDay(
+    athlete.id,
+    { date: "2026-09-01", lifts: { "back-squat": [{ w: 225, r: 5 }] }, notes: LIFT_NOTE },
+    COACH_EMAIL,
+  );
+  await data.upsertLiftDay(
+    other.id,
+    { date: "2026-09-01", lifts: { "bench-press": [{ w: 185, r: 5 }] }, notes: OTHER_LIFT_NOTE },
     COACH_EMAIL,
   );
   await sql`
@@ -320,6 +340,30 @@ test("no password hash or invite token reaches anyone", () => {
       `${r.file} (${r.status}) put a live invite token on the wire`,
     );
   }
+});
+
+/*
+ * The lifting log is the athlete's own, so their note is theirs to read. What
+ * must never travel is somebody else's: the roster route reads every athlete's
+ * days to work out records, and the row it builds is the obvious place for a
+ * note to ride along by accident.
+ */
+test("no other athlete's lifting note reaches this athlete", () => {
+  swept();
+  for (const r of asAthlete)
+    assert.equal(
+      r.body.includes(OTHER_LIFT_NOTE),
+      false,
+      `${r.file} (${r.status}) served the athlete another athlete's lifting note`,
+    );
+});
+
+test("the athlete's own lifting did come back, so the check above means something", () => {
+  swept();
+  assert.ok(
+    asAthlete.some((r) => r.body.includes(LIFT_NOTE)),
+    "no route served the athlete their own lifting — the sweep isn't reaching it",
+  );
 });
 
 test("the coach does still get the notes — the filter isn't just deleting everything", () => {

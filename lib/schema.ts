@@ -4,7 +4,7 @@
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -241,6 +241,28 @@ WHERE results ?| array['push-off-mound.planted', 'push-off-mound.released',
 
 CREATE UNIQUE INDEX IF NOT EXISTS ms_athlete_date_uidx
   ON movement_screens(athlete_id, date);
+
+-- v18: strength. One lifting day per athlete per date, like the check-in and
+-- the screen — re-saving a date replaces it rather than leaving two versions
+-- of the same afternoon for the history to disagree about.
+--
+-- The lifts column is JSONB keyed by lift key -> the working sets in order,
+-- each {"w": pounds, "r": reps}: exactly the shape the entry form holds, and
+-- the same trick training_sessions.throws plays. Revising the lift menu is
+-- therefore a config edit, not a migration. Nothing here stores a lift's NAME.
+CREATE TABLE IF NOT EXISTS lift_sessions (
+  id         text PRIMARY KEY,
+  athlete_id text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  date       date NOT NULL,
+  lifts      jsonb NOT NULL DEFAULT '{}'::jsonb,
+  notes      text NOT NULL DEFAULT '',
+  level      text,
+  created_by text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS lift_athlete_date_uidx
+  ON lift_sessions(athlete_id, date);
 `;
 
 /** The one real session already logged, imported so there is live data on day one. */
@@ -254,3 +276,38 @@ VALUES ('seed-md-s1', 'seed-md', 'pulldown', '2026-08-28', '',
   '{"p1":[null,92.1,93.1,90.6],"p2":[null,89.4,88.8,89.4],"p4":[null,93.4,93.5,94.5],"p5":[null,97.1,94.4,97.1]}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 `;
+
+/**
+ * Every table SCHEMA_SQL creates, read out of the SQL itself.
+ *
+ * Derived rather than listed, because the listed version drifted: `/api/setup`
+ * carried a hand-typed copy that Cole reads after every deploy to confirm the
+ * migration landed, and a table missing from that copy is a table whose
+ * absence the check cannot report. It went a whole schema version without
+ * `lift_sessions` in it.
+ */
+export function schemaTables(): string[] {
+  return [...SCHEMA_SQL.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)/g)]
+    .map((m) => m[1])
+    .sort();
+}
+
+/**
+ * `db/schema.sql` as it should be on disk — the same SQL with a header saying
+ * where it came from. A human-readable copy for anyone who wants the shape of
+ * the database without reading TypeScript.
+ *
+ * Kept honest by `lib/schemaFile.test.ts`, because the file calls itself
+ * generated and that claim went stale for three schema versions: it had no
+ * movement_screens table at all, and anyone reading it would reasonably have
+ * concluded the screen was not stored.
+ *
+ * Rewrite it with:  npx tsx scripts/schema-sql.ts
+ */
+export function schemaFile(): string {
+  return (
+    `-- Generated from lib/schema.ts (SCHEMA_VERSION ${SCHEMA_VERSION}). Do not edit by hand.\n` +
+    `-- Applied by GET /api/setup?key=SETUP_KEY\n` +
+    SCHEMA_SQL
+  );
+}

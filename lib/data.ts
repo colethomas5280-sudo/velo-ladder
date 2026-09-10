@@ -10,6 +10,7 @@ import type {
   RecoveryEntry,
   Setback,
   MovementScreen,
+  LiftSession,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
 import { joinName, splitName } from "./profile";
@@ -300,6 +301,10 @@ export async function stampUnleveledSessions(
   if (!level) return;
   await sql`
     UPDATE training_sessions SET level = ${level}
+    WHERE athlete_id = ${athleteId} AND level IS NULL
+  `;
+  await sql`
+    UPDATE lift_sessions SET level = ${level}
     WHERE athlete_id = ${athleteId} AND level IS NULL
   `;
 }
@@ -940,4 +945,117 @@ export async function deleteScreen(athleteId: string, date: string): Promise<voi
   await sql`
     DELETE FROM movement_screens WHERE athlete_id = ${athleteId} AND date = ${date}
   `;
+}
+
+/* ------------------------------------------------------------------ *
+ * Strength
+ * ------------------------------------------------------------------ */
+
+/** `date` goes through isoDate for the same reason every other date does. */
+export function toLiftDay(r: Record<string, unknown>): LiftSession {
+  return {
+    id: String(r.id),
+    athleteId: String(r.athlete_id),
+    date: isoDate(r.date),
+    lifts: (r.lifts ?? {}) as LiftSession["lifts"],
+    notes: String(r.notes ?? ""),
+    level: (r.level as string | null) ?? null,
+  };
+}
+
+export async function listLiftDays(athleteId: string): Promise<LiftSession[]> {
+  const rows = (await sql`
+    SELECT * FROM lift_sessions WHERE athlete_id = ${athleteId}
+    ORDER BY date ASC
+  `) as Record<string, unknown>[];
+  return rows.map(toLiftDay);
+}
+
+export interface LiftDayInput {
+  date: string;
+  lifts: LiftSession["lifts"];
+  notes: string;
+}
+
+/**
+ * One lifting day per athlete per date. Re-saving the same date replaces it,
+ * so an athlete who logs squats at noon and comes back for the bench work
+ * has to send the whole day — which is what the form holds and posts.
+ *
+ * The level is stamped from the athlete's row at write time and never
+ * rewritten, the same as a throwing session: moving a kid from High School to
+ * College leaves the lifts he did as a high-schooler marked that way.
+ */
+export async function upsertLiftDay(
+  athleteId: string,
+  input: LiftDayInput,
+  createdBy: string,
+): Promise<LiftSession> {
+  const id = crypto.randomUUID();
+  const athlete = await getAthlete(athleteId);
+  const level = athlete?.level ?? null;
+  const rows = (await sql`
+    INSERT INTO lift_sessions (id, athlete_id, date, lifts, notes, created_by, level)
+    VALUES (${id}, ${athleteId}, ${input.date},
+            ${JSON.stringify(input.lifts)}::jsonb, ${input.notes}, ${createdBy}, ${level})
+    ON CONFLICT (athlete_id, date) DO UPDATE SET
+      lifts = EXCLUDED.lifts,
+      notes = EXCLUDED.notes,
+      updated_at = now()
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toLiftDay(rows[0]);
+}
+
+export async function deleteLiftDay(
+  athleteId: string,
+  date: string,
+): Promise<void> {
+  await sql`
+    DELETE FROM lift_sessions WHERE athlete_id = ${athleteId} AND date = ${date}
+  `;
+}
+
+export interface AthleteLifts {
+  athleteId: string;
+  name: string;
+  days: { date: string; lifts: LiftSession["lifts"] }[];
+}
+
+/**
+ * Every athlete with every lifting day they have, for the strength roster.
+ *
+ * All of them rather than the recent ones, because a personal best is a
+ * comparison against the whole history — a row that only saw the last month
+ * would call an athlete's third-best day a PR.
+ *
+ * `notes` is deliberately not selected. The roster has no use for it, and a
+ * column that never leaves the database cannot leak from a route that forgets
+ * to strip it.
+ */
+export async function listAllLiftDays(): Promise<AthleteLifts[]> {
+  const rows = (await sql`
+    SELECT a.id AS athlete_id, a.name, l.date, l.lifts
+    FROM athletes a
+    LEFT JOIN lift_sessions l ON l.athlete_id = a.id
+    WHERE a.archived = false
+    ORDER BY a.name, l.date
+  `) as Record<string, unknown>[];
+
+  const byAthlete = new Map<string, AthleteLifts>();
+  for (const r of rows) {
+    const id = String(r.athlete_id);
+    let entry = byAthlete.get(id);
+    if (!entry) {
+      entry = { athleteId: id, name: String(r.name), days: [] };
+      byAthlete.set(id, entry);
+    }
+    // The LEFT JOIN gives one null row for an athlete who has never lifted.
+    if (r.date)
+      entry.days.push({
+        date: isoDate(r.date),
+        lifts: (r.lifts ?? {}) as LiftSession["lifts"],
+      });
+  }
+  return [...byAthlete.values()];
 }

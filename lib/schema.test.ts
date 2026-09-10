@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { splitStatements } from "@/lib/db";
-import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION } from "@/lib/schema";
+import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
 
 /* ------------------------------------------------------------------ *
  * The gap these tests close
@@ -171,12 +171,25 @@ test("the schema applies to an empty database", async () => {
 
   assert.deepEqual(await tablesIn(db), [
     "athletes",
+    "lift_sessions",
     "movement_screens",
     "recovery_entries",
     "resources",
     "setbacks",
     "training_sessions",
   ]);
+});
+
+/*
+ * `/api/setup` reports which tables are present, and Cole reads that response
+ * after every deploy. The list it checks against is derived from this SQL —
+ * this is what proves the derivation is right rather than merely consistent.
+ */
+test("the tables the setup check looks for are the tables the schema creates", async () => {
+  const db = await freshDb();
+  await applyAsProduction(db, SCHEMA_SQL);
+  assert.deepEqual(schemaTables(), await tablesIn(db));
+  assert.ok(schemaTables().includes("lift_sessions"), "the one the typed list missed");
 });
 
 test("every ALTER lands, so no column is added before its table exists", async () => {
@@ -203,6 +216,7 @@ test("every ALTER lands, so no column is added before its table exists", async (
     assert.ok(athletes.includes(c), `athletes.${c} missing`);
 
   assert.ok((await columnsOf(db, "training_sessions")).includes("level"));
+  assert.ok((await columnsOf(db, "lift_sessions")).includes("lifts"));
   assert.ok((await columnsOf(db, "setbacks")).includes("severity"));
   for (const c of ["arm_readiness", "body_weight", "sleep_duration"])
     assert.ok((await columnsOf(db, "recovery_entries")).includes(c), c);
@@ -213,8 +227,11 @@ test("the schema is safe to run twice", async () => {
   // second pass over an already-migrated database has to be a no-op.
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
+  // Against the first pass, not against a typed count: a hardcoded 6 fails
+  // the next time a table is added, which says nothing about idempotence.
+  const once = await tablesIn(db);
   await applyAsProduction(db, SCHEMA_SQL);
-  assert.equal((await tablesIn(db)).length, 6);
+  assert.deepEqual(await tablesIn(db), once);
 });
 
 /*

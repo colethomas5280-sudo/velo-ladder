@@ -1,4 +1,5 @@
 import type { ScreenSummary } from "./screen";
+import type { Lifts } from "./strength";
 
 export type TrackerId = "mound" | "pulldown";
 export type Hand = "" | "R" | "L";
@@ -182,4 +183,43 @@ export interface Setback {
    * this was tracked; those fall back to reading the latest check-in.
    */
   severity: string | null;
+}
+
+/**
+ * One lifting day. `lifts` maps lift key -> the working sets, in order.
+ *
+ * Keyed by the config's key and never by a name, so renaming "Chin-up" is an
+ * edit in `lib/strength.ts` and nothing else.
+ */
+export interface LiftSession {
+  id: string;
+  athleteId: string;
+  date: string;
+  lifts: Lifts;
+  notes: string;
+  /** level stamped at save time; null for days logged before levels existed */
+  level: string | null;
+}
+
+/**
+ * One athlete's line on the strength roster.
+ *
+ * Carries `last` as a date rather than as an age, for the same reason the
+ * screen row does: the elapsed days are worked out in the browser against the
+ * viewer's own today, so a coach travelling doesn't read yesterday's answer.
+ *
+ * `records` is computed against the athlete's WHOLE history and then filtered
+ * to the window — a personal best is a comparison with everything before it,
+ * and a row built from the last month alone would badge a third-best day.
+ */
+export interface StrengthOverviewRow {
+  athleteId: string;
+  name: string;
+  last: string | null;
+  /** Lifting days inside the window. */
+  recentDays: number;
+  /** Distinct lifts they have ever logged. */
+  lifts: number;
+  /** Records set inside the window, newest first. */
+  records: { key: string; date: string; value: number }[];
 }
