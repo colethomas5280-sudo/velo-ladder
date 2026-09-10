@@ -325,6 +325,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "pelvic-rotation",
     label: "Pelvic Rotation",
+    video: "https://youtu.be/w2_EW-5CMl8",
     group: "core",
     subTests: [
       {
@@ -504,12 +505,14 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "push-off",
     label: "Push-Off Test",
+    video: "https://youtu.be/rwn0VOrTvf8",
     group: "stride",
     subTests: PUSH_OFF_SUBTESTS,
   },
   {
     key: "heel-lift",
     label: "Heel Lift Test",
+    video: "https://youtu.be/0Moeh7CnRFM",
     group: "stride",
     subTests: [
       {
@@ -542,6 +545,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "ankle-rocking",
     label: "Ankle Rocking Test",
+    video: "https://youtu.be/MYJVZ2BiDjs",
     group: "stride",
     subTests: [
       ...ankleSubTests({
@@ -564,6 +568,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
     // The same procedure as Ankle Rocking, applied to tibial rotation.
     key: "ankle-rolling",
     label: "Ankle Rolling Test",
+    video: "https://youtu.be/xx6Q5BLJR1k",
     group: "stride",
     subTests: [
       ...ankleSubTests({
@@ -585,6 +590,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "half-kneeling",
     label: "Half-Kneeling Narrow Base",
+    video: "https://youtu.be/qc_FA9At0pE",
     group: "posture",
     subTests: [
       {
@@ -615,6 +621,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "lunge-extension",
     label: "Lunge w/ Extension Test",
+    video: "https://youtu.be/goU68xwxo38",
     group: "posture",
     subTests: [
       {
@@ -653,6 +660,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "wide-squat",
     label: "Wide Squat Test",
+    video: "https://youtu.be/dTR_csf9UQI",
     group: "posture",
     subTests: [
       {
@@ -684,6 +692,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "shoulder-90-90",
     throwingArmOnly: true,
+    video: "https://youtu.be/dEuhE7J9zAE",
     label: "Shoulder 90/90",
     group: "arms",
     subTests: [
@@ -707,6 +716,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "windshield-wiper",
     throwingArmOnly: true,
+    video: "https://youtu.be/qxPqGSQ62Lo",
     label: "Windshield Wiper Test",
     group: "arms",
     subTests: [
@@ -739,6 +749,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "forearm-80-80",
     throwingArmOnly: true,
+    video: "https://youtu.be/jbRqxRmQFzE",
     label: "Forearm 80/80 Test",
     group: "arms",
     subTests: [
