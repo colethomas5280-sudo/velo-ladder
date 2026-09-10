@@ -6,10 +6,12 @@ import useSWR from "swr";
 import type { Athlete, ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
+  IN_SEASON,
   dueRank,
   leadClock,
   retestState,
   statusRank,
+  type DueState,
   type ReportStatus,
   type RetestKind,
 } from "@/lib/screen";
@@ -105,7 +107,12 @@ const KIND_LABEL: Record<RetestKind, string> = {
  * server, so a coach travelling doesn't see yesterday's answer.
  */
 function schedule(row: ScreenOverviewRow, today: string) {
-  const full = retestState("full", row.lastFull, today);
+  const scheduled = retestState("full", row.lastFull, today);
+  // In-season the full sheet isn't scheduled at all — see IN_SEASON.
+  const full =
+    row.phase === IN_SEASON
+      ? { ...scheduled, state: "paused" as DueState }
+      : scheduled;
   const spot = row.spotTests ? retestState("spot", row.spotSince, today) : null;
   const trigger = row.called
     ? retestState("trigger", row.called.since, today)
@@ -116,6 +123,7 @@ function schedule(row: ScreenOverviewRow, today: string) {
 /** "due in 12–26 days" / "3–4 week spot-check" — the clock in words. */
 function describe(due: ReturnType<typeof retestState>): string {
   if (due.kind === "trigger") return "called, regardless of the clock";
+  if (due.state === "paused") return "in-season · spot-checks only";
   if (due.days === null) return "no full screen on record";
   if (due.state === "not-due")
     return `due in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`;
@@ -131,6 +139,7 @@ function MyTests({ athleteId }: { athleteId: string }) {
       athleteName={data?.name ?? ""}
       hand={handOf(data?.hand)}
       call={callOf(data)}
+      phase={data?.phase ?? null}
       isCoach={false}
     />
   );
@@ -196,7 +205,12 @@ function Roster() {
                 <span className={`ms-dot ${DOT[r.summary!.worst]}`} />
                 <span className="tr-name">
                   {r.name}
-                  {due.lead.state !== "not-due" && (
+                  {/*
+                    * Nothing to badge when the clock is not-due or paused:
+                    * "Due · Full screen" beside "in-season, spot-checks only"
+                    * is the page arguing with itself.
+                    */}
+                  {due.lead.state !== "not-due" && due.lead.state !== "paused" && (
                     <em
                       className={`tr-due t-${
                         due.lead.kind === "trigger" ? "called" : due.lead.state

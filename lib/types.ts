@@ -117,6 +117,8 @@ export interface ScreenOverviewRow {
   spotTests: number;
   /** A called re-screen that no screen has answered yet, and why. */
   called: { since: string; reason: string } | null;
+  /** Training block — in-season pauses the full-screen clock. */
+  phase: string | null;
 }
 
 export interface RecoveryEntry {

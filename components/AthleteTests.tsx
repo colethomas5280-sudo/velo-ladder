@@ -61,6 +61,7 @@ export default function AthleteTests({ athleteId }: { athleteId: string }) {
         athleteName={athlete?.name ?? ""}
         hand={handOf(athlete?.hand)}
         call={callOf(athlete)}
+        phase={athlete?.phase ?? null}
         isCoach={!!isCoach}
         onCalled={() => mutate()}
       />

@@ -1431,8 +1431,11 @@ export function standingScreen(
 
 export type RetestKind = "full" | "spot" | "trigger";
 
-/** Not yet, inside the window, or past the end of it. */
-export type DueState = "not-due" | "due" | "overdue";
+/**
+ * Not yet, inside the window, past the end of it — or not being scheduled at
+ * all, which is what the full sheet does in-season.
+ */
+export type DueState = "not-due" | "due" | "overdue" | "paused";
 
 export const RETEST_CADENCE: Record<RetestKind, { from: number; to: number }> = {
   full: { from: 56, to: 84 },
@@ -1516,14 +1519,37 @@ export function rescreenStanding(
   return !(standing.last && standing.last > call.since);
 }
 
+/**
+ * The phase the full sheet stops being scheduled in.
+ *
+ * Cole: in-season, favour spot-checks over full screens so you're not adding
+ * fatigue or chasing noise across a long schedule. So the quarterly clock
+ * pauses rather than stretching to a number nobody chose — and the phase
+ * change out of the season calls a re-screen on its own, which is where the
+ * next full sheet comes from. Entering the season calls one too, so the
+ * season opens on a complete screen and then goes quiet.
+ */
+export const IN_SEASON = "In-season";
+
+export interface RetestContext {
+  /** A re-screen called by a trigger, if one stands. */
+  call?: RescreenCall | null;
+  /** The athlete's training block — see PHASES. */
+  phase?: string | null;
+}
+
 export function retestPlan(
   standing: Standing,
   today: string,
   tests: ScreenTest[] = SCREEN_TESTS,
-  call: RescreenCall | null = null,
+  ctx: RetestContext = {},
 ): { full: RetestDue; spot: RetestDue | null; trigger: RetestDue | null } {
+  const { call = null, phase = null } = ctx;
+  const scheduled = retestState("full", standing.lastFull, today);
   const full: RetestDue = {
-    ...retestState("full", standing.lastFull, today),
+    ...scheduled,
+    // Paused, not hidden: the roster still says why nothing is coming.
+    state: phase === IN_SEASON ? "paused" : scheduled.state,
     tests,
   };
 
@@ -1535,6 +1561,8 @@ export function retestPlan(
   const trigger: RetestDue | null = rescreenStanding(call, standing)
     ? { ...retestState("trigger", call!.since, today), tests }
     : null;
+  // In-season changes what gets SCHEDULED. A called re-screen is not
+  // scheduled — it is asked for — and it still stands.
 
   const failing = screenReport(standing.results, null, tests)
     .filter((r) => r.work.length)
@@ -1556,6 +1584,7 @@ export function retestPlan(
 
 /** Where a due state sorts on the roster — most pressing first. */
 export function dueRank(state: DueState): number {
+  if (state === "paused") return -1; // below "not yet": it isn't coming.
   return state === "overdue" ? 2 : state === "due" ? 1 : 0;
 }
 

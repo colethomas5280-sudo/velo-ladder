@@ -836,6 +836,8 @@ export interface AthleteScreens {
   /** A re-screen called by any trigger, and why. */
   rescreenSince: string | null;
   rescreenReason: string | null;
+  /** Training block — in-season pauses the full-screen clock. */
+  phase: string | null;
   screens: { date: string; results: Record<string, string> }[];
 }
 
@@ -853,7 +855,7 @@ export interface AthleteScreens {
 export async function listAllScreens(): Promise<AthleteScreens[]> {
   const rows = (await sql`
     SELECT a.id AS athlete_id, a.name, a.hand,
-           a.rescreen_since, a.rescreen_reason, m.date, m.results
+           a.rescreen_since, a.rescreen_reason, a.phase, m.date, m.results
     FROM athletes a
     LEFT JOIN movement_screens m ON m.athlete_id = a.id
     WHERE a.archived = false
@@ -871,6 +873,7 @@ export async function listAllScreens(): Promise<AthleteScreens[]> {
         hand: String(r.hand ?? ""),
         rescreenSince: r.rescreen_since ? isoDate(r.rescreen_since) : null,
         rescreenReason: (r.rescreen_reason as string | null) ?? null,
+        phase: (r.phase as string | null) ?? null,
         screens: [],
       };
       byAthlete.set(id, entry);
