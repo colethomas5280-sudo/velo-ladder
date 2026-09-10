@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import type { ScreenOverviewRow } from "@/lib/types";
+import type { Athlete, ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
   dueRank,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/screen";
 import { todayISO } from "@/lib/velo";
 import ScreenPanel from "./ScreenPanel";
+import { handOf } from "./AthleteTests";
 
 /* ------------------------------------------------------------------ *
  * Tests
@@ -50,7 +51,7 @@ export default function TestsView() {
           <div className="eyebrow">Testing</div>
           <h2>My tests</h2>
         </div>
-        <ScreenPanel athleteId={me.athleteId} athleteName="" isCoach={false} />
+        <MyTests athleteId={me.athleteId} />
       </>
     );
   }
@@ -116,6 +117,19 @@ function describe(due: ReturnType<typeof retestState>): string {
   if (due.state === "not-due")
     return `due in ${Math.max(1, due.from - due.days)}–${due.to - due.days} days`;
   return due.kind === "spot" ? "3–4 week spot-check" : "8–12 week full screen";
+}
+
+/** An athlete's own tests. Fetches their row for the throwing hand. */
+function MyTests({ athleteId }: { athleteId: string }) {
+  const { data } = useSWR<Athlete>(`/api/athletes/${athleteId}`, fetcher);
+  return (
+    <ScreenPanel
+      athleteId={athleteId}
+      athleteName={data?.name ?? ""}
+      hand={handOf(data?.hand)}
+      isCoach={false}
+    />
+  );
 }
 
 function Roster() {
@@ -192,6 +206,8 @@ function Roster() {
                     : "nothing flagged"}
                   {r.summary!.asymmetries > 0 &&
                     ` · ${r.summary!.asymmetries} side gap${r.summary!.asymmetries === 1 ? "" : "s"}`}
+                  {r.summary!.optionalAsymmetries > 0 &&
+                    ` · ${r.summary!.optionalAsymmetries} arm gap${r.summary!.optionalAsymmetries === 1 ? "" : "s"} (fyi)`}
                   {r.summary!.painful > 0 && (
                     <em>
                       {" · "}

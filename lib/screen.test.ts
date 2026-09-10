@@ -1080,6 +1080,20 @@ test("a gap that narrows, widens, or holds is named as such", () => {
   assert.equal(trend(["good", "bad"], ["good", "bad"]), "unchanged");
 });
 
+/*
+ * The gap is the same two steps wide either way, but which side is weak has
+ * flipped. Reporting that as unchanged is how it goes unnoticed.
+ */
+test("a gap the same width on the other side is a change, not a hold", () => {
+  const r = asymmetryReport(
+    { [SQ.L]: "bad", [SQ.R]: "good" },
+    { [SQ.L]: "good", [SQ.R]: "bad" },
+    [sample],
+  );
+  assert.equal(r.standing[0].trend, "changed");
+  assert.equal(r.standing[0].beforeGap, 2, "and it was two steps before too");
+});
+
 test("a gap that wasn't there last time is new", () => {
   const r = asymmetryReport(
     { [SQ.L]: "good", [SQ.R]: "bad" },
@@ -1102,6 +1116,79 @@ test("a gap that closed is reported, not silently dropped", () => {
   assert.deepEqual(r.standing, [], "nothing stands");
   assert.equal(r.closed.length, 1, "but the athlete should still be told");
   assert.equal(r.closed[0].worseSide, "R", "and which side it was");
+});
+
+/* ------------------------------------------------------------------ *
+ * The arm tests: symmetry is nice to have, not required
+ * ------------------------------------------------------------------ */
+
+test("exactly the three arm tests are marked throwing-arm-led", () => {
+  assert.deepEqual(
+    SCREEN_TESTS.filter((t) => t.throwingArmOnly).map((t) => t.key),
+    ["shoulder-90-90", "windshield-wiper", "forearm-80-80"],
+  );
+});
+
+/* What throws the baseball is the throwing arm. */
+test("a weaker non-throwing shoulder is reported but not chased", () => {
+  const results: Results = {
+    "shoulder-90-90.external-rotation:L": "less",
+    "shoulder-90-90.external-rotation:R": "greater",
+  };
+  const [a] = asymmetries(results, SCREEN_TESTS, "R");
+  assert.equal(a.worseSide, "L", "the left is the weaker one");
+  assert.equal(a.optional, true, "and a right-hander doesn't throw with it");
+});
+
+test("a weaker throwing shoulder is the same problem it always was", () => {
+  const results: Results = {
+    "shoulder-90-90.external-rotation:L": "greater",
+    "shoulder-90-90.external-rotation:R": "less",
+  };
+  assert.equal(asymmetries(results, SCREEN_TESTS, "R")[0].optional, false);
+});
+
+test("the caveat follows the hand, not the side", () => {
+  const results: Results = {
+    "forearm-80-80.pronation:L": "lt-80",
+    "forearm-80-80.pronation:R": "gte-80",
+  };
+  assert.equal(asymmetries(results, SCREEN_TESTS, "R")[0].optional, true);
+  assert.equal(asymmetries(results, SCREEN_TESTS, "L")[0].optional, false);
+});
+
+/* A guess about which arm is which is worse than no caveat at all. */
+test("with no throwing hand on file, nothing is waived", () => {
+  const results: Results = {
+    "windshield-wiper.arm-side:L": "lt-90",
+    "windshield-wiper.arm-side:R": "gte-90",
+  };
+  assert.equal(asymmetries(results, SCREEN_TESTS)[0].optional, false);
+  assert.equal(asymmetries(results, SCREEN_TESTS, null)[0].optional, false);
+});
+
+test("the caveat is only for the arm tests, not every sided one", () => {
+  const results: Results = {
+    "hip-45.45-degree-angle:L": "less",
+    "hip-45.45-degree-angle:R": "greater",
+  };
+  assert.equal(
+    asymmetries(results, SCREEN_TESTS, "R")[0].optional,
+    false,
+    "a hip is a hip whichever way they throw",
+  );
+});
+
+test("a roster counts the gaps worth chasing, and the rest separately", () => {
+  const results: Results = {
+    "shoulder-90-90.external-rotation:L": "less",
+    "shoulder-90-90.external-rotation:R": "greater",
+    "hip-45.45-degree-angle:L": "less",
+    "hip-45.45-degree-angle:R": "greater",
+  };
+  const s = screenSummary(results, SCREEN_TESTS, "R");
+  assert.equal(s.asymmetries, 1, "the hip");
+  assert.equal(s.optionalAsymmetries, 1, "the non-throwing shoulder");
 });
 
 test("a summary counts the gaps alongside the failures", () => {

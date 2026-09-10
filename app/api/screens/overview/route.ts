@@ -1,6 +1,6 @@
 import { getScope } from "@/lib/scope";
 import { listAllScreens } from "@/lib/data";
-import { screenSummary, standingScreen } from "@/lib/screen";
+import { screenSummary, standingScreen, type Hand } from "@/lib/screen";
 import type { ScreenOverviewRow } from "@/lib/types";
 import { json, unauthorized, forbidden, guard } from "@/lib/http";
 
@@ -27,6 +27,8 @@ export async function GET() {
   return guard(async () => {
     const out: ScreenOverviewRow[] = (await listAllScreens()).map((a) => {
       const standing = standingScreen(a.screens);
+      // Only "R" or "L" places the arm-test caveat; anything else waives nothing.
+      const hand = a.hand === "R" || a.hand === "L" ? (a.hand as Hand) : null;
       if (!standing.last)
         return {
           athleteId: a.athleteId,
@@ -38,7 +40,7 @@ export async function GET() {
           spotTests: 0,
         };
 
-      const summary = screenSummary(standing.results);
+      const summary = screenSummary(standing.results, undefined, hand);
       /*
        * The spot clock runs from the OLDEST failing test — rechecking the one
        * you just did must not reset the clock on the one you have been

@@ -780,6 +780,8 @@ export function toScreen(r: Record<string, unknown>): MovementScreen {
 export interface AthleteScreens {
   athleteId: string;
   name: string;
+  /** Throwing hand — which arm the arm-test caveat applies to. */
+  hand: string;
   screens: { date: string; results: Record<string, string> }[];
 }
 
@@ -796,7 +798,7 @@ export interface AthleteScreens {
  */
 export async function listAllScreens(): Promise<AthleteScreens[]> {
   const rows = (await sql`
-    SELECT a.id AS athlete_id, a.name, m.date, m.results
+    SELECT a.id AS athlete_id, a.name, a.hand, m.date, m.results
     FROM athletes a
     LEFT JOIN movement_screens m ON m.athlete_id = a.id
     WHERE a.archived = false
@@ -808,7 +810,7 @@ export async function listAllScreens(): Promise<AthleteScreens[]> {
     const id = String(r.athlete_id);
     let entry = byAthlete.get(id);
     if (!entry) {
-      entry = { athleteId: id, name: String(r.name), screens: [] };
+      entry = { athleteId: id, name: String(r.name), hand: String(r.hand ?? ""), screens: [] };
       byAthlete.set(id, entry);
     }
     // The LEFT JOIN gives one null row for an athlete with no screens at all.

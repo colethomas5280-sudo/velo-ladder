@@ -15,6 +15,7 @@ import {
   standingScreen,
   type Deviation,
   type GapTrend,
+  type Hand,
   type ReportReading,
   type TestReport,
   type Trend,
@@ -82,10 +83,13 @@ function sideLabel(reading: { field: ReportReading["field"] }): string | null {
 export default function ScreenPanel({
   athleteId,
   athleteName,
+  hand,
   isCoach,
 }: {
   athleteId: string;
   athleteName: string;
+  /** Throwing hand, for the arm-test caveat. Null when it isn't on file. */
+  hand: Hand | null;
   isCoach: boolean;
 }) {
   const { data, mutate, isLoading } = useSWR<MovementScreen[]>(
@@ -148,9 +152,9 @@ export default function ScreenPanel({
   const gaps = useMemo(
     () =>
       screen
-        ? asymmetryReport(standing.results, standing.previous)
+        ? asymmetryReport(standing.results, standing.previous, undefined, hand)
         : { standing: [], closed: [] },
-    [screen, standing],
+    [screen, standing, hand],
   );
 
   /*
@@ -275,7 +279,10 @@ export default function ScreenPanel({
             <div className="sc-gaps">
               <div className="eyebrow sc-h">Side to side</div>
               {gaps.standing.map((g) => (
-                <div className="sc-gap" key={`${g.test.key}.${g.subTest.key}`}>
+                <div
+                  className={`sc-gap${g.optional ? " optional" : ""}`}
+                  key={`${g.test.key}.${g.subTest.key}`}
+                >
                   <div className="sc-gap-head">
                     <b>{g.test.label}</b>
                     {g.trend && (
@@ -296,6 +303,13 @@ export default function ScreenPanel({
                       </span>
                     ))}
                   </div>
+                  {g.optional && (
+                    <span className="cz-note">
+                      Non-throwing arm. Symmetry here is nice to have, not a
+                      prerequisite for performance — worth watching, not worth
+                      chasing.
+                    </span>
+                  )}
                 </div>
               ))}
               {gaps.closed.length > 0 && (
