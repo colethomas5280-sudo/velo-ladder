@@ -479,6 +479,7 @@ export const SCREEN_TESTS: ScreenTest[] = [
   {
     key: "side-step-walkout",
     label: "Side Step Walkout Test",
+    video: "https://youtu.be/eQbvVt8ixmY",
     group: "stride",
     subTests: [
       {

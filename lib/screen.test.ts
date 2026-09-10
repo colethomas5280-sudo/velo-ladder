@@ -139,6 +139,15 @@ test("no video link carries a tracking parameter", () => {
   }
 });
 
+/*
+ * Sixteen of sixteen. Pinned as a count so a test added later has to be given
+ * one or deliberately exempted, rather than quietly joining without.
+ */
+test("every test has a demonstration to watch", () => {
+  const missing = SCREEN_TESTS.filter((t) => !t.video).map((t) => t.key);
+  assert.deepEqual(missing, []);
+});
+
 test("no two tests point at the same video", () => {
   const links = SCREEN_TESTS.filter((t) => t.video).map((t) => t.video);
   assert.equal(new Set(links).size, links.length, "a link was pasted onto the wrong test");
