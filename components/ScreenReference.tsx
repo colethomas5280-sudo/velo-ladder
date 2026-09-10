@@ -118,6 +118,17 @@ function TestCard({ test }: { test: ScreenTest }) {
         {noYellow && <span className="pill">no yellow — pass or fail</span>}
       </div>
 
+      {test.video && (
+        <a
+          className="ms-video"
+          href={test.video}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ▶ Watch {test.label}
+        </a>
+      )}
+
       {test.subTests.map((sub) => {
         const sides = sidesOf(sub);
         const parent = sub.dependsOn

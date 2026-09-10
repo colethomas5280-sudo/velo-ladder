@@ -385,6 +385,20 @@ function TestCard({
 
       {isOpen && (
         <div className="ms-test-body">
+          {/*
+            * Outside the toggle button on purpose: a link nested in a button
+            * is neither valid markup nor reliably clickable.
+            */}
+          {test.video && (
+            <a
+              className="ms-video"
+              href={test.video}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ▶ Watch {test.label}
+            </a>
+          )}
           {test.subTests.map((subTest) => (
             <Question
               key={subTest.key}

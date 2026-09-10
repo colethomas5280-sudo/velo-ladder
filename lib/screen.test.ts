@@ -114,6 +114,18 @@ test("no finding key collides with the not-tested sentinel", () => {
  * wasn't. A test whose setup lives only in someone's head is a test that gets
  * run differently in six months.
  */
+/*
+ * A video link is optional, but a broken one is worse than none — an athlete
+ * who taps it and lands nowhere stops tapping the rest.
+ */
+test("a linked video is a real, secure, absolute URL", () => {
+  for (const t of SCREEN_TESTS) {
+    if (!t.video) continue;
+    assert.match(t.video, /^https:\/\/\S+$/, `${t.key}: not an https URL`);
+    assert.doesNotThrow(() => new URL(t.video!), `${t.key}: not a parseable URL`);
+  }
+});
+
 test("every test says how to run it", () => {
   const silent = SCREEN_TESTS.filter((t) => !t.subTests.some((s) => s.help));
   assert.deepEqual(silent.map((t) => t.key), []);
