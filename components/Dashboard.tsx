@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import type { DashboardData } from "@/lib/dashboard";
+import { RECENT_DAYS, STALE_DAYS, type DashboardData } from "@/lib/dashboard";
 import { fetcher } from "@/lib/fetcher";
 import { fmt, fmtDate, TRACKERS } from "@/lib/velo";
 import CustomizeDashboard, {
@@ -149,7 +149,7 @@ function Leaderboard({ data }: { data: DashboardData }) {
 
 function RecentPrs({ data }: { data: DashboardData }) {
   return (
-    <WidgetShell title="Recent PRs" sub="last 7 days">
+    <WidgetShell title="Recent PRs" sub={`last ${RECENT_DAYS} days`}>
       {data.recentPrs.length === 0 ? (
         <Empty>No new personal records this week.</Empty>
       ) : (
@@ -184,7 +184,7 @@ function NeedsAttention({ data }: { data: DashboardData }) {
   const { stale, pendingInvites } = data;
   const nothing = stale.length === 0 && pendingInvites.length === 0;
   return (
-    <WidgetShell title="Needs attention" sub="14+ days · pending invites">
+    <WidgetShell title="Needs attention" sub={`${STALE_DAYS}+ days · pending invites`}>
       {nothing ? (
         <Empty>Everyone&rsquo;s current. Nothing to chase.</Empty>
       ) : (

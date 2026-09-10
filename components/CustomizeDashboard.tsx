@@ -1,5 +1,7 @@
 "use client";
 
+import { RECENT_DAYS, STALE_DAYS } from "@/lib/dashboard";
+
 import { useEffect, useSyncExternalStore } from "react";
 import { readLocal, subscribeLocal, writeLocal } from "@/lib/localStore";
 
@@ -38,14 +40,14 @@ export const WIDGETS: WidgetDef[] = [
     id: "prs",
     group: "Velocity",
     name: "Recent PRs",
-    blurb: "Personal records set in the last 7 days, and what they beat",
+    blurb: `Personal records set in the last ${RECENT_DAYS} days, and what they beat`,
   },
   {
     id: "attention",
     group: "Athlete monitoring",
     name: "Needs attention",
     blurb:
-      "Athletes with no session in 14+ days, and invites that haven't been accepted",
+      `Athletes with no session in ${STALE_DAYS}+ days, and invites that haven't been accepted`,
   },
   {
     id: "setbacks",

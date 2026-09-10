@@ -28,7 +28,7 @@ import { TRACKERS, daysBetween, sBestG, shiftDate, todayISO } from "./velo";
 export const CNS_DEFAULT_PCT = 5;
 /** Sessions needed before a CNS baseline means anything. */
 const CNS_MIN_HISTORY = 3;
-const CNS_WINDOW_DAYS = 30;
+export const CNS_WINDOW_DAYS = 30;
 /** Consecutive VERY sore days before a full day off. */
 const HEAVY_ESCALATE_DAY = 3;
 /**
