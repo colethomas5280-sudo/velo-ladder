@@ -452,7 +452,14 @@ function Question({
                     {o.label}
                   </option>
                 ))}
-                <option value={NOT_TESTED}>Not tested</option>
+                {/*
+                  * A diagnostic question records context, not a reading, so
+                  * "not tested" says nothing "not recorded" hasn't already —
+                  * and reads as nonsense against "where was this tested?".
+                  */}
+                {!subTest.diagnostic && (
+                  <option value={NOT_TESTED}>Not tested</option>
+                )}
               </select>
             </label>
           );

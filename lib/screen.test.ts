@@ -148,8 +148,7 @@ test("the screen covers exactly the tests it should", () => {
     "lunge-extension",
     "pelvic-rotation",
     "pelvic-tilt",
-    "push-off-flat",
-    "push-off-mound",
+    "push-off",
     "seated-trunk-rotation",
     "shoulder-90-90",
     "side-step-walkout",
@@ -164,13 +163,18 @@ test("no two tests share a key, and every one lands in a real group", () => {
   for (const t of SCREEN_TESTS) assert.ok(ids.has(t.group), `${t.key} has no group`);
 });
 
-test("the two push-off variants are graded independently", () => {
-  // Splitting them is pointless if their fields collide in storage.
-  const mound = screenFields(SCREEN_TESTS.filter((t) => t.key === "push-off-mound"));
-  const flat = screenFields(SCREEN_TESTS.filter((t) => t.key === "push-off-flat"));
-  assert.ok(mound.length > 0 && flat.length > 0);
-  for (const f of mound)
-    assert.ok(!flat.some((x) => x.key === f.key), `${f.key} is shared between surfaces`);
+/*
+ * Push-Off is ONE test. It used to be two, one per surface, and an athlete
+ * only ever does one of them — so the other stayed permanently unscreened,
+ * which meant no real screen could ever be complete and the quarterly clock
+ * could never start for anybody.
+ */
+test("push-off is a single test, so a real screen can be complete", () => {
+  assert.deepEqual(
+    SCREEN_TESTS.filter((t) => t.key.startsWith("push-off")).map((t) => t.key),
+    ["push-off"],
+  );
+  assert.equal(isFullScreen(fillNormal({})), true);
 });
 
 /* ------------------------------------------------------------------ *
@@ -684,7 +688,15 @@ test("a screen marked normal throughout grades clean, with nothing left blank", 
   assert.deepEqual(deviations(filled), [], "a clean screen has no deviations");
   assert.deepEqual(alerts(filled), [], "and nothing to flag");
   const counts = screenCounts(filled);
-  assert.equal(counts.blank, 0, "every reachable reading is answered");
+  /*
+   * One blank, on purpose: where the push-off was run is context nothing can
+   * guess, so marking a test normal deliberately leaves it for the coach.
+   */
+  assert.equal(counts.blank, 1);
+  const blanks = screenFields()
+    .filter((f) => !filled[f.key] && isApplicable(f, filled))
+    .map((f) => f.key);
+  assert.deepEqual(blanks, ["push-off.surface"]);
   assert.equal(counts.deviation, 0);
   for (const t of SCREEN_TESTS)
     assert.equal(testMark(t, filled), "green", `${t.key} should be green`);
@@ -1726,11 +1738,14 @@ test("trunk rotation: neck and trunk are asked of everyone, not branched", () =>
  * Pain, offered everywhere
  * ------------------------------------------------------------------ */
 
-test("every sub-test in the config offers Painful", () => {
+test("every graded sub-test in the config offers Painful", () => {
   // The reason it is universal rather than repeated: this holds for tests
-  // added later without anyone remembering to add it.
+  // added later without anyone remembering to add it. Diagnostic sub-tests
+  // are the exception — a movement can hurt, a note of where it was run
+  // can't.
   for (const t of SCREEN_TESTS)
     for (const s of t.subTests) {
+      if (s.diagnostic) continue;
       const found = subTestFindings(s).find((x) => x.key === PAINFUL);
       assert.ok(found, `${t.key}.${s.key} cannot record pain`);
       assert.equal(found!.alert, true);
@@ -1800,41 +1815,47 @@ test("side step walkout is graded once, with nothing branching off it", () => {
  * Push-Off — a gate, then a grade, on either surface
  * ------------------------------------------------------------------ */
 
-for (const key of ["push-off-mound", "push-off-flat"] as const) {
-  const test_ = () => SCREEN_TESTS.find((x) => x.key === key)!;
-  const P = K(key, "planted");
-  const R = K(key, "released");
+const push = () => SCREEN_TESTS.find((x) => x.key === "push-off")!;
+const P = K("push-off", "planted");
+const R = K("push-off", "released");
+const SURF = K("push-off", "surface");
 
-  test(`${key}: falling short of five foot lengths fails outright`, () => {
-    assert.equal(testMark(test_(), { [P]: "lt-5" }), "red");
-    const released = screenFields([test_()]).find((f) => f.key === R)!;
-    assert.equal(isApplicable(released, { [P]: "lt-5" }), false, "and asks nothing further");
-  });
+test("push-off: falling short of five foot lengths fails outright", () => {
+  assert.equal(testMark(push(), { [P]: "lt-5" }), "red");
+  const released = screenFields([push()]).find((f) => f.key === R)!;
+  assert.equal(isApplicable(released, { [P]: "lt-5" }), false, "and asks nothing further");
+});
 
-  test(`${key}: stage one is a gate, so stage two supplies the colour`, () => {
-    // Both passing distances carry no colour of their own — five-to-six with
-    // a good release is as green as over-six with one.
-    assert.equal(testMark(test_(), { [P]: "gt-6", [R]: "gt-half" }), "green");
-    assert.equal(testMark(test_(), { [P]: "5-to-6", [R]: "gt-half" }), "green");
-    assert.equal(testMark(test_(), { [P]: "gt-6", [R]: "lt-half" }), "yellow");
-    assert.equal(testMark(test_(), { [P]: "5-to-6", [R]: "none" }), "red");
-  });
+test("push-off: stage one is a gate, so stage two supplies the colour", () => {
+  // Both passing distances carry no colour of their own — five-to-six with
+  // a good release is as green as over-six with one.
+  assert.equal(testMark(push(), { [P]: "gt-6", [R]: "gt-half" }), "green");
+  assert.equal(testMark(push(), { [P]: "5-to-6", [R]: "gt-half" }), "green");
+  assert.equal(testMark(push(), { [P]: "gt-6", [R]: "lt-half" }), "yellow");
+  assert.equal(testMark(push(), { [P]: "5-to-6", [R]: "none" }), "red");
+});
 
-  test(`${key}: pain flags it and skipping leaves no mark`, () => {
-    assert.equal(testMark(test_(), { [P]: PAINFUL }), "alert");
-    assert.equal(testMark(test_(), { [P]: NOT_TESTED }), null);
-  });
-}
+test("push-off: pain flags it and skipping leaves no mark", () => {
+  assert.equal(testMark(push(), { [P]: PAINFUL }), "alert");
+  assert.equal(testMark(push(), { [P]: NOT_TESTED }), null);
+});
 
-test("the two push-off surfaces are graded from separate answers", () => {
-  // Sharing a sub-test definition must not mean sharing an athlete's results.
-  const results = {
-    [K("push-off-mound", "planted")]: "lt-5",
-    [K("push-off-flat", "planted")]: "gt-6",
-    [K("push-off-flat", "released")]: "gt-half",
-  };
-  assert.equal(testMark(SCREEN_TESTS.find((t) => t.key === "push-off-mound")!, results), "red");
-  assert.equal(testMark(SCREEN_TESTS.find((t) => t.key === "push-off-flat")!, results), "green");
+/* Where it was run is context, not a grade — it must not colour anything. */
+test("push-off: the surface is recorded without being marked", () => {
+  const clean = { [SURF]: "mound", [P]: "gt-6", [R]: "gt-half" };
+  assert.equal(testMark(push(), clean), "green");
+  assert.equal(testMark(push(), { ...clean, [SURF]: "flat" }), "green");
+  assert.deepEqual(deviations(clean, [push()]), [], "neither surface is a deviation");
+});
+
+test("push-off: the surface is never guessed by marking the test normal", () => {
+  const filled = fillNormal({}, [push()]);
+  assert.equal(SURF in filled, false, "nothing here knows where he threw");
+  assert.equal(filled[P], "gt-6");
+});
+
+test("push-off: an unrecorded surface still leaves the test asked and answered", () => {
+  assert.equal(covers({ [P]: "gt-6", [R]: "gt-half" }, push()), true);
 });
 
 /* ------------------------------------------------------------------ *
@@ -1868,8 +1889,22 @@ test("heel lift: a good lift opens the quality question on that side only", () =
 test("heel lift: quality supplies the colour once the gate is passed", () => {
   const both = { [HL.hL]: "good", [HL.hR]: "good" };
   assert.equal(testMark(heel(), { ...both, [HL.qL]: "straight-up", [HL.qR]: "straight-up" }), "green");
-  assert.equal(testMark(heel(), { ...both, [HL.qL]: "straight-up", [HL.qR]: "rolls-outside" }), "red", "right");
-  assert.equal(testMark(heel(), { ...both, [HL.qR]: "straight-up", [HL.qL]: "rolls-outside" }), "red", "left");
+  assert.equal(testMark(heel(), { ...both, [HL.qL]: "straight-up", [HL.qR]: "rolls-outside" }), "yellow", "right");
+  assert.equal(testMark(heel(), { ...both, [HL.qR]: "straight-up", [HL.qL]: "rolls-outside" }), "yellow", "left");
+});
+
+/*
+ * Cole, revising his own earlier call while running the sheet: rolling to the
+ * outside is worth working on, not a failed test. The red on this one belongs
+ * to a limited lift and to nothing else.
+ */
+test("heel lift: only a limited lift is a red", () => {
+  const reds = heel()
+    .subTests.flatMap((st) => st.findings)
+    .filter((f) => f.severity === "red")
+    .map((f) => f.key);
+  assert.deepEqual(reds, ["limited"]);
+  assert.equal(testMark(heel(), { [HL.hL]: "limited", [HL.hR]: "good", [HL.qR]: "straight-up" }), "red");
 });
 
 test("heel lift: a good lift alone leaves no mark until quality is answered", () => {
@@ -1888,9 +1923,7 @@ test("push-off grades the improvement, not the constrained baseline", () => {
    * as green as an over-six one, and an over-six baseline that fails to
    * improve is as red as a five-to-six one that doesn't.
    */
-  const t = SCREEN_TESTS.find((x) => x.key === "push-off-mound")!;
-  const P = K("push-off-mound", "planted");
-  const R = K("push-off-mound", "released");
+  const t = push();
   assert.equal(testMark(t, { [P]: "5-to-6", [R]: "gt-half" }), "green");
   assert.equal(testMark(t, { [P]: "gt-6", [R]: "gt-half" }), "green");
   assert.equal(testMark(t, { [P]: "gt-6", [R]: "none" }), "red", "a good baseline earns nothing");
@@ -2379,14 +2412,16 @@ test("windshield wiper: pain at any of the four readings flags it", () => {
 
 test("every finding is graded, or defers to a branch that grades it", () => {
   /*
-   * All seventeen tests now come from the app rather than the 2019 sheet, so
-   * an uncoloured finding is a mistake rather than a gap. The exception is a
-   * gate: "good squat" and "limited without assistance" carry no colour
-   * because the question they open supplies one.
+   * Every test now comes from the app rather than the 2019 sheet, so an
+   * uncoloured finding is a mistake rather than a gap. Two exceptions: a
+   * gate, whose colour comes from the question it opens, and a DIAGNOSTIC
+   * sub-test, which records context rather than a grade — where the push-off
+   * was run is not something that can be green.
    */
   const ungraded: string[] = [];
   for (const t of SCREEN_TESTS)
-    for (const s of t.subTests)
+    for (const s of t.subTests) {
+      if (s.diagnostic) continue;
       for (const f of s.findings) {
         if (f.severity || f.alert) continue;
         const defers = t.subTests.some(
@@ -2394,7 +2429,41 @@ test("every finding is graded, or defers to a branch that grades it", () => {
         );
         if (!defers) ungraded.push(`${t.key}.${s.key} -> ${f.label}`);
       }
+    }
   assert.deepEqual(ungraded, []);
+});
+
+/* The exemption above is only worth having if something actually uses it. */
+test("a diagnostic sub-test isn't offered a painful answer", () => {
+  const surface = SCREEN_TESTS.find((t) => t.key === "push-off")!.subTests.find(
+    (s) => s.key === "surface",
+  )!;
+  assert.deepEqual(
+    subTestFindings(surface).map((f) => f.key),
+    ["mound", "flat"],
+    "where a test was run has no painful answer",
+  );
+  // Every graded sub-test still gets it.
+  const graded = SCREEN_TESTS.flatMap((t) => t.subTests).filter((s) => !s.diagnostic);
+  for (const s of graded)
+    assert.ok(
+      subTestFindings(s).some((f) => f.key === PAINFUL),
+      `${s.key} lost its painful option`,
+    );
+});
+
+test("a diagnostic sub-test records context rather than a grade", () => {
+  const diagnostic = SCREEN_TESTS.flatMap((t) =>
+    t.subTests.filter((s) => s.diagnostic).map((s) => `${t.key}.${s.key}`),
+  );
+  assert.deepEqual(diagnostic, ["push-off.surface"]);
+  for (const t of SCREEN_TESTS)
+    for (const s of t.subTests)
+      if (s.diagnostic)
+        for (const f of s.findings) {
+          assert.equal(f.severity, undefined, `${f.label} should carry no colour`);
+          assert.notEqual(f.normal, true, `${f.label} is not a pass either`);
+        }
 });
 
 test("every gate leads somewhere, and every branch has a gate", () => {
@@ -2404,8 +2473,10 @@ test("every gate leads somewhere, and every branch has a gate", () => {
       const parent = t.subTests.find((x) => x.key === s.dependsOn!.subTest);
       assert.ok(parent, `${t.key}.${s.key} branches off nothing`);
     }
-    // A finding with no colour must open something, or it grades nothing.
+    // A finding with no colour must open something, or it grades nothing —
+    // unless the sub-test is diagnostic, which grades nothing on purpose.
     for (const s of t.subTests)
+      if (!s.diagnostic)
       for (const f of s.findings)
         if (!f.severity && !f.alert)
           assert.ok(

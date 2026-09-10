@@ -31,7 +31,7 @@ export type TestMark = Severity | "alert";
 export const NOT_TESTED = "not-tested";
 
 /**
- * Pain is offered on every sub-test, so it lives here rather than being
+ * Pain is offered on every graded sub-test, so it lives here rather than being
  * repeated in thirty finding lists. A test added to the config gets it
  * automatically — the alternative depends on whoever adds the next one
  * remembering, and pain is the wrong thing to leave to memory.
@@ -103,8 +103,15 @@ export const UNIVERSAL_FINDINGS: Finding[] = [
   { key: PAINFUL, label: "Painful", alert: true },
 ];
 
-/** A sub-test's own findings plus the ones every sub-test offers. */
+/**
+ * A sub-test's own findings plus the ones every sub-test offers.
+ *
+ * Except a diagnostic one, which records context rather than a movement:
+ * "where was this tested?" has no painful answer, and offering one puts a
+ * nonsense option in front of the coach on every screen.
+ */
 export function subTestFindings(subTest: SubTest): Finding[] {
+  if (subTest.diagnostic) return [...subTest.findings];
   return [...subTest.findings, ...UNIVERSAL_FINDINGS];
 }
 
@@ -117,9 +124,9 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
 ];
 
 /**
- * Push-Off, which runs identically on the mound and on flat ground. Defined
- * once and used by both variants: two copies would drift, and the whole point
- * of splitting the surfaces was to compare like with like.
+ * Push-Off. It runs identically on the mound and on flat ground, and an
+ * athlete does one or the other — so the surface is recorded ON the test
+ * rather than being a second test that always reads as unscreened.
  *
  * Stage one is a gate rather than a grade. The question is not really how far
  * they step with the back foot glued down — that is the opening piece. The
@@ -129,6 +136,24 @@ export const SCREEN_GROUPS: ScreenGroup[] = [
  * on either is the finding.
  */
 const PUSH_OFF_SUBTESTS: SubTest[] = [
+  {
+    /*
+     * Where it was run, not how it went — hence diagnostic: it carries no
+     * normal, is never a deviation, and never colours the test.
+     *
+     * It exists because the surfaces used to be two separate tests, and an
+     * athlete only ever does ONE of them. That left the other permanently
+     * unscreened, which quietly meant no athlete could ever have a complete
+     * screen and the quarterly clock could never start.
+     */
+    key: "surface",
+    label: "Where was this tested?",
+    diagnostic: true,
+    findings: [
+      { key: "mound", label: "On the mound" },
+      { key: "flat", label: "On flat ground" },
+    ],
+  },
   {
     key: "planted",
     label: "How far did they step with their back foot planted?",
@@ -429,14 +454,8 @@ export const SCREEN_TESTS: ScreenTest[] = [
    * leaves the other with nothing to compare.
    */
   {
-    key: "push-off-mound",
-    label: "Push-Off Test (Mound)",
-    group: "stride",
-    subTests: PUSH_OFF_SUBTESTS,
-  },
-  {
-    key: "push-off-flat",
-    label: "Push-Off Test (Flat Ground)",
+    key: "push-off",
+    label: "Push-Off Test",
     group: "stride",
     subTests: PUSH_OFF_SUBTESTS,
   },
@@ -464,7 +483,10 @@ export const SCREEN_TESTS: ScreenTest[] = [
         dependsOn: { subTest: "height", findings: ["good"] },
         findings: [
           { key: "straight-up", label: "Raises straight up", normal: true, severity: "green" },
-          { key: "rolls-outside", label: "Rolls to outside of foot", severity: "red" },
+          // Cole, revising his own earlier call while running the sheet: rolling
+          // outside is a fault worth working on, not a failed test. The red on
+          // this test belongs to a limited lift and nothing else.
+          { key: "rolls-outside", label: "Rolls to outside of foot", severity: "yellow" },
         ],
       },
     ],
