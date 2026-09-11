@@ -1,6 +1,7 @@
 import { isCalendarDate } from "./velo";
 import {
   MAX_REPS,
+  MAX_SECONDS,
   MAX_SETS,
   MAX_WEIGHT,
   type Lift,
@@ -46,10 +47,15 @@ function parseSet(
   // A row the athlete tabbed through and left empty is not an error.
   if (!hasW && !hasR) return { set: null };
 
-  if (!hasR) return { error: `${where} has a weight but no reps` };
+  // On a hold, `r` is seconds — same field, and the mode says what it counts.
+  const counts = lift.mode === "time" ? "seconds" : "reps";
+  const ceiling = lift.mode === "time" ? MAX_SECONDS : MAX_REPS;
+  if (!hasR) return { error: `${where} has a weight but no ${counts}` };
   const r = Number(s.r);
-  if (!Number.isInteger(r) || r < 1 || r > MAX_REPS)
-    return { error: `${where}: reps must be a whole number from 1 to ${MAX_REPS}` };
+  if (!Number.isInteger(r) || r < 1 || r > ceiling)
+    return {
+      error: `${where}: ${counts} must be a whole number from 1 to ${ceiling}`,
+    };
 
   /*
    * Weight is required on a loaded lift and optional on a bodyweight one,
@@ -58,7 +64,7 @@ function parseSet(
    * bodyweight, so it is refused rather than stored as zero.
    */
   if (!hasW) {
-    if (lift.mode === "load") return { error: `${where} has reps but no weight` };
+    if (lift.mode === "load") return { error: `${where} has ${counts} but no weight` };
     return { set: { w: 0, r } };
   }
 

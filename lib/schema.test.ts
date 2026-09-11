@@ -2,7 +2,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { splitStatements } from "@/lib/db";
 import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
-import { seedLifts } from "@/lib/strength";
+import { programLifts } from "@/lib/program";
 
 /* ------------------------------------------------------------------ *
  * The gap these tests close
@@ -204,6 +204,11 @@ test("the tables the setup check looks for are the tables the schema creates", a
   await applyAsProduction(db, SCHEMA_SQL);
   assert.deepEqual(schemaTables(), await tablesIn(db));
   assert.ok(schemaTables().includes("lift_sessions"), "the one the typed list missed");
+  assert.equal(
+    schemaTables().includes("never"),
+    false,
+    "a CREATE TABLE written in a COMMENT is prose, not a table",
+  );
 });
 
 /*
@@ -212,7 +217,7 @@ test("the tables the setup check looks for are the tables the schema creates", a
  * starts with" from drifting — including the `lift_group` column name, which
  * differs from the field it carries because `group` is reserved in SQL.
  */
-test("a fresh database starts with exactly the seeded lift menu", async () => {
+test("a fresh database starts with exactly the program's exercises", async () => {
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
   const rows = (
@@ -230,7 +235,7 @@ test("a fresh database starts with exactly the seeded lift menu", async () => {
       position: Number(r.position),
       archived: Boolean(r.archived),
     })),
-    seedLifts(),
+    programLifts(),
   );
 });
 
@@ -242,18 +247,18 @@ test("a fresh database starts with exactly the seeded lift menu", async () => {
 test("re-running setup does not resurrect a lift the coach retired", async () => {
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
-  await db.query("UPDATE lifts SET archived = true WHERE key = 'hip-thrust'");
-  await db.query("UPDATE lifts SET name = 'Trap bar pull' WHERE key = 'trap-bar-deadlift'");
+  await db.query("UPDATE lifts SET archived = true WHERE key = 'barbell-hip-thrust'");
+  await db.query("UPDATE lifts SET name = 'Deadlift pull' WHERE key = 'deadlift'");
   await applyAsProduction(db, SCHEMA_SQL);
 
   const rows = (
-    await db.query("SELECT key, name, archived FROM lifts WHERE key IN ('hip-thrust','trap-bar-deadlift')")
+    await db.query("SELECT key, name, archived FROM lifts WHERE key IN ('barbell-hip-thrust','deadlift')")
   ).rows;
   const byKey = new Map(rows.map((r) => [String(r.key), r]));
-  assert.equal(Boolean(byKey.get("hip-thrust")!.archived), true, "still retired");
+  assert.equal(Boolean(byKey.get("barbell-hip-thrust")!.archived), true, "still retired");
   assert.equal(
-    String(byKey.get("trap-bar-deadlift")!.name),
-    "Trap bar pull",
+    String(byKey.get("deadlift")!.name),
+    "Deadlift pull",
     "and his rename survived too",
   );
 });

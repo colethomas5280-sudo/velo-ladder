@@ -270,7 +270,7 @@ CREATE TABLE IF NOT EXISTS lifts (
   key        text PRIMARY KEY,
   name       text NOT NULL,
   lift_group text NOT NULL DEFAULT '',
-  mode       text NOT NULL DEFAULT 'load' CHECK (mode IN ('load','reps')),
+  mode       text NOT NULL DEFAULT 'load' CHECK (mode IN ('load','reps','time')),
   help       text NOT NULL DEFAULT '',
   position   int NOT NULL DEFAULT 0,
   archived   boolean NOT NULL DEFAULT false,
@@ -279,15 +279,31 @@ CREATE TABLE IF NOT EXISTS lifts (
 );
 CREATE INDEX IF NOT EXISTS lifts_order_idx ON lifts(position, name)
   WHERE archived = false;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('trap-bar-deadlift', 'Trap bar deadlift', 'Lower body', 'load', '', 0) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('back-squat', 'Back squat', 'Lower body', 'load', '', 1) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('front-squat', 'Front squat', 'Lower body', 'load', '', 2) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('romanian-deadlift', 'Romanian deadlift', 'Lower body', 'load', '', 3) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('split-squat', 'Rear-foot elevated split squat', 'Lower body', 'load', 'Log one side — the load, not the total', 4) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('hip-thrust', 'Hip thrust', 'Lower body', 'load', '', 5) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('bench-press', 'Bench press', 'Push', 'load', '', 6) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('incline-db-press', 'Incline dumbbell press', 'Push', 'load', 'Per dumbbell', 7) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('overhead-press', 'Overhead press', 'Push', 'load', '', 8) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('chin-up', 'Chin-up', 'Pull', 'reps', 'Leave the weight blank for bodyweight, or enter what you hung on', 9) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('barbell-row', 'Barbell row', 'Pull', 'load', '', 10) ON CONFLICT (key) DO NOTHING;
-INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('db-row', 'Dumbbell row', 'Pull', 'load', 'Per hand', 11) ON CONFLICT (key) DO NOTHING;
+-- The mode list grew a 'time' once the program turned out to hold planks.
+-- CREATE TABLE IF NOT EXISTS never updates an existing table, so a database
+-- built before that keeps the old two-value constraint and every insert of a
+-- hold fails. Replace it outright; both statements are idempotent.
+ALTER TABLE lifts DROP CONSTRAINT IF EXISTS lifts_mode_check;
+ALTER TABLE lifts ADD CONSTRAINT lifts_mode_check
+  CHECK (mode IN ('load','reps','time'));
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('front-squat', 'Front squat', 'Lower body', 'load', '', 0) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('prone-1-arm-trap-raise', 'Prone 1-arm trap raise', 'Shoulder care', 'load', 'Per side — the load in one hand, not the total', 1) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('reverse-lunge', 'Reverse lunge', 'Lower body', 'load', 'Per side — the load you carried, not the total', 2) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('three-point-db-row', 'Three point DB row', 'Pull', 'load', 'Per hand', 3) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('push-up', 'Push-up', 'Push', 'reps', '', 4) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('banded-side-lying-clam', 'Banded side lying clam', 'Core & hips', 'reps', 'Per side', 5) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('high-plank', 'High plank', 'Core & hips', 'time', '', 6) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('bench', 'Bench', 'Push', 'load', '', 7) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('half-kneeling-hip-flexor-mob', 'Half kneeling hip flexor mob', 'Mobility', 'reps', 'Per side', 8) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('half-kneeling-landmine-press', 'Half kneeling landmine press', 'Push', 'load', 'Per side', 9) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('rdl', 'RDL', 'Lower body', 'load', '', 10) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('db-goblet-lateral-lunge', 'DB goblet lateral lunge', 'Lower body', 'load', 'Per side', 11) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('half-kneeling-cable-high-row', 'Half kneeling cable high row', 'Pull', 'load', 'Per side', 12) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('dead-bug', 'Dead bug', 'Core & hips', 'reps', 'Per side', 13) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('deadlift', 'Deadlift', 'Lower body', 'load', '', 14) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('cable-external-rotation', 'Cable external rotation', 'Shoulder care', 'load', 'Per side', 15) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('barbell-hip-thrust', 'Barbell hip thrust', 'Lower body', 'load', '', 16) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('bench-t-spine-mob', 'Bench T-spine mob', 'Mobility', 'reps', '', 17) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('yoga-push-up', 'Yoga push-up', 'Push', 'reps', '', 18) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('band-assisted-nordic-glute-ham', 'Band assisted Nordic glute ham', 'Lower body', 'reps', '', 19) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('single-leg-pallof-press', 'Single leg Pallof press', 'Core & hips', 'reps', 'Per side', 20) ON CONFLICT (key) DO NOTHING;

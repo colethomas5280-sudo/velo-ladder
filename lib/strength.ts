@@ -16,11 +16,17 @@
  *
  * `load` — a barbell or dumbbell movement. Weight is the load on the bar and
  *          progress is an estimated one-rep max.
- * `reps`  — a bodyweight movement. Weight is whatever was HUNG ON (0 = plain
+ * `reps` — a bodyweight movement. Weight is whatever was HUNG ON (0 = plain
  *          bodyweight) and progress is reps, because an estimated max off a
  *          chin-up means nothing without knowing what the athlete weighs.
+ * `time` — a hold. The count is SECONDS rather than reps: a high plank is
+ *          2x45s and there is no rep in it to estimate anything from.
+ *
+ * A set is always `{w, r}` whatever the mode — `r` is "the thing that was
+ * counted" and the mode says what it counts. That keeps one stored shape for
+ * every lift rather than a column per kind of work.
  */
-export type LiftMode = "load" | "reps";
+export type LiftMode = "load" | "reps" | "time";
 
 export interface Lift {
   /**
@@ -43,50 +49,6 @@ export interface Lift {
    */
   archived: boolean;
 }
-
-/**
- * What a brand-new database starts with.
- *
- * A starting list of the main barbell movements, NOT a transcription of any
- * particular program — Cole lifts his athletes off Driveline's, and the menu
- * is his. It is the SEED and nothing more: the live menu lives in the `lifts`
- * table, which he edits himself. Changing an entry here has no effect on a
- * database that has already been set up, by design — otherwise a deploy would
- * quietly overwrite his own edits.
- */
-export const SEED_LIFTS: (Omit<Lift, "position" | "archived" | "help"> & {
-  help?: string;
-})[] = [
-  // Lower body
-  { key: "trap-bar-deadlift", name: "Trap bar deadlift", group: "Lower body", mode: "load" },
-  { key: "back-squat", name: "Back squat", group: "Lower body", mode: "load" },
-  { key: "front-squat", name: "Front squat", group: "Lower body", mode: "load" },
-  { key: "romanian-deadlift", name: "Romanian deadlift", group: "Lower body", mode: "load" },
-  {
-    key: "split-squat",
-    name: "Rear-foot elevated split squat",
-    group: "Lower body",
-    mode: "load",
-    help: "Log one side — the load, not the total",
-  },
-  { key: "hip-thrust", name: "Hip thrust", group: "Lower body", mode: "load" },
-
-  // Upper body — push
-  { key: "bench-press", name: "Bench press", group: "Push", mode: "load" },
-  { key: "incline-db-press", name: "Incline dumbbell press", group: "Push", mode: "load", help: "Per dumbbell" },
-  { key: "overhead-press", name: "Overhead press", group: "Push", mode: "load" },
-
-  // Upper body — pull
-  {
-    key: "chin-up",
-    name: "Chin-up",
-    group: "Pull",
-    mode: "reps",
-    help: "Leave the weight blank for bodyweight, or enter what you hung on",
-  },
-  { key: "barbell-row", name: "Barbell row", group: "Pull", mode: "load" },
-  { key: "db-row", name: "Dumbbell row", group: "Pull", mode: "load", help: "Per hand" },
-];
 
 /* ------------------------------------------------------------------ *
  * The menu
@@ -135,26 +97,6 @@ export function liftMenu(all: readonly Lift[]): Menu {
 
 /** A menu holding nothing — for a page rendering before its fetch lands. */
 export const EMPTY_MENU: Menu = liftMenu([]);
-
-/**
- * `SEED_LIFTS` as real rows: position by declaration order, none archived.
- *
- * The single expansion of the seed. The schema builds its INSERTs from this
- * and `lib/schema.test.ts` checks a freshly set-up database against it, so
- * "what the code says a new database starts with" and "what a new database
- * actually starts with" cannot come apart.
- */
-export function seedLifts(): Lift[] {
-  return SEED_LIFTS.map((l, i) => ({
-    ...l,
-    // Always a string, never absent. An optional field that is sometimes
-    // missing and sometimes `undefined` compares unequal to itself across
-    // the wire, which is a needless way to make two identical menus differ.
-    help: l.help ?? "",
-    position: i,
-    archived: false,
-  }));
-}
 
 /**
  * The key a new lift gets, from the name the coach typed.
@@ -213,10 +155,13 @@ export const MAX_SETS = 12;
 export const MAX_LIFT_NAME = 60;
 
 export function isLiftMode(v: unknown): v is LiftMode {
-  return v === "load" || v === "reps";
+  return v === "load" || v === "reps" || v === "time";
 }
 export const MAX_WEIGHT = 1000;
 export const MAX_REPS = 50;
+
+/** Ten minutes. Longer than any hold in the program, short of a typo. */
+export const MAX_SECONDS = 600;
 
 /**
  * Above this many reps an estimated max is fiction, not arithmetic — every
@@ -327,19 +272,47 @@ export function liftStats(sets: readonly LiftSet[] | undefined): LiftStats {
  * with no reps, or a loaded day of nothing but long sets.
  */
 export function liftMetric(stats: LiftStats, mode: LiftMode): number | null {
-  if (mode === "reps") return stats.longest ? stats.longest.r : null;
+  // A hold and a bodyweight set are read the same way — the longest one.
+  if (mode === "reps" || mode === "time")
+    return stats.longest ? stats.longest.r : null;
   return stats.e1rm;
+}
+
+/**
+ * The set the charted number came from.
+ *
+ * Paired with `liftMetric` deliberately: these two answer "what is the number"
+ * and "which set produced it", and a page that shows them side by side is
+ * wrong the moment they disagree. It already went wrong once, reading
+ * "Best 310 lb (275 × 3)" off a day whose 310 came from 245 × 8.
+ */
+export function metricSet(stats: LiftStats, mode: LiftMode): LiftSet | null {
+  return mode === "load" ? stats.e1rmSet : stats.longest;
+}
+
+/**
+ * The set worth quoting as "what you last hit" — the heaviest, or the longest
+ * where there is no weight to rank by.
+ *
+ * NOT the same question as `metricSet`, and deliberately not the same answer:
+ * the heaviest set is what an athlete wants to see beside a date, while the
+ * best estimate may have come from a lighter, longer one.
+ */
+export function topSet(stats: LiftStats, mode: LiftMode): LiftSet | null {
+  return mode === "load" ? stats.top : stats.longest;
 }
 
 /** What the charted number is called, so the axis can't drift from the maths. */
 export const METRIC_LABEL: Record<LiftMode, string> = {
   load: "Est. 1RM",
   reps: "Top set reps",
+  time: "Longest hold",
 };
 
 export const METRIC_UNIT: Record<LiftMode, string> = {
   load: "lb",
   reps: "reps",
+  time: "seconds",
 };
 
 /* ------------------------------------------------------------------ *
@@ -452,7 +425,7 @@ export function liftBest(
         value: p.value,
         date: p.date,
         // The set the number came from, so the caption can't contradict it.
-        set: mode === "reps" ? p.stats.longest : p.stats.e1rmSet,
+        set: metricSet(p.stats, mode),
       };
   }
   return best;
@@ -523,8 +496,10 @@ export function dayTotals(menu: Menu, day: DatedLifts): DayTotals {
  * Formatting
  * ------------------------------------------------------------------ */
 
-/** "225 × 5", or "BW × 8" / "BW+25 × 8" for a bodyweight lift. */
+/** "225 × 5", "BW × 8" / "BW+25 × 8" for bodyweight, "45s" for a hold. */
 export function fmtSet(set: LiftSet, mode: LiftMode): string {
+  if (mode === "time")
+    return set.w > 0 ? `${trim(set.w)} × ${set.r}s` : `${set.r}s`;
   if (mode === "reps")
     return set.w > 0 ? `BW+${trim(set.w)} × ${set.r}` : `BW × ${set.r}`;
   return `${trim(set.w)} × ${set.r}`;
@@ -538,6 +513,7 @@ export function trim(w: number): string {
 /** The charted number as it reads: "248 lb" or "8 reps". */
 export function fmtMetric(value: number | null, mode: LiftMode): string {
   if (value == null) return "–";
+  if (mode === "time") return `${value}s`;
   return mode === "reps"
     ? `${value} rep${value === 1 ? "" : "s"}`
     : `${Math.round(value)} lb`;

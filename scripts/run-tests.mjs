@@ -20,7 +20,7 @@
 import { spawn } from "node:child_process";
 
 /** The suite has never legitimately been smaller than this. */
-const MIN_TESTS = 650;
+const MIN_TESTS = 670;
 
 const args = [
   "--import",

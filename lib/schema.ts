@@ -1,4 +1,4 @@
-import { seedLifts } from "./strength";
+import { programLifts } from "./program";
 
 /**
  * Canonical database schema. Run once (and after any schema change) via
@@ -19,7 +19,7 @@ const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
  * is `ON CONFLICT DO NOTHING`: on Cole's database, which already has a menu
  * he has edited, this whole block is a no-op.
  */
-const LIFT_SEED_SQL = seedLifts()
+const LIFT_SEED_SQL = programLifts()
   .map(
     (l) =>
       `INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES (` +
@@ -298,7 +298,7 @@ CREATE TABLE IF NOT EXISTS lifts (
   key        text PRIMARY KEY,
   name       text NOT NULL,
   lift_group text NOT NULL DEFAULT '',
-  mode       text NOT NULL DEFAULT 'load' CHECK (mode IN ('load','reps')),
+  mode       text NOT NULL DEFAULT 'load' CHECK (mode IN ('load','reps','time')),
   help       text NOT NULL DEFAULT '',
   position   int NOT NULL DEFAULT 0,
   archived   boolean NOT NULL DEFAULT false,
@@ -307,6 +307,13 @@ CREATE TABLE IF NOT EXISTS lifts (
 );
 CREATE INDEX IF NOT EXISTS lifts_order_idx ON lifts(position, name)
   WHERE archived = false;
+-- The mode list grew a 'time' once the program turned out to hold planks.
+-- CREATE TABLE IF NOT EXISTS never updates an existing table, so a database
+-- built before that keeps the old two-value constraint and every insert of a
+-- hold fails. Replace it outright; both statements are idempotent.
+ALTER TABLE lifts DROP CONSTRAINT IF EXISTS lifts_mode_check;
+ALTER TABLE lifts ADD CONSTRAINT lifts_mode_check
+  CHECK (mode IN ('load','reps','time'));
 ${LIFT_SEED_SQL}
 `;
 
@@ -332,7 +339,14 @@ ON CONFLICT (id) DO NOTHING;
  * `lift_sessions` in it.
  */
 export function schemaTables(): string[] {
-  return [...SCHEMA_SQL.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)/g)]
+  /*
+   * Comments stripped FIRST. Without that the scan reads its own prose: a
+   * comment beginning "CREATE TABLE IF NOT EXISTS never updates an existing
+   * table" put a table called `never` on the list, and `/api/setup` would
+   * have reported it missing from a perfectly healthy database.
+   */
+  const sql = SCHEMA_SQL.replace(/--[^\n]*/g, "");
+  return [...sql.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)/g)]
     .map((m) => m[1])
     .sort();
 }

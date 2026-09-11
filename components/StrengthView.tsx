@@ -45,6 +45,9 @@ export default function StrengthView() {
           <h2>My lifting</h2>
         </div>
         <StrengthPanel athleteId={me.athleteId} canEdit />
+        <p className="cz-note">
+          <Link href="/strength/program">See what the program asks for →</Link>
+        </p>
       </>
     );
   }
@@ -115,6 +118,7 @@ function Roster() {
         <h3>Lifting</h3>
         <div className="sub sr-sub">
           <span>Personal bests and recent work, last {STRENGTH_WINDOW / 7} weeks</span>
+          <Link href="/strength/program">The program, as written →</Link>
         </div>
       </div>
 

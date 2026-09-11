@@ -65,20 +65,20 @@ test("a recent record names the lift and the number", () => {
   roster([
     rowOf({
       records: [
-        { key: "back-squat", date: TODAY, value: 263.2 },
-        { key: "bench-press", date: daysAgo(3), value: 210 },
+        { key: "front-squat", date: TODAY, value: 263.2 },
+        { key: "bench", date: daysAgo(3), value: 210 },
       ],
     }),
   ]);
   assert.ok(screen.getByText(/2 PRs/));
   const row = document.querySelector(".tr-row")!.textContent!;
-  assert.match(row, /Back squat 263 lb/, "the newest one, spelled out");
+  assert.match(row, /Front squat 263 lb/, "the newest one, spelled out");
 });
 
 test("a single record is not pluralised", () => {
-  roster([rowOf({ records: [{ key: "chin-up", date: TODAY, value: 12 }] })]);
+  roster([rowOf({ records: [{ key: "push-up", date: TODAY, value: 12 }] })]);
   assert.ok(screen.getByText(/1 PR$/));
-  assert.match(document.querySelector(".tr-row")!.textContent!, /Chin-up 12 reps/);
+  assert.match(document.querySelector(".tr-row")!.textContent!, /Push-up 12 reps/);
 });
 
 test("the window in the caption comes from the config, not from beside it", () => {

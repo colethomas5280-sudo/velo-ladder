@@ -16,12 +16,14 @@ import {
   liftSeries,
   liftStats,
   liftsDone,
+  metricSet,
   liftsEverDone,
   recentRecords,
-  seedLifts,
+  topSet,
   type DatedLifts,
   type LiftSet,
 } from "@/lib/strength";
+import { programLifts } from "@/lib/program";
 
 /* ------------------------------------------------------------------ *
  * Strength
@@ -39,7 +41,7 @@ const day = (date: string, lifts: Record<string, LiftSet[]>): DatedLifts => ({
 const set = (w: number, r: number): LiftSet => ({ w, r });
 
 /* The menu a fresh database starts with — what these tests read keys against. */
-const LIFTS = seedLifts();
+const LIFTS = programLifts();
 const LIFT_GROUPS = [...new Set(LIFTS.map((l) => l.group))];
 const menu = liftMenu(LIFTS);
 const liftName = (k: string) => menu.name(k);
@@ -61,8 +63,8 @@ test("keys are slugs, because they are what the database stores forever", () => 
 test("a lift no longer on the menu still reads by its key", () => {
   assert.equal(liftName("power-clean-retired"), "power-clean-retired");
   assert.equal(liftMode("power-clean-retired"), "load", "and reads as a loaded lift");
-  assert.equal(liftName("bench-press"), "Bench press");
-  assert.equal(liftMode("chin-up"), "reps");
+  assert.equal(liftName("bench"), "Bench");
+  assert.equal(liftMode("push-up"), "reps");
 });
 
 /* ---------------- estimating a max ---------------- */
@@ -82,7 +84,7 @@ test("a set too long to estimate from returns nothing rather than a number", () 
 });
 
 test("an unloaded set estimates nothing", () => {
-  assert.equal(e1rm(0, 8), null, "a chin-up has no bar weight to estimate from");
+  assert.equal(e1rm(0, 8), null, "a push-up has no bar weight to estimate from");
   assert.equal(e1rm(200, 0), null);
 });
 
@@ -141,9 +143,9 @@ test("a loaded day of nothing but long sets charts nothing rather than zero", ()
 
 test("a day's totals add up across every lift", () => {
   const d = day("2026-09-01", {
-    "back-squat": [set(225, 5), set(225, 5)],
-    "bench-press": [set(185, 5)],
-    "chin-up": [],
+    "front-squat": [set(225, 5), set(225, 5)],
+    "bench": [set(185, 5)],
+    "push-up": [],
   });
   assert.deepEqual(dayTotals(menu, d), { lifts: 2, sets: 3, reps: 15, volume: 3175 });
 });
@@ -151,30 +153,30 @@ test("a day's totals add up across every lift", () => {
 test("lifts done come back in menu order, with anything retired at the end", () => {
   const d = day("2026-09-01", {
     "zz-retired": [set(100, 5)],
-    "bench-press": [set(185, 5)],
-    "back-squat": [set(225, 5)],
-    "trap-bar-deadlift": [],
+    "bench": [set(185, 5)],
+    "front-squat": [set(225, 5)],
+    "deadlift": [],
   });
-  assert.deepEqual(liftsDone(menu, d), ["back-squat", "bench-press", "zz-retired"]);
+  assert.deepEqual(liftsDone(menu, d), ["front-squat", "bench", "zz-retired"]);
 });
 
 /* ---------------- reading a lift across days ---------------- */
 
 const history: DatedLifts[] = [
-  day("2026-08-03", { "back-squat": [set(225, 5)] }),
-  day("2026-08-10", { "back-squat": [set(235, 5)] }),
-  day("2026-08-17", { "back-squat": [set(235, 5)] }),
-  day("2026-08-24", { "back-squat": [set(215, 5)] }),
-  day("2026-09-01", { "back-squat": [set(245, 5)] }),
+  day("2026-08-03", { "front-squat": [set(225, 5)] }),
+  day("2026-08-10", { "front-squat": [set(235, 5)] }),
+  day("2026-08-17", { "front-squat": [set(235, 5)] }),
+  day("2026-08-24", { "front-squat": [set(215, 5)] }),
+  day("2026-09-01", { "front-squat": [set(245, 5)] }),
 ];
 
 test("a series is oldest first and skips days the lift wasn't done", () => {
-  const s = liftSeries(menu, [...history].reverse(), "back-squat");
+  const s = liftSeries(menu, [...history].reverse(), "front-squat");
   assert.deepEqual(
     s.map((p) => p.date),
     ["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-09-01"],
   );
-  assert.equal(liftSeries(menu, history, "bench-press").length, 0);
+  assert.equal(liftSeries(menu, history, "bench").length, 0);
 });
 
 /*
@@ -182,11 +184,11 @@ test("a series is oldest first and skips days the lift wasn't done", () => {
  * badge on it would fire on every new lift and mean nothing.
  */
 test("the first day of a lift is not a personal best", () => {
-  assert.equal(liftSeries(menu, history, "back-squat")[0].record, false);
+  assert.equal(liftSeries(menu, history, "front-squat")[0].record, false);
 });
 
 test("repeating the best is not a new best", () => {
-  const s = liftSeries(menu, history, "back-squat");
+  const s = liftSeries(menu, history, "front-squat");
   assert.equal(s[1].record, true, "235 beat 225");
   assert.equal(s[2].record, false, "235 again is a good day, not a new one");
   assert.equal(s[3].record, false, "and 215 is not");
@@ -201,43 +203,43 @@ test("repeating the best is not a new best", () => {
 test("a day that charts nothing doesn't reset the record clock", () => {
   const s = liftSeries(menu, 
     [
-      day("2026-08-01", { "back-squat": [set(135, 20)] }),
-      day("2026-08-08", { "back-squat": [set(225, 5)] }),
+      day("2026-08-01", { "front-squat": [set(135, 20)] }),
+      day("2026-08-08", { "front-squat": [set(225, 5)] }),
     ],
-    "back-squat",
+    "front-squat",
   );
   assert.equal(s[0].value, null);
   assert.equal(s[1].record, true, "225x5 beat nothing recorded, but it is not the first day");
 });
 
 test("the best day is the best number and the set behind it", () => {
-  const best = liftBest(menu, history, "back-squat")!;
+  const best = liftBest(menu, history, "front-squat")!;
   assert.equal(best.date, "2026-09-01");
   assert.deepEqual(best.set, set(245, 5));
-  assert.equal(liftBest(menu, history, "bench-press"), null);
+  assert.equal(liftBest(menu, history, "bench"), null);
 });
 
 test("a bodyweight best reports the longest set, not the heaviest", () => {
   const days = [
-    day("2026-08-01", { "chin-up": [set(0, 8)] }),
-    day("2026-08-08", { "chin-up": [set(45, 3), set(0, 12)] }),
+    day("2026-08-01", { "push-up": [set(0, 8)] }),
+    day("2026-08-08", { "push-up": [set(45, 3), set(0, 12)] }),
   ];
-  const best = liftBest(menu, days, "chin-up")!;
+  const best = liftBest(menu, days, "push-up")!;
   assert.equal(best.value, 12);
   assert.deepEqual(best.set, set(0, 12), "the 45lb triple is heavier and shorter");
 });
 
 test("the last day is the most recent one, whatever order the rows arrive in", () => {
-  assert.equal(liftLast(menu, [...history].reverse(), "back-squat")!.date, "2026-09-01");
-  assert.equal(liftLast(menu, history, "bench-press"), null);
+  assert.equal(liftLast(menu, [...history].reverse(), "front-squat")!.date, "2026-09-01");
+  assert.equal(liftLast(menu, history, "bench"), null);
 });
 
 test("every lift ever done comes back once, in menu order", () => {
   const days = [
-    day("2026-08-01", { "bench-press": [set(185, 5)] }),
-    day("2026-08-02", { "back-squat": [set(225, 5)], "bench-press": [set(190, 5)] }),
+    day("2026-08-01", { "bench": [set(185, 5)] }),
+    day("2026-08-02", { "front-squat": [set(225, 5)], "bench": [set(190, 5)] }),
   ];
-  assert.deepEqual(liftsEverDone(menu, days), ["back-squat", "bench-press"]);
+  assert.deepEqual(liftsEverDone(menu, days), ["front-squat", "bench"]);
 });
 
 /*
@@ -247,17 +249,17 @@ test("every lift ever done comes back once, in menu order", () => {
  */
 test("recent records are inside the window and newest first", () => {
   const days = [
-    day("2026-08-01", { "back-squat": [set(225, 5)] }), // first: sets the number
-    day("2026-08-10", { "back-squat": [set(230, 5)] }), // a record, but old
-    day("2026-08-20", { "back-squat": [set(235, 5)] }), // exactly on the cutoff
-    day("2026-09-01", { "back-squat": [set(245, 5)] }),
-    day("2026-09-05", { "bench-press": [set(185, 5)] }), // first bench: not a record
+    day("2026-08-01", { "front-squat": [set(225, 5)] }), // first: sets the number
+    day("2026-08-10", { "front-squat": [set(230, 5)] }), // a record, but old
+    day("2026-08-20", { "front-squat": [set(235, 5)] }), // exactly on the cutoff
+    day("2026-09-01", { "front-squat": [set(245, 5)] }),
+    day("2026-09-05", { "bench": [set(185, 5)] }), // first bench: not a record
   ];
   assert.deepEqual(
     recentRecords(menu, days, "2026-08-20").map((r) => [r.key, r.date]),
     [
-      ["back-squat", "2026-09-01"],
-      ["back-squat", "2026-08-20"],
+      ["front-squat", "2026-09-01"],
+      ["front-squat", "2026-08-20"],
     ],
   );
 });
@@ -291,24 +293,24 @@ test("the charted number reads in its own unit", () => {
  */
 test("the lift shown first is the one with the most behind it", () => {
   const days = [
-    day("2026-07-15", { "trap-bar-deadlift": [set(315, 5)], "back-squat": [set(225, 5)] }),
-    day("2026-08-05", { "back-squat": [set(245, 5)] }),
-    day("2026-08-26", { "back-squat": [set(255, 5)] }),
+    day("2026-07-15", { "deadlift": [set(315, 5)], "front-squat": [set(225, 5)] }),
+    day("2026-08-05", { "front-squat": [set(245, 5)] }),
+    day("2026-08-26", { "front-squat": [set(255, 5)] }),
   ];
-  assert.equal(defaultLift(menu, days), "back-squat");
+  assert.equal(defaultLift(menu, days), "front-squat");
 });
 
 test("a tie goes to whichever was lifted most recently", () => {
   const days = [
-    day("2026-07-15", { "trap-bar-deadlift": [set(315, 5)] }),
-    day("2026-08-26", { "back-squat": [set(225, 5)] }),
+    day("2026-07-15", { "deadlift": [set(315, 5)] }),
+    day("2026-08-26", { "front-squat": [set(225, 5)] }),
   ];
-  assert.equal(defaultLift(menu, days), "back-squat", "one session each");
+  assert.equal(defaultLift(menu, days), "front-squat", "one session each");
 });
 
 test("nothing logged leads with nothing", () => {
   assert.equal(defaultLift(menu, []), null);
-  assert.equal(defaultLift(menu, [day("2026-08-01", { "back-squat": [] })]), null);
+  assert.equal(defaultLift(menu, [day("2026-08-01", { "front-squat": [] })]), null);
 });
 
 /*
@@ -318,10 +320,10 @@ test("nothing logged leads with nothing", () => {
  */
 test("a best names the set its number actually came from", () => {
   const days = [
-    day("2026-08-01", { "back-squat": [set(225, 5)] }),
-    day("2026-09-09", { "back-squat": [set(275, 3), set(245, 8)] }),
+    day("2026-08-01", { "front-squat": [set(225, 5)] }),
+    day("2026-09-09", { "front-squat": [set(275, 3), set(245, 8)] }),
   ];
-  const best = liftBest(menu, days, "back-squat")!;
+  const best = liftBest(menu, days, "front-squat")!;
   assert.equal(Math.round(best.value), 310);
   assert.deepEqual(best.set, set(245, 8), "not the 275 triple, which estimates 302");
 });
@@ -335,7 +337,7 @@ test("the stats say which set the estimate came from", () => {
 
 /* ---------------- the menu ---------------- */
 
-const lift = (over: Partial<ReturnType<typeof seedLifts>[number]>) => ({
+const lift = (over: Partial<ReturnType<typeof programLifts>[number]>) => ({
   key: "x",
   name: "X",
   group: "Lower body",
@@ -358,17 +360,17 @@ test("the menu offers live lifts in the coach's order, not alphabetically", () =
 /*
  * The reason the menu is built from EVERY lift rather than the live ones. An
  * athlete who benched for a year should not find that year relabelled
- * `bench-press` because the movement came off the menu.
+ * `bench` because the movement came off the menu.
  */
 test("a retired lift is off the menu but still named", () => {
   const m = liftMenu([
-    lift({ key: "bench-press", name: "Bench press", archived: true }),
-    lift({ key: "back-squat", name: "Back squat", position: 1 }),
+    lift({ key: "bench", name: "Bench", archived: true }),
+    lift({ key: "front-squat", name: "Front squat", position: 1 }),
   ]);
-  assert.deepEqual(m.lifts.map((l) => l.key), ["back-squat"]);
-  assert.equal(m.name("bench-press"), "Bench press", "history still reads");
-  assert.equal(m.mode("bench-press"), "load");
-  assert.equal(m.rank("bench-press"), m.lifts.length, "and it sorts last");
+  assert.deepEqual(m.lifts.map((l) => l.key), ["front-squat"]);
+  assert.equal(m.name("bench"), "Bench", "history still reads");
+  assert.equal(m.mode("bench"), "load");
+  assert.equal(m.rank("bench"), m.lifts.length, "and it sorts last");
 });
 
 test("a key that was never defined falls back to itself rather than blank", () => {
@@ -401,10 +403,10 @@ test("a new lift's key is a readable slug of its name", () => {
  * graft its whole history onto whatever was just created.
  */
 test("a key never collides, archived ones included", () => {
-  assert.equal(liftKeyFrom("Back squat", ["back-squat"]), "back-squat-2");
+  assert.equal(liftKeyFrom("Front squat", ["front-squat"]), "front-squat-2");
   assert.equal(
-    liftKeyFrom("Back squat", ["back-squat", "back-squat-2"]),
-    "back-squat-3",
+    liftKeyFrom("Front squat", ["front-squat", "front-squat-2"]),
+    "front-squat-3",
   );
 });
 
@@ -424,4 +426,53 @@ test("a very long name is cut without leaving a trailing dash", () => {
   assert.ok(key.length <= 48);
   assert.equal(/-$/.test(key), false);
   assert.equal(/-$/.test(liftKeyFrom(`${"b".repeat(47)} tail`, [])), false);
+});
+
+/* ---------------- holds ---------------- */
+
+/*
+ * A hold stores seconds in the same field a rep count uses. One stored shape
+ * for every lift beats a column per kind of work — and the mode is what says
+ * which it is, so nothing has to guess from the number.
+ */
+test("a hold is read as its longest set, in seconds", () => {
+  const s = liftStats([set(0, 30), set(0, 45), set(25, 40)]);
+  assert.equal(liftMetric(s, "time"), 45);
+  assert.equal(fmtMetric(45, "time"), "45s");
+});
+
+test("a hold formats as time, loaded or not", () => {
+  assert.equal(fmtSet(set(0, 45), "time"), "45s");
+  assert.equal(fmtSet(set(25, 45), "time"), "25 × 45s");
+  assert.equal(fmtSet(set(0, 45), "reps"), "BW × 45", "and reps still read as reps");
+});
+
+test("a hold never claims an estimated max", () => {
+  const days = [
+    day("2026-08-01", { "high-plank": [set(0, 30)] }),
+    day("2026-08-08", { "high-plank": [set(0, 45)] }),
+  ];
+  const m = liftMenu([lift({ key: "high-plank", name: "High plank", mode: "time" })]);
+  const best = liftBest(m, days, "high-plank")!;
+  assert.equal(best.value, 45);
+  assert.deepEqual(best.set, set(0, 45));
+});
+
+/*
+ * These two answer different questions and are easy to conflate. The best
+ * quotes the set its own number came from; "last hit" quotes the heaviest.
+ * A page showing both was briefly wrong by using one for the other.
+ */
+test("the metric's set and the set worth quoting are not always the same", () => {
+  const s = liftStats([set(275, 3), set(245, 8)]);
+  assert.deepEqual(metricSet(s, "load"), set(245, 8), "where the estimate came from");
+  assert.deepEqual(topSet(s, "load"), set(275, 3), "what he actually hit hardest");
+});
+
+test("with nothing loaded, both fall back to the longest set", () => {
+  const s = liftStats([set(0, 12), set(45, 3)]);
+  for (const mode of ["reps", "time"] as const) {
+    assert.deepEqual(metricSet(s, mode), set(0, 12), mode);
+    assert.deepEqual(topSet(s, mode), set(0, 12), mode);
+  }
 });

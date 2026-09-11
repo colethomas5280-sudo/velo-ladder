@@ -2,7 +2,8 @@ import "./testDom";
 import { shiftDate, todayISO } from "@/lib/velo";
 import type { ScreenOverviewRow } from "@/lib/types";
 import { screenSummary, fillNormal, type Results } from "@/lib/screen";
-import { liftMenu, seedLifts } from "@/lib/strength";
+import { liftMenu } from "@/lib/strength";
+import { programLifts } from "@/lib/program";
 
 /* Fixtures are built relative to today, so the tests don't rot overnight. */
 export const TODAY = todayISO();
@@ -34,5 +35,5 @@ export function rowOf(over: Partial<ScreenOverviewRow> = {}): ScreenOverviewRow 
  * `/api/lifts`, so a test that renders one has to provide that key — MENU is
  * the object form for anything taking it as a prop, LIFT_ROWS the wire form.
  */
-export const LIFT_ROWS = seedLifts();
+export const LIFT_ROWS = programLifts();
 export const MENU = liftMenu(LIFT_ROWS);

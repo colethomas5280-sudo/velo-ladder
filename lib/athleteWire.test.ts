@@ -122,12 +122,12 @@ async function seed(): Promise<Seeded> {
    */
   await data.upsertLiftDay(
     athlete.id,
-    { date: "2026-09-01", lifts: { "back-squat": [{ w: 225, r: 5 }] }, notes: LIFT_NOTE },
+    { date: "2026-09-01", lifts: { "front-squat": [{ w: 225, r: 5 }] }, notes: LIFT_NOTE },
     COACH_EMAIL,
   );
   await data.upsertLiftDay(
     other.id,
-    { date: "2026-09-01", lifts: { "bench-press": [{ w: 185, r: 5 }] }, notes: OTHER_LIFT_NOTE },
+    { date: "2026-09-01", lifts: { "bench": [{ w: 185, r: 5 }] }, notes: OTHER_LIFT_NOTE },
     COACH_EMAIL,
   );
   await sql`

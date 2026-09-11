@@ -79,7 +79,7 @@ const readDays = async () =>
 test("a fresh database comes up with the seeded menu", async () => {
   const lifts = await list();
   assert.ok(lifts.length >= 10, `only ${lifts.length} lifts seeded`);
-  assert.ok(lifts.some((l) => l.key === "back-squat"));
+  assert.ok(lifts.some((l) => l.key === "front-squat"));
   assert.equal(lifts.every((l) => !l.archived), true);
 });
 
@@ -101,12 +101,12 @@ test("an athlete reads the menu but cannot change it", async () => {
   assert.equal((await menuRoute.GET()).status, 200, "they need it to read their own log");
   assert.equal((await menuRoute.POST(req({ name: "Sneaky lift" }))).status, 403);
   assert.equal(
-    (await oneRoute.PATCH(req({ name: "Renamed" }, "PATCH"), keyCtx("back-squat")))
+    (await oneRoute.PATCH(req({ name: "Renamed" }, "PATCH"), keyCtx("front-squat")))
       .status,
     403,
   );
   assert.equal(
-    (await oneRoute.DELETE(req(undefined, "DELETE"), keyCtx("back-squat"))).status,
+    (await oneRoute.DELETE(req(undefined, "DELETE"), keyCtx("front-squat"))).status,
     403,
   );
   signedInAs = COACH;
@@ -126,19 +126,19 @@ test("a nameless lift is refused", async () => {
  * CALLED; the key every set is filed under never moves.
  */
 test("renaming a lift keeps its key, and its history with it", async () => {
-  await logDay("2026-09-01", { "back-squat": [{ w: 225, r: 5 }] });
+  await logDay("2026-09-01", { "front-squat": [{ w: 225, r: 5 }] });
 
   const res = await oneRoute.PATCH(
-    req({ name: "Back squat (high bar)" }, "PATCH"),
-    keyCtx("back-squat"),
+    req({ name: "Front squat (high bar)" }, "PATCH"),
+    keyCtx("front-squat"),
   );
   const renamed = (await res.json()) as Lift;
   assert.equal(res.status, 200, JSON.stringify(renamed));
-  assert.equal(renamed.key, "back-squat", "the key did not move");
-  assert.equal(renamed.name, "Back squat (high bar)");
+  assert.equal(renamed.key, "front-squat", "the key did not move");
+  assert.equal(renamed.name, "Front squat (high bar)");
 
   const days = await readDays();
-  assert.deepEqual(days[0].lifts, { "back-squat": [{ w: 225, r: 5 }] });
+  assert.deepEqual(days[0].lifts, { "front-squat": [{ w: 225, r: 5 }] });
 });
 
 /*
@@ -170,11 +170,11 @@ test("how a lift is measured can be fixed before there is history, not after", a
 
 test("re-sending the same mode on a used lift is not treated as a change", async () => {
   const res = await oneRoute.PATCH(
-    req({ name: "Back squat", mode: "load" }, "PATCH"),
-    keyCtx("back-squat"),
+    req({ name: "Front squat", mode: "load" }, "PATCH"),
+    keyCtx("front-squat"),
   );
   assert.equal(res.status, 200, JSON.stringify(await res.json()));
-  assert.equal((await find("back-squat"))!.name, "Back squat");
+  assert.equal((await find("front-squat"))!.name, "Front squat");
 });
 
 /*
@@ -183,30 +183,30 @@ test("re-sending the same mode on a used lift is not treated as a change", async
  */
 test("removing a lift takes it off the menu and closes its write path", async () => {
   assert.equal(
-    (await oneRoute.DELETE(req(undefined, "DELETE"), keyCtx("hip-thrust"))).status,
+    (await oneRoute.DELETE(req(undefined, "DELETE"), keyCtx("barbell-hip-thrust"))).status,
     200,
   );
 
-  const gone = await find("hip-thrust");
+  const gone = await find("barbell-hip-thrust");
   assert.equal(gone!.archived, true, "archived, not deleted");
 
-  const refused = await logDay("2026-09-03", { "hip-thrust": [{ w: 225, r: 8 }] });
+  const refused = await logDay("2026-09-03", { "barbell-hip-thrust": [{ w: 225, r: 8 }] });
   assert.equal(refused.status, 400, "no longer loggable");
 
   // And the one with history behind it still reads it back.
   const days = await readDays();
-  assert.deepEqual(days[0].lifts, { "back-squat": [{ w: 225, r: 5 }] });
+  assert.deepEqual(days[0].lifts, { "front-squat": [{ w: 225, r: 5 }] });
 });
 
 test("a lift put back is offered again", async () => {
   assert.equal(
-    (await oneRoute.PATCH(req({ archived: false }, "PATCH"), keyCtx("hip-thrust")))
+    (await oneRoute.PATCH(req({ archived: false }, "PATCH"), keyCtx("barbell-hip-thrust")))
       .status,
     200,
   );
-  assert.equal((await find("hip-thrust"))!.archived, false);
+  assert.equal((await find("barbell-hip-thrust"))!.archived, false);
   assert.equal(
-    (await logDay("2026-09-03", { "hip-thrust": [{ w: 225, r: 8 }] })).status,
+    (await logDay("2026-09-03", { "barbell-hip-thrust": [{ w: 225, r: 8 }] })).status,
     201,
   );
 });

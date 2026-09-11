@@ -9,6 +9,7 @@ import {
   fmtSet,
   liftBest,
   liftLast,
+  topSet,
   type DatedLifts,
   type Lift,
   type Menu,
@@ -286,10 +287,11 @@ function LiftBlock({
   const mode = lift?.mode ?? menu.mode(liftKey);
   const last = liftLast(menu, past, liftKey);
   const best = liftBest(menu, past, liftKey, mode);
-  const bw = mode === "reps";
-  // The set worth beating: the longest on a bodyweight lift, the heaviest
-  // otherwise — the same set the best and the chart are read from.
-  const lastSet = last ? (bw ? last.stats.longest : last.stats.top) : null;
+  const bw = mode !== "load";
+  // What he last hit — the heaviest set, or the longest where nothing is
+  // loaded. Not the same question as the best, which quotes the set its own
+  // number came from.
+  const lastSet = last ? topSet(last.stats, mode) : null;
 
   return (
     <div className="lm-lift">
