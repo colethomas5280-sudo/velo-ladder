@@ -3602,3 +3602,8 @@ table.roster-table {
   color: var(--good);
   border-color: color-mix(in srgb, var(--good) 45%, var(--line));
 }
+.sd-note {
+  margin: 7px 0 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}

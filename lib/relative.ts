@@ -1,5 +1,6 @@
 import type { RecoveryEntry } from "./types";
 import {
+  e1rm,
   liftBest,
   type DatedLifts,
   type Menu,
@@ -49,6 +50,29 @@ export type Standard =
       /** Reps in one set. */
       target: number;
       note?: string;
+    }
+  /**
+   * A standard that graduates.
+   *
+   * Cole on pull-ups: "once we can get to 14+, I believe we start concerning
+   * ourselves with adding weight." So the mark is reps until it is cleared,
+   * and the chart's loaded ratio after that. One row on the page, two stages —
+   * because an athlete who can do fifteen strict pull-ups does not need to be
+   * told "Cleared" every week for the rest of his career.
+   *
+   * The loaded target is read off the chart via `targetFor`, not carried here.
+   */
+  | {
+      liftKey: string;
+      kind: "reps-then-load";
+      /** Strict bodyweight reps to clear before added load is the point. */
+      reps: number;
+      /**
+       * Band for the loaded stage, when the usual target band would land
+       * somewhere the rep gate has already carried the athlete past.
+       */
+      loadedBand?: StrengthLevel;
+      note?: string;
     };
 
 /* ------------------------------------------------------------------ *
@@ -85,6 +109,12 @@ export const STRENGTH_CHART: Record<string, Record<StrengthLevel, number>> = {
   deadlift: { beginner: 1, novice: 1.25, intermediate: 2, advanced: 2.5, elite: 3 },
   "front-squat": { beginner: 0.6, novice: 0.85, intermediate: 1.25, advanced: 1.75, elite: 2 },
   "barbell-hip-thrust": { beginner: 0.75, novice: 1.25, intermediate: 1.75, advanced: 2.25, elite: 2.75 },
+  /*
+   * Total load INCLUDING the athlete, over bodyweight — so 1.25x is a single
+   * with a quarter of your bodyweight hanging off you. This row only comes
+   * into play once the rep mark is cleared; see the two-stage standard below.
+   */
+  "pull-up": { beginner: 0.1, novice: 0.5, intermediate: 1, advanced: 1.25, elite: 1.5 },
 };
 
 /**
@@ -98,6 +128,11 @@ export const TARGET_BAND: readonly [StrengthLevel, StrengthLevel] = [
   "intermediate",
   "advanced",
 ];
+
+/** One band's mark for a lift, or null if the chart has no row for it. */
+export function markFor(liftKey: string, level: StrengthLevel): number | null {
+  return STRENGTH_CHART[liftKey]?.[level] ?? null;
+}
 
 /** The multiple to chase on a lift, or null if the chart has no row for it. */
 export function targetFor(liftKey: string): number | null {
@@ -140,9 +175,22 @@ export const STRENGTH_STANDARDS: Standard[] = [
   { liftKey: "bench", kind: "ratio", target: targetFor("bench")! },
   {
     liftKey: "pull-up",
-    kind: "reps",
-    target: 10,
-    note: "Strict, from a dead hang. This mark is not off the chart.",
+    kind: "reps-then-load",
+    reps: 14,
+    /*
+     * ELITE, not the usual intermediate-advanced midpoint, and this is the one
+     * place the target band is overridden.
+     *
+     * The rep gate has already carried the athlete past it. Fourteen strict
+     * pull-ups puts a 180 lb athlete around 1.33x on this row — above the
+     * chart's advanced (1.25x) — so the midpoint target of 1.125x would
+     * arrive already met, which is not a target at all. In pounds: the
+     * midpoint asks for 23 lb hung on for a single, elite asks for 90.
+     *
+     * Cole's to move, like every other number here.
+     */
+    loadedBand: "elite",
+    note: "Strict, from a dead hang. Cole's number, not the chart's.",
   },
 ];
 
@@ -210,6 +258,74 @@ export function bodyWeightOn(
 }
 
 /* ------------------------------------------------------------------ *
+ * Loaded bodyweight lifts
+ * ------------------------------------------------------------------ */
+
+export interface LoadedBest {
+  /** Estimated 1RM of the TOTAL load: the athlete plus what they hung on. */
+  e1rm: number;
+  ratio: number;
+  on: string;
+  weight: BodyWeight;
+  /** What was hung on for that set, so the row can name it. */
+  added: number;
+  reps: number;
+}
+
+/**
+ * The best loaded set of a bodyweight lift, as a ratio of total load to
+ * bodyweight — the number the chart's pull-up row is measured in.
+ *
+ * The athlete IS most of the load, so a weighted pull-up's real 1RM is
+ * `bodyweight + added`, and only then divided by bodyweight. Ignoring the
+ * athlete's own weight would call a 25 lb pull-up a 0.14x lift.
+ *
+ * Evaluated day by day, each against its OWN bodyweight, for the same reason
+ * the loaded ratios are: a set done in March was done at March's bodyweight.
+ */
+export function loadedBest(
+  days: readonly DatedLifts[],
+  key: string,
+  entries: readonly RecoveryEntry[],
+  profileWeight: number | null,
+): LoadedBest | null {
+  let best: LoadedBest | null = null;
+
+  for (const d of days) {
+    const sets = d.lifts?.[key];
+    if (!sets?.length) continue;
+    // Only sets with something hung on: a bodyweight set is the rep stage.
+    const loaded = sets.filter((set) => set.w > 0);
+    if (!loaded.length) continue;
+
+    const weight = bodyWeightOn(entries, d.date, profileWeight);
+    if (!weight) continue;
+
+    for (const set of loaded) {
+      const e = e1rm(weight.lb + set.w, set.r);
+      if (e == null) continue;
+      const ratio = e / weight.lb;
+      if (!best || ratio > best.ratio)
+        best = { e1rm: e, ratio, on: d.date, weight, added: set.w, reps: set.r };
+    }
+  }
+  return best;
+}
+
+/** Most reps in one STRICT set — nothing hung on. */
+export function bodyweightReps(
+  days: readonly DatedLifts[],
+  key: string,
+): { reps: number; on: string } | null {
+  let best: { reps: number; on: string } | null = null;
+  for (const d of days)
+    for (const set of d.lifts?.[key] ?? [])
+      if (set.w === 0 && (!best || set.r > best.reps))
+        best = { reps: set.r, on: d.date };
+  return best;
+}
+
+/* ------------------------------------------------------------------ *
  * The ratio
  * ------------------------------------------------------------------ */
 
@@ -263,6 +379,7 @@ export function relativeStrength(
 
   for (const s of standards) {
     const mode = menu.mode(s.liftKey);
+
     /*
      * The standard and the lift have to agree about what is being measured.
      * A ratio needs a loaded lift to take a max of; a rep standard needs a
@@ -270,53 +387,132 @@ export function relativeStrength(
      * silently showing something would hide it.
      */
     if (s.kind === "ratio" && mode !== "load") continue;
-    if (s.kind === "reps" && mode !== "reps") continue;
+    if (s.kind !== "ratio" && mode !== "reps") continue;
+
+    if (s.kind === "reps-then-load") {
+      const graduated = resolveGraduating(s, days, entries, profileWeight);
+      if (graduated) out.push(graduated);
+      continue;
+    }
 
     const best = liftBest(menu, days, s.liftKey);
     if (!best) continue;
-
     const weight = bodyWeightOn(entries, best.date, profileWeight);
 
     if (s.kind === "reps") {
-      out.push({
-        liftKey: s.liftKey,
-        kind: "reps",
-        achieved: best.value,
-        on: best.date,
-        weight,
-        value: best.value,
-        target: s.target,
-        met: best.value >= s.target,
-        toGo: Math.max(0, s.target - best.value),
-        unit: "reps",
-        level: null,
-        note: s.note,
-      });
+      out.push(repsRow(s.liftKey, best.value, best.date, weight, s.target, s.note));
       continue;
     }
 
     // A ratio with no denominator is not a ratio.
     if (!weight) continue;
-    const value = best.value / weight.lb;
-    out.push({
-      liftKey: s.liftKey,
-      kind: "ratio",
-      achieved: best.value,
-      on: best.date,
-      weight,
-      value,
-      target: s.target,
-      met: value >= s.target,
-      toGo: Math.max(0, s.target * weight.lb - best.value),
-      unit: "lb",
-      level: levelReached(s.liftKey, value),
-      note: s.note,
-    });
+    out.push(ratioRow(s.liftKey, best.value, best.date, weight, s.target, s.note));
   }
 
   // Closest to the target first — the one worth a push this block.
   return out.sort((a, b) => b.value / b.target - a.value / a.target);
 }
+
+function repsRow(
+  liftKey: string,
+  reps: number,
+  on: string,
+  weight: BodyWeight | null,
+  target: number,
+  note?: string,
+): Relative {
+  return {
+    liftKey,
+    kind: "reps",
+    achieved: reps,
+    on,
+    weight,
+    value: reps,
+    target,
+    met: reps >= target,
+    toGo: Math.max(0, target - reps),
+    unit: "reps",
+    level: null,
+    note,
+  };
+}
+
+function ratioRow(
+  liftKey: string,
+  e1rmLb: number,
+  on: string,
+  weight: BodyWeight,
+  target: number,
+  note?: string,
+): Relative {
+  const value = e1rmLb / weight.lb;
+  return {
+    liftKey,
+    kind: "ratio",
+    achieved: e1rmLb,
+    on,
+    weight,
+    value,
+    target,
+    met: value >= target,
+    toGo: Math.max(0, target * weight.lb - e1rmLb),
+    unit: "lb",
+    level: levelReached(liftKey, value),
+    note,
+  };
+}
+
+/**
+ * Which stage of a graduating standard the athlete is on.
+ *
+ * Reps until the mark is cleared, the chart's loaded ratio after that — but
+ * only once there is loaded work to read it from. An athlete who has just
+ * cleared fourteen and never hung a plate on has NOT failed the loaded
+ * standard; showing him 0.00x of 1.125x would be the page inventing a
+ * setback out of a milestone. He gets his cleared rep row and a note telling
+ * him what comes next, until his first loaded set flips the row over.
+ */
+function resolveGraduating(
+  s: Extract<Standard, { kind: "reps-then-load" }>,
+  days: readonly DatedLifts[],
+  entries: readonly RecoveryEntry[],
+  profileWeight: number | null,
+): Relative | null {
+  const strict = bodyweightReps(days, s.liftKey);
+  const cleared = !!strict && strict.reps >= s.reps;
+  const target = s.loadedBand
+    ? markFor(s.liftKey, s.loadedBand)
+    : targetFor(s.liftKey);
+
+  if (cleared && target != null) {
+    const loaded = loadedBest(days, s.liftKey, entries, profileWeight);
+    if (loaded)
+      return ratioRow(
+        s.liftKey,
+        loaded.e1rm,
+        loaded.on,
+        loaded.weight,
+        target,
+        `Total load — you plus the ${trimAdded(loaded.added)} you hung on.`,
+      );
+  }
+
+  if (!strict) return null;
+  const weight = bodyWeightOn(entries, strict.on, profileWeight);
+  return repsRow(
+    s.liftKey,
+    strict.reps,
+    strict.on,
+    weight,
+    s.reps,
+    cleared
+      ? "Cleared — start adding weight, and this turns into a loaded ratio."
+      : s.note,
+  );
+}
+
+const trimAdded = (lb: number) =>
+  `${Number.isInteger(lb) ? lb : Math.round(lb * 10) / 10} lb`;
 
 /** "1.72×" for a ratio, "8" for reps — the number as its own kind reads. */
 export function fmtValue(r: Relative): string {

@@ -325,6 +325,12 @@ function StandardRow({ r, name }: { r: Relative; name: string }) {
           )}
         </span>
       </div>
+      {/*
+        * The note is where a standard says something the numbers cannot —
+        * most of all at the top of the rep stage, where "Cleared" alone would
+        * leave an athlete who can do fifteen pull-ups with nothing to chase.
+        */}
+      {r.note && <p className="sd-note">{r.note}</p>}
     </li>
   );
 }

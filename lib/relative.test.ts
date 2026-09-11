@@ -7,6 +7,7 @@ import {
   TARGET_BAND,
   bodyWeightOn,
   levelReached,
+  markFor,
   targetFor,
   fmtToGo,
   fmtValue,
@@ -15,7 +16,7 @@ import {
   relativeStrength,
   type Standard,
 } from "@/lib/relative";
-import { liftMenu, seedLifts, type DatedLifts, type LiftSet } from "@/lib/strength";
+import { e1rm as e1rmOf, liftMenu, seedLifts, type DatedLifts, type LiftSet } from "@/lib/strength";
 import type { RecoveryEntry } from "@/lib/types";
 
 /* ------------------------------------------------------------------ *
@@ -270,12 +271,13 @@ test("every standard names a menu lift whose mode matches its kind", () => {
     assert.ok(MENU.get(s.liftKey), `${s.liftKey} is not on the menu`);
     assert.equal(
       MENU.mode(s.liftKey),
-      s.kind === "reps" ? "reps" : "load",
+      s.kind === "ratio" ? "load" : "reps",
       `${s.liftKey} is a ${MENU.mode(s.liftKey)} lift with a ${s.kind} standard`,
     );
-    assert.ok(s.target > 0, `${s.liftKey}: ${s.target} is not a target`);
+    const target = s.kind === "reps-then-load" ? s.reps : s.target;
+    assert.ok(target > 0, `${s.liftKey}: ${target} is not a target`);
     if (s.kind === "ratio")
-      assert.ok(s.target < 5, `${s.liftKey}: ${s.target}× is not plausible`);
+      assert.ok(target < 5, `${s.liftKey}: ${target}× is not plausible`);
   }
 });
 
@@ -364,5 +366,131 @@ test("the band is the highest one actually cleared", () => {
 
 test("below the first band is no band at all, not 'beginner'", () => {
   assert.equal(levelReached("deadlift", 0.9), null);
-  assert.equal(levelReached("pull-up", 5), null, "and a lift with no row has none either");
+  assert.equal(levelReached("push-up", 5), null, "and a lift with no row has none either");
+});
+
+/* ---------------- the ladder ---------------- */
+
+/*
+ * Cole: "once we can get to 14+, I believe we start concerning ourselves with
+ * adding weight." So the pull-up standard has two stages and the athlete's own
+ * work decides which one he is looking at.
+ */
+const graduating: Standard[] = [
+  { liftKey: "pull-up", kind: "reps-then-load", reps: 14, loadedBand: "elite" },
+];
+const pullDay = (date: string, sets: LiftSet[]): DatedLifts => ({
+  date,
+  lifts: { "pull-up": sets },
+});
+
+test("under the rep mark it is a rep standard", () => {
+  const [r] = relativeStrength(MENU, pulled(9), steady(180), null, graduating);
+  assert.equal(r.kind, "reps");
+  assert.equal(r.target, 14);
+  assert.equal(r.toGo, 5);
+  assert.equal(r.met, false);
+});
+
+/*
+ * Cleared the reps but never hung a plate on. He has NOT failed the loaded
+ * standard — showing him 0.00× of 1.5× would invent a setback out of a
+ * milestone. He keeps the cleared rep row and is told what comes next.
+ */
+test("clearing the reps with nothing loaded yet says what comes next", () => {
+  const [r] = relativeStrength(MENU, pulled(15), steady(180), null, graduating);
+  assert.equal(r.kind, "reps", "still the rep row, not a ratio at zero");
+  assert.equal(r.met, true);
+  assert.match(r.note!, /start adding weight/i);
+});
+
+test("exactly the rep mark clears it", () => {
+  const [r] = relativeStrength(MENU, pulled(14), steady(180), null, graduating);
+  assert.equal(r.met, true);
+  assert.match(r.note!, /start adding weight/i);
+});
+
+/*
+ * The athlete IS most of the load. Ignoring his own bodyweight would call a
+ * 45 lb pull-up a 0.25× lift; the real total is 180 + 45.
+ */
+test("once loaded, the ratio counts the athlete as well as the plate", () => {
+  const days = [pullDay("2026-09-05", [{ w: 0, r: 15 }, { w: 45, r: 3 }])];
+  const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
+  assert.equal(r.kind, "ratio");
+  assert.equal(Math.round(r.achieved), Math.round(e1rmOf(225, 3)!), "225 on the bar, not 45");
+  assert.equal(r.target, 1.5);
+  assert.equal(fmtValue(r), "1.38×");
+  assert.match(r.note!, /45 lb/, "and it names what was hung on");
+});
+
+/* Reps first, in Cole's order: loaded work before the gate does not skip it. */
+test("a loaded set under the rep mark does not graduate him early", () => {
+  const days = [pullDay("2026-09-05", [{ w: 0, r: 8 }, { w: 25, r: 3 }])];
+  const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
+  assert.equal(r.kind, "reps");
+  assert.equal(r.value, 8);
+});
+
+test("a loaded set is not counted as a bodyweight rep test", () => {
+  const days = [pullDay("2026-09-05", [{ w: 0, r: 9 }, { w: 25, r: 20 }])];
+  const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
+  assert.equal(r.value, 9, "twenty reps with a plate on is not twenty strict pull-ups");
+});
+
+/* Each day against its own bodyweight, like every other ratio here. */
+test("a loaded set is divided by what he weighed that day", () => {
+  const days = [
+    pullDay("2026-03-05", [{ w: 0, r: 15 }, { w: 45, r: 3 }]),
+    pullDay("2026-09-05", [{ w: 45, r: 3 }]),
+  ];
+  const entries = [
+    weighIn("2026-03-01", 150), weighIn("2026-03-05", 150), weighIn("2026-03-09", 150),
+    weighIn("2026-09-01", 200), weighIn("2026-09-05", 200), weighIn("2026-09-09", 200),
+  ];
+  const [r] = relativeStrength(MENU, days, entries, null, graduating);
+  // 195/150 = 1.30 in March beats 245/200 = 1.23 in September.
+  assert.equal(r.on, "2026-03-05");
+  assert.equal(r.weight!.lb, 150);
+});
+
+test("no bodyweight at all leaves him on the rep stage", () => {
+  const days = [pullDay("2026-09-05", [{ w: 0, r: 15 }, { w: 45, r: 3 }])];
+  const [r] = relativeStrength(MENU, days, [], null, graduating);
+  assert.equal(r.kind, "reps", "a ratio needs a denominator; the rep count does not");
+  assert.equal(r.met, true);
+});
+
+test("no pull-ups logged at all shows no row", () => {
+  assert.deepEqual(relativeStrength(MENU, [], steady(180), null, graduating), []);
+});
+
+/*
+ * The reason the loaded stage is ELITE rather than the usual band. Fourteen
+ * strict pull-ups already puts an athlete past the chart's advanced mark, so
+ * the intermediate-advanced midpoint would arrive pre-met — not a target.
+ */
+test("the loaded pull-up target is one an athlete who just cleared 14 has not met", () => {
+  const justCleared = e1rmOf(180, 10)! / 180; // ~1.33x, on bodyweight alone
+  assert.ok(justCleared > targetFor("pull-up")!, "the usual midpoint is already behind him");
+  assert.ok(justCleared < markFor("pull-up", "elite")!, "elite is still ahead");
+});
+
+/*
+ * The loaded stage measures LOADED work, and a bodyweight set is not that —
+ * even when it estimates higher. An athlete at 180 lb doing ten strict reps
+ * estimates to 1.33x; a real 20 lb single-digit set estimates to 1.22x. If the
+ * bodyweight set counted, he could sit on his rep strength forever and the row
+ * would never ask him to hang a plate on, which is the whole point of the
+ * stage Cole described.
+ */
+test("the loaded ratio reads loaded sets only, even when a rep set estimates higher", () => {
+  const days = [
+    pullDay("2026-09-01", [{ w: 0, r: 15 }]), // clears the gate
+    pullDay("2026-09-05", [{ w: 0, r: 10 }, { w: 20, r: 3 }]),
+  ];
+  const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
+  assert.equal(r.kind, "ratio");
+  assert.equal(fmtValue(r), "1.22×", "the 20 lb triple, not the bodyweight ten");
+  assert.match(r.note!, /20 lb/);
 });

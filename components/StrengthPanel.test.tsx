@@ -264,3 +264,45 @@ test("nothing logged at all shows no standards section", () => {
   panel([], true, { weighIns: weighing(180) });
   assert.equal(screen.queryByText(/strength standards/i), null);
 });
+
+/*
+ * The pull-up ladder, as an athlete climbs it. Cole: "once we can get to 14+,
+ * I believe we start concerning ourselves with adding weight."
+ */
+const pullDay = (date: string, sets: { w: number; r: number }[]) =>
+  day(date, { "pull-up": sets });
+
+test("under the rep mark, the pull-up row counts reps", () => {
+  panel([pullDay(daysAgo(2), [{ w: 0, r: 9 }])], true, { weighIns: weighing(180) });
+  const row = [...document.querySelectorAll(".sd")].find((e) =>
+    /pull/i.test(e.textContent!),
+  )!;
+  assert.match(row.textContent!, /of 14 reps/i);
+  assert.match(row.textContent!, /5 reps to go/);
+});
+
+/*
+ * The state that matters most. "Cleared" on its own leaves an athlete who can
+ * do fifteen pull-ups with nothing to chase — the row has to say what next.
+ */
+test("clearing the reps tells him to start adding weight", () => {
+  panel([pullDay(daysAgo(2), [{ w: 0, r: 15 }])], true, { weighIns: weighing(180) });
+  const row = [...document.querySelectorAll(".sd")].find((e) =>
+    /pull/i.test(e.textContent!),
+  )!;
+  assert.match(row.textContent!, /Cleared/);
+  assert.match(row.textContent!, /start adding weight/i);
+});
+
+test("once loaded, the row turns into a ratio of total load", () => {
+  panel([pullDay(daysAgo(2), [{ w: 0, r: 15 }, { w: 45, r: 3 }])], true, {
+    weighIns: weighing(180),
+  });
+  const row = [...document.querySelectorAll(".sd")].find((e) =>
+    /pull/i.test(e.textContent!),
+  )!;
+  assert.match(row.textContent!, /of 1\.5× bodyweight/i);
+  assert.match(row.textContent!, /advanced/i);
+  assert.match(row.textContent!, /45 lb/, "and names what was hung on");
+  assert.equal(/of 14 reps/i.test(row.textContent!), false, "the rep stage is behind him");
+});
