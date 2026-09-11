@@ -12,6 +12,7 @@ import { RECIPE_KINDS, type RecipeKind } from "./types";
 /** Enough headroom for a real gainer shake, low enough to catch a stray zero. */
 export const MAX_CALORIES = 5000;
 export const MAX_PROTEIN_G = 400;
+export const MAX_SERVINGS = 40;
 export const MAX_CARBS_G = 600;
 export const MAX_FAT_G = 300;
 export const MAX_INGREDIENTS = 40;
@@ -22,6 +23,7 @@ export interface RecipeFields {
   title: string;
   kind: RecipeKind;
   blurb: string;
+  servings: number | null;
   calories: number | null;
   proteinG: number | null;
   carbsG: number | null;
@@ -80,6 +82,7 @@ function read(b: Record<string, unknown>): Parsed<RecipePatch> {
     out.calories = n;
   }
   for (const [key, max, label] of [
+    ["servings", MAX_SERVINGS, "Servings"],
     ["proteinG", MAX_PROTEIN_G, "Protein"],
     ["carbsG", MAX_CARBS_G, "Carbs"],
     ["fatG", MAX_FAT_G, "Fat"],
@@ -87,7 +90,7 @@ function read(b: Record<string, unknown>): Parsed<RecipePatch> {
     if (b[key] === undefined) continue;
     const n = whole(b[key], max, label);
     if (typeof n === "string") return { ok: false, error: n };
-    out[key] = n;
+    out[key] = n ?? null;
   }
 
   for (const [key, max] of [
@@ -133,6 +136,7 @@ export function parseNewRecipe(body: unknown): Parsed<RecipeFields> {
       title: v.title,
       kind: v.kind ?? "smoothie",
       blurb: v.blurb ?? "",
+      servings: v.servings ?? null,
       calories: v.calories ?? null,
       proteinG: v.proteinG ?? null,
       carbsG: v.carbsG ?? null,

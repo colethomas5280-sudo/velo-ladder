@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seedLifts } from "@/lib/strength";
-import { SEED_RECIPES } from "@/lib/recipes";
+import { ALL_SEED_RECIPES } from "@/lib/recipes";
 
 /* ------------------------------------------------------------------ *
  * What /api/setup can actually tell Cole
@@ -113,12 +113,12 @@ test("a lift Cole retired is archived, not reported as missing", async () => {
 test("a clean run reports Cole's recipes, and nothing missing", async () => {
   const body = await run();
   assert.deepEqual(body.recipes.missingSeed, []);
-  assert.equal(body.recipes.live, SEED_RECIPES.length);
+  assert.equal(body.recipes.live, ALL_SEED_RECIPES.length);
 });
 
 test("running it twice does not duplicate the library", async () => {
   const body = await run();
-  assert.equal(body.recipes.live, SEED_RECIPES.length);
+  assert.equal(body.recipes.live, ALL_SEED_RECIPES.length);
 });
 
 /*

@@ -1,4 +1,5 @@
 import type { Recipe } from "./types";
+import { COOKBOOK } from "./cookbook";
 
 /* ------------------------------------------------------------------ *
  * The recipes a fresh database starts with
@@ -19,11 +20,14 @@ import type { Recipe } from "./types";
 
 export type SeedRecipe = Omit<Recipe, "position" | "archived">;
 
+/** Cole's six shakes, typed in from the message he sent. */
+
 export const SEED_RECIPES: SeedRecipe[] = [
   {
     id: "seed-choc-mousse",
     title: "Chocolate Mousse Bulking Shake",
     kind: "smoothie",
+    servings: 1,
     blurb: "Thick and mousse-like. Eat it with a spoon, or thin it out to drink.",
     calories: 1070,
     proteinG: 73,
@@ -50,6 +54,7 @@ export const SEED_RECIPES: SeedRecipe[] = [
     id: "seed-rice-krispie",
     title: "Rice Krispie Treat Bulking Shake",
     kind: "smoothie",
+    servings: 1,
     blurb: "Tastes like a Rice Krispie treat in shake form.",
     calories: 1068,
     proteinG: 77,
@@ -75,6 +80,7 @@ export const SEED_RECIPES: SeedRecipe[] = [
     id: "seed-berry-fresh",
     title: "Berry Fresh Special Bulking Shake",
     kind: "smoothie",
+    servings: 1,
     /* Cole wrote "the highest-protein of the three" when there were three of
      * them. There are six, and in a filtered list "the three" names nothing. */
     blurb: "The highest-protein of all of these.",
@@ -101,6 +107,7 @@ export const SEED_RECIPES: SeedRecipe[] = [
     id: "seed-choc-pb",
     title: "Chocolate Peanut Butter Shake",
     kind: "smoothie",
+    servings: 1,
     blurb: "Tastes like a peanut butter cup milkshake.",
     calories: 1110,
     proteinG: 73,
@@ -128,6 +135,7 @@ export const SEED_RECIPES: SeedRecipe[] = [
     id: "seed-green-machine",
     title: "Green Machine Shake",
     kind: "smoothie",
+    servings: 1,
     blurb: "The spinach disappears completely under the mango and banana.",
     calories: 1080,
     proteinG: 65,
@@ -156,6 +164,7 @@ export const SEED_RECIPES: SeedRecipe[] = [
     id: "seed-tropical-gainer",
     title: "Tropical Gainer Shake",
     kind: "smoothie",
+    servings: 1,
     blurb: "The lightest and lowest-fat of these. Good straight after training.",
     calories: 680,
     proteinG: 46,
@@ -181,8 +190,18 @@ export const SEED_RECIPES: SeedRecipe[] = [
   },
 ];
 
+/**
+ * Everything a fresh database starts with: the six shakes above, then the
+ * slow cooker cookbook extracted from Cole's PDF.
+ *
+ * Shakes first, because that is the order they were written and position is
+ * only a tiebreak — the library sorts on calories, so the 1,100 kcal shakes
+ * lead the 600 kcal meals on their own merits.
+ */
+export const ALL_SEED_RECIPES: SeedRecipe[] = [...SEED_RECIPES, ...COOKBOOK];
+
 /** Seeded ids absent from a live library: a recipe that failed to insert. */
 export function missingSeedRecipes(present: readonly string[]): string[] {
   const have = new Set(present);
-  return SEED_RECIPES.filter((r) => !have.has(r.id)).map((r) => r.id);
+  return ALL_SEED_RECIPES.filter((r) => !have.has(r.id)).map((r) => r.id);
 }

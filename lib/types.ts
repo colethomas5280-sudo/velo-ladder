@@ -238,6 +238,8 @@ export interface Recipe {
   kind: RecipeKind;
   /** One line of "why pick this one", shown on the row without opening it. */
   blurb: string;
+  /** Servings a batch makes. Calories are PER SERVING, so this is not decoration. */
+  servings: number | null;
   /** null when nobody has worked it out yet, never 0 as a stand-in */
   calories: number | null;
   proteinG: number | null;
