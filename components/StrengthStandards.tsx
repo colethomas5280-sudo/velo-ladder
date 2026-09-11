@@ -11,7 +11,8 @@ import {
   type BodyweightStanding,
 } from "@/lib/relative";
 import { liftMenu, seedLifts } from "@/lib/strength";
-import { readLocal, subscribeLocal, writeLocal } from "@/lib/localStore";
+import { subscribeLocal, readLocal } from "@/lib/localStore";
+import { BLANK_BODY, BODY_KEY, readBody, writeBody, type EnteredBody } from "./bodyStore";
 
 /* ------------------------------------------------------------------ *
  * Strength standards, as a thing you can use
@@ -29,33 +30,8 @@ import { readLocal, subscribeLocal, writeLocal } from "@/lib/localStore";
  * browser, which is the right default for a page anyone can open and poke at.
  * ------------------------------------------------------------------ */
 
-const KEY = "velo.standards.body";
-
 /** The menu never loads here — this page is reference, not the live roster. */
 const MENU = liftMenu(seedLifts());
-
-interface Entered {
-  ft: string;
-  inch: string;
-  lb: string;
-}
-
-const BLANK: Entered = { ft: "", inch: "", lb: "" };
-
-function readSaved(): Entered {
-  const raw = readLocal(KEY);
-  if (!raw) return BLANK;
-  try {
-    const v = JSON.parse(raw) as Partial<Entered>;
-    return {
-      ft: String(v.ft ?? ""),
-      inch: String(v.inch ?? ""),
-      lb: String(v.lb ?? ""),
-    };
-  } catch {
-    return BLANK;
-  }
-}
 
 const digits = (s: string) => s.replace(/[^0-9]/g, "").slice(0, 3);
 
@@ -67,19 +43,19 @@ export default function StrengthStandards() {
    */
   const saved = useSyncExternalStore(
     subscribeLocal,
-    () => readLocal(KEY) ?? "",
+    () => readLocal(BODY_KEY) ?? "",
     () => "",
   );
-  const initial = useMemo(() => (saved ? readSaved() : BLANK), [saved]);
-  const [draft, setDraft] = useState<Entered>(initial);
+  const initial = useMemo(() => (saved ? readBody() : BLANK_BODY), [saved]);
+  const [draft, setDraft] = useState<EnteredBody>(initial);
   const [touched, setTouched] = useState(false);
   const v = touched ? draft : initial;
 
-  const set = (patch: Partial<Entered>) => {
+  const set = (patch: Partial<EnteredBody>) => {
     const next = { ...v, ...patch };
     setTouched(true);
     setDraft(next);
-    writeLocal(KEY, JSON.stringify(next));
+    writeBody(next);
   };
 
   const heightIn = Number(v.ft) * 12 + Number(v.inch || 0);

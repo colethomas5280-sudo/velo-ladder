@@ -1,12 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import type { Recipe, RecipeKind } from "@/lib/types";
 import { RECIPE_KINDS } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import useSWR from "swr";
 import RecipeEditor from "./RecipeEditor";
+import { BODY_KEY, readBody, writeBody } from "./bodyStore";
+import {
+  CALORIES_PER_LB,
+  PROTEIN_G_PER_LB,
+  fmtShare,
+  intakeFor,
+  shareOfDay,
+  type DailyIntake,
+} from "@/lib/nutrition";
+import { readLocal, subscribeLocal } from "@/lib/localStore";
 
 /* ------------------------------------------------------------------ *
  * Eating to gain
@@ -36,6 +46,20 @@ export default function Nutrition() {
   const { data, mutate, isLoading } = useSWR<Recipe[]>("/api/recipes", fetcher);
   const isCoach = me?.role === "coach";
   const rows = useMemo(() => data ?? [], [data]);
+
+  /*
+   * The weight the standards calculator already asked for. Reading it here
+   * rather than asking again is the difference between two pages and one
+   * flow: an athlete arrives from "14 lb from target" and the answer is
+   * already in his own terms.
+   */
+  const saved = useSyncExternalStore(
+    subscribeLocal,
+    () => readLocal(BODY_KEY) ?? "",
+    () => "",
+  );
+  const weightLb = useMemo(() => Number(saved ? readBody().lb : "") || 0, [saved]);
+  const intake = useMemo(() => intakeFor(weightLb), [weightLb]);
 
   const [floor, setFloor] = useState<number>(0);
   const [kind, setKind] = useState<RecipeKind | "all">("all");
@@ -91,6 +115,35 @@ export default function Nutrition() {
           hungry, which is the actual problem most of the time.
         </p>
       </div>
+
+      <section className="card pad">
+        <div className="eyebrow">What a day looks like</div>
+        {intake ? (
+          <DailyTarget intake={intake} onClear={() => writeBody({ lb: "" })} />
+        ) : (
+          <div className="nu-ask">
+            <label className="field">
+              <span>Your bodyweight</span>
+              <span className="ss-height">
+                <input
+                  className="tin"
+                  inputMode="numeric"
+                  aria-label="Your bodyweight in pounds"
+                  placeholder="180"
+                  onChange={(e) =>
+                    writeBody({ lb: e.target.value.replace(/[^0-9]/g, "").slice(0, 3) })
+                  }
+                />
+                <em>lb</em>
+              </span>
+            </label>
+            <p className="cz-note">
+              Put it in and every recipe below says what it is worth against
+              your day. Nothing is saved anywhere but this browser.
+            </p>
+          </div>
+        )}
+      </section>
 
       <section className="card pad">
         <div className="nu-filters">
@@ -170,6 +223,15 @@ export default function Nutrition() {
                     * light one after training is the page wasting his time.
                     */}
                   {r.blurb && <span className="nu-blurb">{r.blurb}</span>}
+                  {/*
+                    * "1,070 calories" means little on its own. "About a third
+                    * of your day" is the sentence that gets it drunk.
+                    */}
+                  {intake && r.calories != null && (
+                    <span className="nu-share">
+                      {fmtShare(shareOfDay(r.calories, intake))}
+                    </span>
+                  )}
                 </span>
                 <span className="nu-toggle" aria-hidden="true">{open.has(r.id) ? "−" : "+"}</span>
               </button>
@@ -221,6 +283,45 @@ export default function Nutrition() {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+/**
+ * The day an athlete is aiming at, in Cole's numbers: 20 calories a pound and
+ * a gram of protein a pound.
+ *
+ * Both rules are shown, not just their answers. An athlete who knows the rule
+ * can work out his own target when he has gained ten pounds, which is the
+ * whole point of it being a rule rather than a figure someone handed him.
+ */
+function DailyTarget({
+  intake,
+  onClear,
+}: {
+  intake: DailyIntake;
+  onClear: () => void;
+}) {
+  return (
+    <div className="nu-target">
+      <div className="nu-figure">
+        <span className="n">{intake.calories.toLocaleString("en-US")}</span>
+        <span className="l">kcal a day</span>
+      </div>
+      <div className="nu-figure">
+        <span className="n">{intake.proteinG}</span>
+        <span className="l">g protein</span>
+      </div>
+      <div className="nu-target-why">
+        <span className="cz-note">
+          At {intake.weightLb} lb: {CALORIES_PER_LB} calories a pound, and{" "}
+          {PROTEIN_G_PER_LB}g of protein a pound. The protein number is just
+          your bodyweight, which is the easy part to remember.
+        </span>
+        <button className="btn sm ghost" onClick={onClear}>
+          Not my weight
+        </button>
+      </div>
     </div>
   );
 }
