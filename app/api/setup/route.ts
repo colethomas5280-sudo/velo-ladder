@@ -1,7 +1,7 @@
 import { execScript, assertDbConfigured, sql } from "@/lib/db";
 import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
 import { missingSeedLifts, seedLifts } from "@/lib/strength";
-import { missingSeedRecipes } from "@/lib/recipes";
+import { ALL_SEED_RECIPES, missingSeedRecipes } from "@/lib/recipes";
 import { json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +25,9 @@ export const runtime = "nodejs";
  * reported a clean setup on a database that never got the table.
  */
 const EXPECTED_TABLES = schemaTables();
+
+/** Recipes this deploy ships, so an unsorted one means the backfill failed. */
+const SEEDED_IDS = new Set(ALL_SEED_RECIPES.map((r) => r.id));
 
 /** What actually exists, and where — the answer to "but setup said it worked". */
 async function verify() {
@@ -58,9 +61,10 @@ async function verify() {
       }[])
     : [];
   const library = present.has("recipes")
-    ? ((await sql`SELECT id, archived FROM recipes`) as {
+    ? ((await sql`SELECT id, archived, meals FROM recipes`) as {
         id: string;
         archived: boolean;
+        meals: unknown;
       }[])
     : [];
 
@@ -79,6 +83,22 @@ async function verify() {
       live: library.filter((r) => !r.archived).length,
       archived: library.filter((r) => r.archived).length,
       missingSeed: missingSeedRecipes(library.map((r) => r.id)),
+      /*
+       * SEEDED recipes that belong to no meal. "live: 51" was true and useless
+       * when the question was whether the backfill had run: a stale deployment
+       * has no `meals` column at all, every recipe reads as unsorted, and the
+       * breakfast, lunch and dinner filters silently find nothing.
+       *
+       * Scoped to seeded ids on purpose. A recipe Cole adds and leaves
+       * unsorted is his business, and counting it here would turn a real
+       * signal into an alarm he learns to ignore.
+       */
+      unsorted: library.filter(
+        (r) =>
+          !r.archived &&
+          SEEDED_IDS.has(r.id) &&
+          !(Array.isArray(r.meals) && r.meals.length),
+      ).length,
     },
   };
 }
@@ -170,6 +190,10 @@ export async function GET(request: Request) {
               state.recipes.missingSeed.length &&
                 `${state.recipes.missingSeed.length} seed recipe(s) are missing: ` +
                   `${state.recipes.missingSeed.join(", ")}.`,
+              state.recipes.unsorted &&
+                `${state.recipes.unsorted} recipe(s) belong to no meal, so the ` +
+                  `breakfast, lunch and dinner filters will find nothing. ` +
+                  `Usually an old deployment: check schemaVersion.`,
             ]
               .filter(Boolean)
               .join(" "),
