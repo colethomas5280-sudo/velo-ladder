@@ -223,3 +223,25 @@ export interface StrengthOverviewRow {
   /** Records set inside the window, newest first. */
   records: { key: string; date: string; value: number }[];
 }
+
+/** What a recipe is for. Kept small: an athlete picks by meal, not by cuisine. */
+export const RECIPE_KINDS = ["smoothie", "meal", "snack"] as const;
+export type RecipeKind = (typeof RECIPE_KINDS)[number];
+
+/**
+ * One recipe. Calories and protein are entered, not computed: working them
+ * out would need a food database, and Cole's recipes already carry the totals.
+ */
+export interface Recipe {
+  id: string;
+  title: string;
+  kind: RecipeKind;
+  /** null when nobody has worked it out yet, never 0 as a stand-in */
+  calories: number | null;
+  proteinG: number | null;
+  ingredients: string[];
+  method: string;
+  notes: string;
+  position: number;
+  archived: boolean;
+}

@@ -3803,3 +3803,126 @@ table.roster-table {
 .rg-list li:last-child {
   margin-bottom: 0;
 }
+
+/* ---------- eating to gain ---------- */
+.ss-how {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.nu-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+}
+.nu-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nu {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.nu.open {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+.nu-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.nu-head:hover {
+  background: var(--panel-2);
+}
+/* The calorie count leads, because it is the question an athlete arrives
+   with. Everything else on the row is subordinate to it. */
+.nu-cal {
+  flex: 0 0 auto;
+  min-width: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  font-family: var(--font-teko), system-ui, sans-serif;
+  font-size: 26px;
+  line-height: 1;
+}
+.nu-cal em {
+  font-family: inherit;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.nu-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.nu-meta {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+.nu-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--line-soft);
+}
+.nu-ing {
+  margin: 12px 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.nu-nums {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.nu-nums .field {
+  flex: 1 1 110px;
+}
+.nu-ing-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.nu-ing-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nu-ing-row input {
+  flex: 1 1 auto;
+}
+/* Not `.caret` — that is a CSS triangle drawn from borders and meant to hold
+   no text, so reusing it rendered the arrow AND the sign. */
+.nu-toggle {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--ink-faint);
+}

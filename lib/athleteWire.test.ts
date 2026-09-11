@@ -134,6 +134,15 @@ async function seed(): Promise<Seeded> {
     INSERT INTO setbacks (id, athlete_id, kind, opened_on, detail)
     VALUES ('sb-wire', ${athlete.id}, 'soreness', '2026-09-01', 'sore')
   `;
+  await data.createRecipe({
+    title: "Wire gainer smoothie",
+    calories: 1200,
+    proteinG: 60,
+    ingredients: ["2 cups whole milk", "1 cup oats"],
+    method: "Blend.",
+  });
+  // One nobody has counted, to prove the difference survives the database.
+  await data.createRecipe({ title: "Wire uncounted recipe" });
   const resource = await data.createResource({
     title: "Wire resource",
     body: "body",
@@ -290,6 +299,26 @@ test("seed a database and sweep every GET route as each role", async () => {
     served.some((r) => r.body.includes("Wire Athlete")),
     "the athlete's own row never came back, so nothing here was really tested",
   );
+  /*
+   * Recipes are for the athletes, so this one checks the opposite of the rest
+   * of the file: that something DID reach them. A route answering with an
+   * empty list is a route the sweep never really ran.
+   */
+  assert.ok(
+    served.some((r) => r.body.includes("Wire gainer smoothie")),
+    "the recipes route served the athlete nothing",
+  );
+  /*
+   * "Nobody has worked this out" and "zero calories" are different facts, and
+   * the page filters on the difference: an uncounted recipe must not turn up
+   * as an answer to "what gets me 1000 calories". A `?? 0` in the row mapper
+   * would erase that, and until this assertion existed nothing noticed.
+   */
+  const recipes = served.find((r) => r.file.includes(join("recipes", "route.ts")));
+  assert.ok(recipes, "the recipes route did not answer at all");
+  const uncounted = (JSON.parse(recipes.body) as { title: string; calories: number | null }[])
+    .find((r) => r.title === "Wire uncounted recipe");
+  assert.equal(uncounted?.calories, null, "an uncounted recipe is null, not zero");
   /*
    * A route that blows up is a route the sweep did not read, which is the
    * same blind spot as one that 403s — silently untested while counted.

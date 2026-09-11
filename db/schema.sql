@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 19). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 20). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -257,6 +257,33 @@ CREATE TABLE IF NOT EXISTS lift_sessions (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS lift_athlete_date_uidx
   ON lift_sessions(athlete_id, date);
+
+-- v20: recipes. Most of Cole's athletes are underweight, and the standards
+-- page tells one he is 14 lb light without saying how. These are the how.
+--
+-- Separate from the resources library rather than a category of it, because
+-- the whole point is the NUMBERS: an athlete looking for a 1000 kcal
+-- breakfast needs to sort by calories, which free text cannot do.
+--
+-- Ingredients are JSONB strings in order, the same shape trick as throws and
+-- lifts: a list that is only ever read whole and never queried into.
+CREATE TABLE IF NOT EXISTS recipes (
+  id          text PRIMARY KEY,
+  title       text NOT NULL,
+  kind        text NOT NULL DEFAULT 'smoothie',
+  calories    int,
+  protein_g   int,
+  ingredients jsonb NOT NULL DEFAULT '[]'::jsonb,
+  method      text NOT NULL DEFAULT '',
+  notes       text NOT NULL DEFAULT '',
+  position    int NOT NULL DEFAULT 0,
+  archived    boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- Biggest first is the order an athlete trying to gain actually wants.
+CREATE INDEX IF NOT EXISTS recipes_order_idx
+  ON recipes(calories DESC NULLS LAST, position, lower(title)) WHERE archived = false;
 
 -- v19: the lift menu became Cole's to edit rather than a constant in the
 -- code. Keyed by the slug, because that slug is what every logged set is
