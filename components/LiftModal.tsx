@@ -14,7 +14,7 @@ import {
   type Lift,
   type Menu,
 } from "@/lib/strength";
-import { fmtDate, todayISO } from "@/lib/velo";
+import { EMPTY, fmtDate, todayISO } from "@/lib/velo";
 
 /* ------------------------------------------------------------------ *
  * Logging a lifting day
@@ -310,7 +310,7 @@ function LiftBlock({
       <div className="lm-target">
         {last ? (
           <span>
-            Last <b>{lastSet ? fmtSet(lastSet, mode) : "–"}</b> ·{" "}
+            Last <b>{lastSet ? fmtSet(lastSet, mode) : EMPTY}</b> ·{" "}
             {fmtDate(last.date)}
           </span>
         ) : (

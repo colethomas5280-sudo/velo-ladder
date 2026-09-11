@@ -15,11 +15,10 @@ import { join, relative, sep } from "node:path";
  *
  * Two things are deliberately allowed:
  *
- *   "—" standing alone is the placeholder for an empty cell, not prose. It is
- *   a glyph doing the job of "nothing here", and reads as one.
- *
  *   SQL `--` comment lines inside SCHEMA_SQL never reach a screen. They are
- *   comments that happen to live in a string.
+ *   comments that happen to live in a string. That is the only exception:
+ *   the empty-cell placeholder used to be one too, until every copy of it
+ *   was pointed at `EMPTY` and there was nothing left to excuse.
  * ------------------------------------------------------------------ */
 
 const EM = "—";
@@ -49,8 +48,7 @@ export function readableText(src: string): string {
   return src
     .replace(/\/\*[\s\S]*?\*\//g, (m) => "\n".repeat((m.match(/\n/g) ?? []).length))
     .replace(/\/\/.*$/gm, "")
-    .replace(/^\s*--.*$/gm, "") // SQL comments inside SCHEMA_SQL
-    .replace(/"—"/g, ""); // the empty-cell placeholder
+    .replace(/^\s*--.*$/gm, ""); // SQL comments inside SCHEMA_SQL
 }
 
 test("no em dash reaches an athlete", () => {
@@ -72,15 +70,14 @@ test("no em dash reaches an athlete", () => {
  * it lets the two exceptions through. All three cases asserted, because a
  * rule that quietly matches nothing is the failure mode of a style test.
  */
-test("the check catches prose, and leaves the placeholder and SQL alone", () => {
+test("the check catches prose and a stray placeholder, and leaves SQL alone", () => {
   assert.ok(
     readableText(`const s = "watch over weeks ${EM} one bad morning";`).includes(EM),
     "prose has to be caught",
   );
-  assert.equal(
+  assert.ok(
     readableText(`{value(f) || "${EM}"}`).includes(EM),
-    false,
-    "a bare placeholder is a glyph, not writing",
+    "and so does a placeholder typed out instead of taken from EMPTY",
   );
   assert.equal(
     readableText(`  -- a note ${EM} inside SCHEMA_SQL\n`).includes(EM),

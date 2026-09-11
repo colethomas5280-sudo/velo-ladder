@@ -3,7 +3,7 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fetcher, ApiError } from "@/lib/fetcher";
-import { TRACKERS, TRACKER_IDS, fmt, fmtDate } from "@/lib/velo";
+import { EMPTY, TRACKERS, TRACKER_IDS, fmt, fmtDate } from "@/lib/velo";
 import type { TrackerId } from "@/lib/types";
 import type { Board } from "@/lib/leaderboard";
 
@@ -137,8 +137,8 @@ export default function Leaderboard() {
                       {r.name}
                       {r.isYou && <span className="lb-you">you</span>}
                     </td>
-                    <td className="lb-dim">{r.band ?? "–"}</td>
-                    <td className="lb-dim">{r.hand || "–"}</td>
+                    <td className="lb-dim">{r.band ?? EMPTY}</td>
+                    <td className="lb-dim">{r.hand || EMPTY}</td>
                     <td className="lb-velo">{fmt(r.velocity)}</td>
                     <td className="lb-dim">{fmtDate(r.date)}</td>
                   </tr>

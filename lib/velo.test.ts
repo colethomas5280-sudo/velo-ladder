@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync } from "node:fs";
+import { join, relative, sep } from "node:path";
 import {
   TRACKERS,
   ALL_SLOT_KEYS,
@@ -551,4 +553,45 @@ test("an empty roster still produces a usable header row", () => {
   const csv = sessionsToCsv("A", []);
   assert.equal(csv.split("\n").length, 1);
   assert.match(csv, /^athlete,date,tracker/);
+});
+
+/* ------------------------------------------------------------------ *
+ * One placeholder, from one place
+ *
+ * There were two: an en dash from `EMPTY` for a missing velocity, and an em
+ * dash typed out in six components for a missing anything-else. Same idea,
+ * two glyphs, and nothing keeping them in step — which is how the app came
+ * to show "–" in one column and "—" in the next.
+ * ------------------------------------------------------------------ */
+
+test("no component types out an empty-value placeholder instead of importing it", () => {
+  const walk = (dir: string, ok: (f: string) => boolean): string[] => {
+    const out: string[] = [];
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) out.push(...walk(p, ok));
+      else if (ok(e.name)) out.push(p);
+    }
+    return out;
+  };
+  const files = [
+    ...walk(join(process.cwd(), "components"), (f) => f.endsWith(".tsx")),
+    ...walk(join(process.cwd(), "lib"), (f) => f.endsWith(".ts")),
+    ...walk(join(process.cwd(), "app"), (f) => f.endsWith(".tsx")),
+  ].filter((f) => !f.includes(".test.") && !f.endsWith(`velo.ts`));
+
+  const typed: string[] = [];
+  for (const file of files) {
+    const src = readFileSync(file, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    // A dash standing alone as a whole string literal is a placeholder.
+    if (/"[–—]"/.test(src)) typed.push(relative(process.cwd(), file).split(sep).join("/"));
+  }
+  assert.deepEqual(typed, []);
+});
+
+test("EMPTY is a single dash, so the check above is looking for the right thing", () => {
+  assert.equal(EMPTY.length, 1);
+  assert.match(EMPTY, /[–—]/);
 });

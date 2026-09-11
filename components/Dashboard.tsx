@@ -6,7 +6,7 @@ import useSWR from "swr";
 import type { DashboardData } from "@/lib/dashboard";
 import { RECENT_DAYS, STALE_DAYS } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
-import { fmt, fmtDate, TRACKERS } from "@/lib/velo";
+import { EMPTY, fmt, fmtDate, TRACKERS } from "@/lib/velo";
 import CustomizeDashboard, {
   WIDGETS,
   type WidgetId,
@@ -230,7 +230,7 @@ function NeedsAttention({ data }: { data: DashboardData }) {
                     </span>
                   </div>
                   <span className="pill">
-                    {s.days == null ? "—" : `${s.days}d`}
+                    {s.days == null ? EMPTY : `${s.days}d`}
                   </span>
                 </li>
               ))}

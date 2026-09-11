@@ -17,7 +17,7 @@ import {
   sleepBandLabel,
   SLEEP_BAND_SHORT,
 } from "@/lib/recovery";
-import { fmt, fmtDate, todayISO } from "@/lib/velo";
+import { EMPTY, fmt, fmtDate, todayISO } from "@/lib/velo";
 import RecoveryModal from "./RecoveryModal";
 
 export default function RecoveryPanel({
@@ -88,7 +88,7 @@ export default function RecoveryPanel({
       <div className="rec-top">
         <div className={`ci-score big ${todayEntry ? scoreBand(recoveryScore(todayEntry) ?? 0) : ""}`}>
           <span className="n">
-            {todayEntry ? (recoveryScore(todayEntry) ?? "–") : "–"}
+            {todayEntry ? (recoveryScore(todayEntry) ?? EMPTY) : EMPTY}
           </span>
           <span className="l">Today</span>
         </div>
@@ -122,7 +122,7 @@ export default function RecoveryPanel({
             return (
               <li key={e.date}>
                 <span className={`chip-score ${sc == null ? "" : scoreBand(sc)}`}>
-                  {sc ?? "–"}
+                  {sc ?? EMPTY}
                 </span>
                 <div className="feed-main">
                   <b>{fmtDate(e.date)}</b>
@@ -138,7 +138,7 @@ export default function RecoveryPanel({
                       e.diet != null ? `diet ${e.diet}/5` : null,
                     ]
                       .filter(Boolean)
-                      .join(" · ") || "—"}
+                      .join(" · ") || EMPTY}
                   </span>
                 </div>
                 <span className="rec-actions">

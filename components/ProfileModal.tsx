@@ -9,6 +9,7 @@ import {
   missingProfileFields,
   type ProfileField,
 } from "@/lib/profile";
+import { EMPTY } from "@/lib/velo";
 
 type Row = Record<string, unknown>;
 
@@ -138,7 +139,7 @@ export default function ProfileModal({
 
                     {!editable(f) ? (
                       <div className="pf-locked">
-                        {value(f) || "—"}
+                        {value(f) || EMPTY}
                         <span>
                           {f.athleteSetOnce
                             ? "ask your coach to change this"

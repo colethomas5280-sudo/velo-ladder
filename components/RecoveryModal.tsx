@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { RecoveryEntry } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
 import { WELLNESS_SECTIONS, recoveryScore, scoreBand } from "@/lib/recovery";
-import { todayISO, fmtDate } from "@/lib/velo";
+import { EMPTY, todayISO, fmtDate } from "@/lib/velo";
 
 type Draft = {
   date: string;
@@ -146,7 +146,7 @@ export default function RecoveryModal({
               />
             </label>
             <div className={`ci-score ${preview == null ? "" : scoreBand(preview)}`}>
-              <span className="n">{preview ?? "–"}</span>
+              <span className="n">{preview ?? EMPTY}</span>
               <span className="l">Score</span>
             </div>
           </div>

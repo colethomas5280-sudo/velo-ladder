@@ -29,7 +29,7 @@ import {
   relativeStrength,
   type Relative,
 } from "@/lib/relative";
-import { fmtDate, todayISO } from "@/lib/velo";
+import { EMPTY, fmtDate, todayISO } from "@/lib/velo";
 import LiftChart from "./LiftChart";
 import LiftModal from "./LiftModal";
 
@@ -202,7 +202,7 @@ export default function StrengthPanel({
                     <span className="st-when">
                       {lastSet
                         ? `last ${fmtSet(lastSet, mode)} · ${fmtDate(last!.date)}`
-                        : "—"}
+                        : EMPTY}
                     </span>
                   </button>
                 </li>
@@ -235,7 +235,7 @@ export default function StrengthPanel({
                           const top = topSet(liftStats(d.lifts[k]), mode);
                           return `${menu.name(k)} ${top ? fmtSet(top, mode) : ""}`.trim();
                         })
-                        .join(" · ") || (d.notes ? "note only" : "—")}
+                        .join(" · ") || (d.notes ? "note only" : EMPTY)}
                     </span>
                     {d.notes && <span className="st-note">{d.notes}</span>}
                   </div>

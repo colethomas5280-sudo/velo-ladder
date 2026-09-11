@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import type { TrainingSession } from "@/lib/types";
 import {
+  EMPTY,
   type TrackerConfig,
   gid,
   recStatsG,
@@ -126,9 +127,9 @@ export default function HistoryTable({
                                       {sl.oz}oz <b>–</b>
                                     </div>
                                   );
-                                const primer = t[0] == null ? "–" : t[0];
+                                const primer = t[0] == null ? EMPTY : t[0];
                                 const hs = BOX_INDEXES.slice(1)
-                                  .map((i) => (t[i] == null ? "–" : t[i]))
+                                  .map((i) => (t[i] == null ? EMPTY : t[i]))
                                   .join("  ");
                                 return (
                                   <div key={sl.key}>
