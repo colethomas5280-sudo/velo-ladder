@@ -34,10 +34,21 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   ...over,
 });
 
-const page = (rows: Recipe[], role: "coach" | "athlete" = "athlete") =>
-  render(
+const page = (
+  rows: Recipe[],
+  role: "coach" | "athlete" = "athlete",
+  body?: { lb: string },
+) => {
+  try {
+    window.localStorage.clear();
+    if (body) window.localStorage.setItem("velo.standards.body", JSON.stringify(body));
+  } catch {
+    /* storage blocked; the page copes */
+  }
+  return render(
     withSwr({ "/api/me": { role }, "/api/recipes": rows }, <Nutrition />),
   );
+};
 
 beforeEach(cleanup);
 
@@ -213,4 +224,46 @@ test("meal and calorie filters narrow together", () => {
   fireEvent.click(screen.getByText("1000+ kcal"));
   assert.ok(screen.getByText("Big breakfast"));
   assert.equal(screen.queryByText("Small breakfast"), null);
+});
+
+/* ---------------- entering a bodyweight ---------------- */
+
+const weightBox = () =>
+  screen.getByLabelText(/your bodyweight in pounds/i) as HTMLInputElement;
+
+/*
+ * The bug Cole hit, and the reason the box is now rendered unconditionally.
+ * It used to appear only while there was NO weight, so the first digit typed
+ * gave the page a weight and unmounted the field mid-entry.
+ */
+test("typing a digit does not tear the box away", () => {
+  page([recipe()]);
+  fireEvent.change(weightBox(), { target: { value: "1" } });
+  assert.ok(weightBox(), "the box vanished after one keystroke");
+  fireEvent.change(weightBox(), { target: { value: "18" } });
+  assert.ok(weightBox());
+  fireEvent.change(weightBox(), { target: { value: "186" } });
+  assert.equal(weightBox().value, "186");
+});
+
+test("a half-typed weight shows no target, and a finished one does", () => {
+  page([recipe()]);
+  fireEvent.change(weightBox(), { target: { value: "1" } });
+  assert.equal(document.querySelector(".nu-target"), null, "1 lb is not a target");
+  fireEvent.change(weightBox(), { target: { value: "186" } });
+  const target = document.querySelector(".nu-target")!;
+  assert.match(target.textContent!, /3,700/);
+  assert.match(target.textContent!, /186/);
+});
+
+test("the box is there even once a weight is known", () => {
+  page([recipe()], "athlete", { lb: "186" });
+  assert.ok(document.querySelector(".nu-target"), "the target is shown");
+  assert.equal(weightBox().value, "186", "and the field is still editable");
+});
+
+test("it refuses anything that is not a number", () => {
+  page([recipe()]);
+  fireEvent.change(weightBox(), { target: { value: "18o lbs" } });
+  assert.equal(weightBox().value, "18");
 });

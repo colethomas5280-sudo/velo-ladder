@@ -64,8 +64,14 @@ export default function Nutrition() {
     () => readLocal(BODY_KEY) ?? "",
     () => "",
   );
-  const weightLb = useMemo(() => Number(saved ? readBody().lb : "") || 0, [saved]);
-  const intake = useMemo(() => intakeFor(weightLb), [weightLb]);
+  /*
+   * Read straight from the store, with no draft copy beside it. `writeBody`
+   * notifies its subscribers, so a keystroke round-trips and comes back in
+   * the same tick — a local draft was a second home for one value, which is
+   * the shape of every drift bug in this codebase.
+   */
+  const weightText = useMemo(() => (saved ? readBody().lb : ""), [saved]);
+  const intake = useMemo(() => intakeFor(Number(weightText) || 0), [weightText]);
 
   const [floor, setFloor] = useState<number>(0);
   const [kind, setKind] = useState<RecipeKind | "all">("all");
@@ -135,31 +141,39 @@ export default function Nutrition() {
 
       <section className="card pad">
         <div className="eyebrow">What a day looks like</div>
-        {intake ? (
-          <DailyTarget intake={intake} onClear={() => writeBody({ lb: "" })} />
-        ) : (
-          <div className="nu-ask">
-            <label className="field">
-              <span>Your bodyweight</span>
-              <span className="ss-height">
-                <input
-                  className="tin"
-                  inputMode="numeric"
-                  aria-label="Your bodyweight in pounds"
-                  placeholder="180"
-                  onChange={(e) =>
-                    writeBody({ lb: e.target.value.replace(/[^0-9]/g, "").slice(0, 3) })
-                  }
-                />
-                <em>lb</em>
-              </span>
-            </label>
+        {/*
+          * The box is rendered unconditionally. It used to appear only while
+          * there was no weight, so the first digit typed gave the page a
+          * weight and unmounted the input mid-entry — one keystroke in, box
+          * gone. Whatever it is showing, the field an athlete is typing into
+          * stays on the screen.
+          */}
+        <div className="nu-ask">
+          <label className="field">
+            <span>Your bodyweight</span>
+            <span className="ss-height">
+              <input
+                className="tin"
+                inputMode="numeric"
+                aria-label="Your bodyweight in pounds"
+                placeholder="180"
+                value={weightText}
+                onChange={(e) =>
+                  writeBody({ lb: e.target.value.replace(/[^0-9]/g, "").slice(0, 3) })
+                }
+              />
+              <em>lb</em>
+            </span>
+          </label>
+          {intake ? (
+            <DailyTarget intake={intake} />
+          ) : (
             <p className="cz-note">
               Put it in and every recipe below says what it is worth against
               your day. Nothing is saved anywhere but this browser.
             </p>
-          </div>
-        )}
+          )}
+        </div>
       </section>
 
       <section className="card pad">
@@ -340,13 +354,7 @@ export default function Nutrition() {
  * can work out his own target when he has gained ten pounds, which is the
  * whole point of it being a rule rather than a figure someone handed him.
  */
-function DailyTarget({
-  intake,
-  onClear,
-}: {
-  intake: DailyIntake;
-  onClear: () => void;
-}) {
+function DailyTarget({ intake }: { intake: DailyIntake }) {
   return (
     <div className="nu-target">
       <div className="nu-figure">
@@ -363,9 +371,6 @@ function DailyTarget({
           {PROTEIN_G_PER_LB}g of protein a pound. The protein number is just
           your bodyweight, which is the easy part to remember.
         </span>
-        <button className="btn sm ghost" onClick={onClear}>
-          Not my weight
-        </button>
       </div>
     </div>
   );

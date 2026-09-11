@@ -1,3 +1,5 @@
+import { PROFILE_FIELDS } from "./profile";
+
 /* ------------------------------------------------------------------ *
  * Eating to gain, as numbers
  *
@@ -8,6 +10,17 @@
  *
  * Pure, so the page and the tests read the same arithmetic.
  * ------------------------------------------------------------------ */
+
+/*
+ * The same bounds the profile enforces on a bodyweight, read from the same
+ * place. A calculator that accepts a weight the profile would refuse is two
+ * answers to one question — and 1 lb produced a target of 0 calories, which
+ * was enough to convince the page it had a weight and tear the input box out
+ * from under whoever was still typing.
+ */
+const WEIGHT_FIELD = PROFILE_FIELDS.find((f) => f.key === "weightLb")!;
+export const MIN_BODYWEIGHT_LB = WEIGHT_FIELD.min ?? 50;
+export const MAX_BODYWEIGHT_LB = WEIGHT_FIELD.max ?? 500;
 
 /** Daily calories per pound of bodyweight, for an athlete trying to gain. */
 export const CALORIES_PER_LB = 20;
@@ -30,7 +43,7 @@ export interface DailyIntake {
  * thing making it memorable.
  */
 export function intakeFor(weightLb: number): DailyIntake | null {
-  if (!(weightLb > 0)) return null;
+  if (!(weightLb >= MIN_BODYWEIGHT_LB && weightLb <= MAX_BODYWEIGHT_LB)) return null;
   return {
     weightLb,
     calories: Math.round((weightLb * CALORIES_PER_LB) / 50) * 50,
