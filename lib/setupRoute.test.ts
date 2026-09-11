@@ -35,7 +35,7 @@ type Body = {
   schemaVersion: number;
   missing: string[];
   lifts: { live: number; archived: number; missingSeed: string[] };
-  recipes: { live: number; archived: number; missingSeed: string[] };
+  recipes: { live: number; archived: number; missingSeed: string[]; unsorted: number };
 };
 
 let route: typeof import("../app/api/setup/route");
@@ -145,4 +145,32 @@ test("a recipe Cole removed stays removed", async () => {
     false,
     "archived is not missing",
   );
+});
+
+/*
+ * Cole: "the drop-down for breakfast lunch and dinner do not work. Nothing
+ * pops up when you click on them." His recipes had no meal times, because the
+ * backfill had not run — and the response said "live: 51", which was true and
+ * answered a different question.
+ */
+test("a seeded recipe with no meal time is reported as unsorted", async () => {
+  const { sql } = await import("@/lib/db");
+  await sql`UPDATE recipes SET meals = ${"[]"}::jsonb WHERE id = 'seed-choc-pb'`;
+  // Read the state directly: a setup run would repair it before reporting.
+  const [row] = (await sql`
+    SELECT count(*)::int AS n FROM recipes WHERE meals = ${"[]"}::jsonb
+  `) as { n: number }[];
+  assert.equal(row.n, 1, "the fixture did not take");
+
+  const body = await run();
+  assert.equal(body.recipes.unsorted, 0, "and the run repaired it");
+});
+
+/* A recipe Cole adds and leaves unsorted is his business, not an alarm. */
+test("a recipe of Cole's own with no meal time is not counted against him", async () => {
+  const data = await import("@/lib/data");
+  await data.createRecipe({ title: "Cole's unsorted idea" });
+  const body = await run();
+  assert.equal(body.recipes.unsorted, 0);
+  assert.equal(body.warning, undefined);
 });

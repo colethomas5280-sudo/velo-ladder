@@ -173,10 +173,35 @@ test("dinner is narrower than lunch, because the shakes are not dinner", () => {
 });
 
 test("an unsorted recipe is not an answer to a meal question", () => {
-  page([recipe({ title: "Unsorted", meals: [] })]);
+  page([
+    recipe({ title: "Unsorted", meals: [] }),
+    recipe({ title: "Sorted", meals: ["breakfast"] }),
+  ]);
   assert.ok(screen.getByText("Unsorted"), "visible under any meal");
   fireEvent.click(screen.getByText("Breakfast"));
+  assert.ok(screen.getByText("Sorted"));
   assert.equal(screen.queryByText("Unsorted"), null);
+});
+
+/*
+ * The bug Cole hit. A deployment without the meals column left every recipe
+ * unsorted, so three buttons sat there returning nothing, and there was no
+ * way to tell a filter that found nothing from one that was broken.
+ */
+test("the meal filter is not offered when nothing is sorted", () => {
+  page([recipe({ title: "Unsorted", meals: [] })]);
+  assert.equal(screen.queryByText("Breakfast"), null);
+  assert.equal(screen.queryByText("Any meal"), null);
+  assert.ok(screen.getByText("Unsorted"), "the recipe is still readable");
+  assert.ok(screen.getByText("1000+ kcal"), "and the filters that do work remain");
+});
+
+test("it comes back as soon as one recipe is sorted", () => {
+  page([
+    recipe({ title: "Unsorted", meals: [] }),
+    recipe({ title: "Sorted", meals: ["dinner"] }),
+  ]);
+  assert.ok(screen.getByText("Breakfast"));
 });
 
 test("meal and calorie filters narrow together", () => {

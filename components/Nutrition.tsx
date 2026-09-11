@@ -78,6 +78,9 @@ export default function Nutrition() {
     setTimeout(() => setToast(null), 2600);
   };
 
+  /* Nothing sorted means the meal filter can only ever find nothing. */
+  const sorted = rows.some((r) => r.meals.length > 0);
+
   const shown = rows.filter(
     (r) =>
       (kind === "all" || r.kind === kind) &&
@@ -173,6 +176,13 @@ export default function Nutrition() {
               </button>
             ))}
           </div>
+          {/*
+            * Only when something is actually sorted. Cole hit exactly this:
+            * a deployment without the meals column left every recipe
+            * unsorted, and three buttons sat there returning nothing with no
+            * way to tell a filter that found nothing from one that is broken.
+            */}
+          {sorted && (
           <div className="chips" role="group" aria-label="Meal">
             <button
               className="chip"
@@ -192,6 +202,7 @@ export default function Nutrition() {
               </button>
             ))}
           </div>
+          )}
           <div className="chips" role="group" aria-label="Kind of recipe">
             <button
               className="chip"
