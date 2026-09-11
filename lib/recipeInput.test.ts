@@ -7,6 +7,7 @@ import {
   parseNewRecipe,
   parseRecipePatch,
 } from "@/lib/recipeInput";
+import { SEED_RECIPES, missingSeedRecipes } from "@/lib/recipes";
 
 /* ------------------------------------------------------------------ *
  * Validating a recipe
@@ -106,4 +107,32 @@ test("a body that isn't an object is refused by either path", () => {
     assert.equal(parseNewRecipe(body).ok, false);
     assert.equal(parseRecipePatch(body).ok, false);
   }
+});
+
+/* ---------------- the seeded six ---------------- */
+
+test("every seeded recipe would pass the validator it bypasses", () => {
+  for (const r of SEED_RECIPES) {
+    const parsed = parseNewRecipe({ ...r });
+    assert.equal(parsed.ok, true, `${r.title}: ${parsed.error}`);
+  }
+});
+
+test("seed ids are stable and readable, because the conflict clause needs them", () => {
+  const ids = SEED_RECIPES.map((r) => r.id);
+  assert.equal(new Set(ids).size, ids.length, "a duplicate id silently drops a recipe");
+  for (const id of ids) assert.match(id, /^seed-[a-z0-9-]+$/, id);
+});
+
+/* Cole's own rule, and these are the copy an athlete reads. */
+test("no seeded recipe is written in em dashes", () => {
+  for (const r of SEED_RECIPES)
+    for (const text of [r.title, r.blurb, ...r.ingredients, ...r.steps, r.notes])
+      assert.equal(text.includes("—"), false, `${r.title}: ${text}`);
+});
+
+test("a missing seed recipe is named", () => {
+  const short = SEED_RECIPES.map((r) => r.id).filter((id) => id !== "seed-choc-pb");
+  assert.deepEqual(missingSeedRecipes(short), ["seed-choc-pb"]);
+  assert.deepEqual(missingSeedRecipes(SEED_RECIPES.map((r) => r.id)), []);
 });

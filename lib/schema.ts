@@ -1,4 +1,5 @@
 import { seedLifts } from "./strength";
+import { SEED_RECIPES } from "./recipes";
 
 /**
  * Canonical database schema. Run once (and after any schema change) via
@@ -6,7 +7,7 @@ import { seedLifts } from "./strength";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 21;
+export const SCHEMA_VERSION = 22;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -27,6 +28,25 @@ const LIFT_SEED_SQL = seedLifts()
       ` ON CONFLICT (key) DO NOTHING;`,
   )
   .join("\n");
+
+/**
+ * Cole's six recipes, as INSERTs.
+ *
+ * Same contract as the lift menu: ON CONFLICT (id) DO NOTHING, so once a
+ * recipe is on his database it is his to edit, and a deploy never overwrites
+ * it. The ids are stable and readable for exactly that reason.
+ */
+const RECIPE_SEED_SQL = SEED_RECIPES.map((r, i) => {
+  const n = (v: number | null) => (v == null ? "NULL" : String(v));
+  return (
+    `INSERT INTO recipes (id, title, kind, blurb, calories, protein_g, carbs_g,` +
+    ` fat_g, ingredients, steps, notes, position) VALUES (` +
+    `${q(r.id)}, ${q(r.title)}, ${q(r.kind)}, ${q(r.blurb)}, ` +
+    `${n(r.calories)}, ${n(r.proteinG)}, ${n(r.carbsG)}, ${n(r.fatG)}, ` +
+    `${q(JSON.stringify(r.ingredients))}::jsonb, ${q(JSON.stringify(r.steps))}::jsonb, ` +
+    `${q(r.notes)}, ${i}) ON CONFLICT (id) DO NOTHING;`
+  );
+}).join("\n");
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -377,6 +397,7 @@ ALTER TABLE lifts DROP CONSTRAINT IF EXISTS lifts_mode_check;
 ALTER TABLE lifts ADD CONSTRAINT lifts_mode_check
   CHECK (mode IN ('load','reps','time'));
 ${LIFT_SEED_SQL}
+${RECIPE_SEED_SQL}
 `;
 
 /** The one real session already logged, imported so there is live data on day one. */

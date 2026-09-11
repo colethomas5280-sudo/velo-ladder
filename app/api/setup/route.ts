@@ -1,6 +1,7 @@
 import { execScript, assertDbConfigured, sql } from "@/lib/db";
 import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
 import { missingSeedLifts, seedLifts } from "@/lib/strength";
+import { missingSeedRecipes } from "@/lib/recipes";
 import { json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,13 @@ async function verify() {
         archived: boolean;
       }[])
     : [];
+  const library = present.has("recipes")
+    ? ((await sql`SELECT id, archived FROM recipes`) as {
+        id: string;
+        archived: boolean;
+      }[])
+    : [];
+
   return {
     ...meta,
     tables: Object.fromEntries(
@@ -66,6 +74,11 @@ async function verify() {
       live: menu.filter((r) => !r.archived).length,
       archived: menu.filter((r) => r.archived).length,
       missingSeed: missingSeedLifts(menu.map((r) => r.key)),
+    },
+    recipes: {
+      live: library.filter((r) => !r.archived).length,
+      archived: library.filter((r) => r.archived).length,
+      missingSeed: missingSeedRecipes(library.map((r) => r.id)),
     },
   };
 }
@@ -148,11 +161,18 @@ export async function GET(request: Request) {
       seed,
       // Named rather than left in the numbers: a lift that failed to insert
       // is a lift athletes cannot log, and a standard with nothing to bind to.
-      ...(state.lifts.missingSeed.length
+      ...(state.lifts.missingSeed.length || state.recipes.missingSeed.length
         ? {
-            warning:
-              `${state.lifts.missingSeed.length} seed lift(s) are not in the menu: ` +
-              `${state.lifts.missingSeed.join(", ")}. Athletes cannot log them.`,
+            warning: [
+              state.lifts.missingSeed.length &&
+                `${state.lifts.missingSeed.length} seed lift(s) are not in the menu: ` +
+                  `${state.lifts.missingSeed.join(", ")}. Athletes cannot log them.`,
+              state.recipes.missingSeed.length &&
+                `${state.recipes.missingSeed.length} seed recipe(s) are missing: ` +
+                  `${state.recipes.missingSeed.join(", ")}.`,
+            ]
+              .filter(Boolean)
+              .join(" "),
           }
         : {}),
       // Bumped whenever the schema changes, so a stale deployment is obvious
