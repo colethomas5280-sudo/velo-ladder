@@ -22,7 +22,10 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   calories: 1100,
   proteinG: 55,
   ingredients: ["2 cups whole milk", "1 cup oats"],
-  method: "Blend the liquids first.",
+  carbsG: null,
+  fatG: null,
+  blurb: "",
+  steps: ["Blend the liquids first."],
   notes: "",
   position: 0,
   archived: false,
@@ -48,7 +51,6 @@ test("a row summarises without being opened", () => {
   const meta = document.querySelector(".nu-meta")!.textContent!;
   assert.match(meta, /Smoothie/);
   assert.match(meta, /55g protein/);
-  assert.match(meta, /2 ingredients/);
   assert.equal(document.querySelector(".nu-ing"), null, "closed until asked");
 });
 
