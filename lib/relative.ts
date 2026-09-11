@@ -72,6 +72,26 @@ export type Standard =
    *
    * The loaded target is read off the chart via `targetFor`, not carried here.
    */
+  /**
+   * A load AND a rep count together: carry this much, for this many reps, in
+   * one set.
+   *
+   * Cole's reverse lunge, "10 reps per side with BW on the bar", is neither of
+   * the kinds above. A ratio would measure it as an estimated max, and an
+   * estimated max is exactly the wrong number here: 245 for a triple estimates
+   * to 270, which clears a 248 target set by ten reps at 186 without the
+   * athlete ever doing ten of anything. The reps are the point.
+   */
+  | {
+      liftKey: string;
+      kind: "load-for-reps";
+      tier?: Tier;
+      /** Reps the set must contain for it to count at all. */
+      reps: number;
+      /** Multiple of bodyweight to be carrying for those reps. */
+      target: number;
+      note?: string;
+    }
   | {
       liftKey: string;
       kind: "reps-then-load";
@@ -193,6 +213,21 @@ export const STRENGTH_STANDARDS: Standard[] = [
    */
   { liftKey: "db-bench-press", kind: "ratio", target: 0.5 },
   { liftKey: "barbell-row", kind: "ratio", target: targetFor("barbell-row")! },
+  /*
+   * The unilateral marker, in Cole's words the "gold star". Ten a side with
+   * bodyweight on the bar, from Zach Dechant's work at TCU and Josh Heenan's
+   * 90mph formula: single-leg strength is where incoming athletes are most
+   * often weakest, and it reads onto both velocity and the back and elbow.
+   *
+   * No chart row, so no band. It is one number, hit or not hit.
+   */
+  {
+    liftKey: "reverse-lunge",
+    kind: "load-for-reps",
+    reps: 10,
+    target: 1,
+    note: "Ten a side, with your own bodyweight on the bar.",
+  },
   {
     liftKey: "pull-up",
     kind: "reps-then-load",
@@ -332,6 +367,48 @@ export function loadedBest(
   return best;
 }
 
+export interface RepSetBest {
+  /** Load carried. For a per-side lift this is one side, as the menu says. */
+  w: number;
+  reps: number;
+  on: string;
+  weight: BodyWeight;
+  ratio: number;
+}
+
+/**
+ * The heaviest set that actually contained the reps.
+ *
+ * Sets shorter than the mark are ignored outright rather than estimated from.
+ * That is the whole reason this is not a ratio standard: an estimated max
+ * rewards a heavy triple, and the rep count is the thing being asked for.
+ *
+ * Each day against its OWN bodyweight, like every other ratio here.
+ */
+export function bestSetAtReps(
+  days: readonly DatedLifts[],
+  key: string,
+  minReps: number,
+  entries: readonly RecoveryEntry[],
+  profileWeight: number | null,
+): RepSetBest | null {
+  let best: RepSetBest | null = null;
+  for (const d of days) {
+    const qualifying = (d.lifts?.[key] ?? []).filter(
+      (set) => set.r >= minReps && set.w > 0,
+    );
+    if (!qualifying.length) continue;
+    const weight = bodyWeightOn(entries, d.date, profileWeight);
+    if (!weight) continue;
+    for (const set of qualifying) {
+      const ratio = set.w / weight.lb;
+      if (!best || ratio > best.ratio)
+        best = { w: set.w, reps: set.r, on: d.date, weight, ratio };
+    }
+  }
+  return best;
+}
+
 /** Most reps in one STRICT set — nothing hung on. */
 export function bodyweightReps(
   days: readonly DatedLifts[],
@@ -388,6 +465,13 @@ export interface Relative {
   level: StrengthLevel | null;
   /** Whether this is one of the markers Cole reads first. */
   tier: Tier;
+  /**
+   * Reps the set had to contain to count. Set only by a `load-for-reps`
+   * standard, where the weight alone does not say whether the mark was hit.
+   */
+  targetReps?: number;
+  /** Reps actually in the qualifying set, which may be more than required. */
+  didReps?: number;
   note?: string;
 }
 
@@ -418,7 +502,32 @@ export function relativeStrength(
      * silently showing something would hide it.
      */
     if (s.kind === "ratio" && mode !== "load") continue;
-    if (s.kind !== "ratio" && mode !== "reps") continue;
+    if (s.kind === "load-for-reps" && mode !== "load") continue;
+    if (s.kind === "reps" && mode !== "reps") continue;
+    if (s.kind === "reps-then-load" && mode !== "reps") continue;
+
+    if (s.kind === "load-for-reps") {
+      const best = bestSetAtReps(days, s.liftKey, s.reps, entries, profileWeight);
+      if (!best) continue;
+      out.push({
+        liftKey: s.liftKey,
+        tier: tierOf(s),
+        kind: "ratio",
+        achieved: best.w,
+        on: best.on,
+        weight: best.weight,
+        value: best.ratio,
+        target: s.target,
+        met: best.ratio >= s.target,
+        toGo: Math.max(0, s.target * best.weight.lb - best.w),
+        unit: "lb",
+        level: null,
+        targetReps: s.reps,
+        didReps: best.reps,
+        note: s.note,
+      });
+      continue;
+    }
 
     if (s.kind === "reps-then-load") {
       const graduated = resolveGraduating(s, days, entries, profileWeight);
@@ -577,6 +686,7 @@ export function fmtValue(r: Relative): string {
 export function fmtTarget(r: Relative): string {
   if (r.kind === "reps") return `of ${r.target} reps`;
   if (r.kind === "total") return `of ${r.target} lb total`;
+  if (r.targetReps) return `of ${r.target}× bodyweight for ${r.targetReps} reps`;
   return `of ${r.target}× bodyweight`;
 }
 
@@ -717,6 +827,8 @@ export interface LiftTarget {
    * start hanging weight on.
    */
   then?: { added: number; note: string };
+  /** Reps the load has to be carried for. Only a `load-for-reps` target. */
+  forReps?: number;
 }
 
 /**
@@ -743,6 +855,17 @@ export function targetsAt(
     }
     if (s.kind === "reps") {
       out.push({ liftKey: s.liftKey, amount: s.target, unit: "reps", ratio: null });
+      continue;
+    }
+
+    if (s.kind === "load-for-reps") {
+      out.push({
+        liftKey: s.liftKey,
+        amount: s.target * weightLb,
+        unit: "lb",
+        ratio: s.target,
+        forReps: s.reps,
+      });
       continue;
     }
     // reps-then-load: the reps are the target, the load is the rung after.

@@ -324,9 +324,16 @@ function StandardRow({ r, name }: { r: Relative; name: string }) {
           * is context, not arithmetic, so its absence hides nothing.
           */}
         <span className="sd-src">
+          {/*
+            * "est." only where the number IS an estimate. A load-for-reps row
+            * reports a set the athlete actually did, and calling that an
+            * estimated max would be the page inventing arithmetic it did not do.
+            */}
           {r.kind === "reps"
             ? `${r.achieved} on ${fmtDate(r.on)}`
-            : `${Math.round(r.achieved)} lb est. on ${fmtDate(r.on)}`}
+            : r.didReps
+              ? `${Math.round(r.achieved)} lb × ${r.didReps} on ${fmtDate(r.on)}`
+              : `${Math.round(r.achieved)} lb est. on ${fmtDate(r.on)}`}
           {r.weight && (
             <>
               {" at "}
