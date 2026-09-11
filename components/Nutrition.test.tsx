@@ -26,6 +26,7 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   fatG: null,
   blurb: "",
   servings: 1,
+  meals: ["breakfast", "lunch"],
   steps: ["Blend the liquids first."],
   notes: "",
   position: 0,
@@ -50,9 +51,17 @@ test("the calorie count leads each row", () => {
 test("a row summarises without being opened", () => {
   page([recipe()]);
   const meta = document.querySelector(".nu-meta")!.textContent!;
-  assert.match(meta, /Smoothie/);
+  // The meal times lead, since that is what an athlete is choosing between.
+  assert.match(meta, /Breakfast \/ Lunch/);
   assert.match(meta, /55g protein/);
   assert.equal(document.querySelector(".nu-ing"), null, "closed until asked");
+});
+
+test("a batch says how many it makes; a single serving does not", () => {
+  page([recipe({ servings: 10, title: "Batch" }), recipe({ servings: 1, title: "One" })]);
+  const rows = [...document.querySelectorAll(".nu-meta")].map((n) => n.textContent!);
+  assert.ok(rows.some((r) => /makes 10/.test(r)));
+  assert.equal(rows.some((r) => /makes 1\b/.test(r)), false, "'makes 1' is noise");
 });
 
 test("opening one shows the ingredients and the method", () => {
@@ -131,4 +140,52 @@ test("an empty library tells each role something different", () => {
   cleanup();
   page([], "athlete");
   assert.ok(screen.getByText(/hasn't put any recipes up yet/i));
+});
+
+
+/* ---------------- meal times ---------------- */
+
+/*
+ * A recipe belongs to every meal it fits, so filtering is membership rather
+ * than equality. Cole's cookbook groups its mains as "Lunch Dinner Meals"
+ * because a slow cooker chili is both.
+ */
+test("filtering by meal keeps everything that fits it", () => {
+  page([
+    recipe({ title: "Shake", meals: ["breakfast", "lunch"] }),
+    recipe({ title: "Chili", meals: ["lunch", "dinner"] }),
+    recipe({ title: "Casserole", meals: ["breakfast"] }),
+  ]);
+  fireEvent.click(screen.getByText("Lunch"));
+  assert.ok(screen.getByText("Shake"));
+  assert.ok(screen.getByText("Chili"));
+  assert.equal(screen.queryByText("Casserole"), null);
+});
+
+test("dinner is narrower than lunch, because the shakes are not dinner", () => {
+  page([
+    recipe({ title: "Shake", meals: ["breakfast", "lunch"] }),
+    recipe({ title: "Chili", meals: ["lunch", "dinner"] }),
+  ]);
+  fireEvent.click(screen.getByText("Dinner"));
+  assert.ok(screen.getByText("Chili"));
+  assert.equal(screen.queryByText("Shake"), null);
+});
+
+test("an unsorted recipe is not an answer to a meal question", () => {
+  page([recipe({ title: "Unsorted", meals: [] })]);
+  assert.ok(screen.getByText("Unsorted"), "visible under any meal");
+  fireEvent.click(screen.getByText("Breakfast"));
+  assert.equal(screen.queryByText("Unsorted"), null);
+});
+
+test("meal and calorie filters narrow together", () => {
+  page([
+    recipe({ title: "Big breakfast", meals: ["breakfast"], calories: 1100 }),
+    recipe({ title: "Small breakfast", meals: ["breakfast"], calories: 400 }),
+  ]);
+  fireEvent.click(screen.getByText("Breakfast"));
+  fireEvent.click(screen.getByText("1000+ kcal"));
+  assert.ok(screen.getByText("Big breakfast"));
+  assert.equal(screen.queryByText("Small breakfast"), null);
 });

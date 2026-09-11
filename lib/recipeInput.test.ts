@@ -210,3 +210,41 @@ test("no recipe is in the seed twice", () => {
   const titles = ALL_SEED_RECIPES.map((r) => r.title);
   assert.equal(new Set(titles).size, titles.length, "the PDF had one duplicate page");
 });
+
+/* ---------------- meal times ---------------- */
+
+test("a meal time has to be one we know", () => {
+  assert.equal(parseNewRecipe({ title: "x", meals: ["brunch"] }).ok, false);
+  assert.match(parseNewRecipe({ title: "x", meals: ["brunch"] }).error!, /brunch/);
+  assert.equal(parseNewRecipe({ title: "x", meals: "lunch" }).ok, false, "a list, not a word");
+  assert.equal(parseNewRecipe({ title: "x", meals: ["lunch", "dinner"] }).ok, true);
+});
+
+/* Order and repeats belong to the form, not the record: a recipe ticked
+ * dinner-then-lunch is the same recipe as one ticked lunch-then-dinner. */
+test("meals come back in a settled order, without repeats", () => {
+  const r = parseNewRecipe({ title: "x", meals: ["dinner", "lunch", "dinner"] });
+  assert.deepEqual(r.value!.meals, ["lunch", "dinner"]);
+});
+
+test("no meals at all is allowed, and means unsorted", () => {
+  assert.deepEqual(parseNewRecipe({ title: "x" }).value!.meals, []);
+  assert.deepEqual(parseNewRecipe({ title: "x", meals: [] }).value!.meals, []);
+});
+
+/*
+ * The PDF's own two headings decide this: 43 mains under "Lunch Dinner Meals"
+ * and two under "Breakfast". Nothing here was assigned by taste.
+ */
+test("every seeded recipe is sorted into at least one meal", () => {
+  for (const r of ALL_SEED_RECIPES)
+    assert.ok(r.meals.length > 0, `${r.title} belongs to no meal`);
+});
+
+test("the shakes are breakfast or lunch, and the cookbook mains are not breakfast", () => {
+  for (const r of SEED_RECIPES)
+    assert.deepEqual(r.meals, ["breakfast", "lunch"], r.title);
+  const mains = COOKBOOK.filter((r) => !r.title.toLowerCase().includes("breakfast"));
+  for (const r of mains)
+    assert.deepEqual(r.meals, ["lunch", "dinner"], r.title);
+});
