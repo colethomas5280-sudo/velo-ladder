@@ -255,7 +255,7 @@ function WeightBlock({ w }: { w: NonNullable<ReturnType<typeof weightTrend>> }) 
         <span className="cz-note">
           Today&apos;s {fmt(w.latest)} is {fmt(Math.abs(swing))} lb{" "}
           {swing < 0 ? "under" : "over"} your own week. A swing that size in a
-          day is fluid and food, not muscle — weigh in the same way each morning
+          day is fluid and food, not muscle. Weigh in the same way each morning
           and watch the average, not the number.
         </span>
       ) : (
@@ -318,7 +318,7 @@ function InsightBlock({
       ) : (
         <p>
           Across {i.n} throwing days your recovery looked about the same whether
-          you threw hard or not — no clear pattern yet.
+          you threw hard or not, so there&rsquo;s no clear pattern yet.
         </p>
       )}
       <span className="cz-note">

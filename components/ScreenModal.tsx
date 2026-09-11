@@ -227,7 +227,7 @@ export default function ScreenModal({
           {existing && (
             <p className="ms-note">
               Editing the screen from {fmtDate(existing.date)}. The date is what
-              identifies it — to move a screen, delete it and record it again.{" "}
+              identifies it. To move a screen, delete it and record it again.{" "}
               <button
                 className="linkish"
                 onClick={() => {
@@ -244,14 +244,14 @@ export default function ScreenModal({
           {threw.count > 0 && (
             <p className="ms-note warn" role="status">
               <b>
-                Threw on this date —{" "}
+                Threw on this date:{" "}
                 {threw.kinds
                   .map((k) => TRACKERS[k].label.toLowerCase())
                   .join(" and ")}
                 .
               </b>{" "}
               If the screen came after, the shoulder and thoracic readings will
-              sit low. Worth recording anyway — worth knowing it isn&rsquo;t a
+              sit low. Worth recording anyway, and worth knowing it isn&rsquo;t a
               fresh number.
             </p>
           )}
@@ -293,7 +293,7 @@ export default function ScreenModal({
           )}
 
           <label className="field">
-            <span>Notes (coach only — never shown to the athlete)</span>
+            <span>Notes (coach only, never shown to the athlete)</span>
             <textarea
               placeholder="Guarding on the left, suspect he's protecting the shoulder…"
               value={notes}
@@ -455,7 +455,7 @@ function Question({
               <select
                 className="ms-select"
                 aria-label={
-                  side ? `${subTest.label} — ${side.label}` : subTest.label
+                  side ? `${subTest.label} · ${side.label}` : subTest.label
                 }
                 value={results[f.key] ?? ""}
                 onChange={(e) => onField(f.key, e.target.value)}

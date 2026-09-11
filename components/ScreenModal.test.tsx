@@ -64,19 +64,19 @@ test("a branch is absent until the answer above it opens one", () => {
     "nothing has come up short yet",
   );
 
-  const { sel } = options(/Hip internal rotation — Left/i);
+  const { sel } = options(/Hip internal rotation · Left/i);
   fireEvent.change(sel, { target: { value: "short" } });
 
   assert.equal(
     [...document.querySelectorAll(".ms-select")].some((s) =>
-      /pelvis held — Left/i.test(s.getAttribute("aria-label") ?? ""),
+      /pelvis held · Left/i.test(s.getAttribute("aria-label") ?? ""),
     ),
     true,
     "the left leg came up short, so ask about the left",
   );
   assert.equal(
     [...document.querySelectorAll(".ms-select")].some((s) =>
-      /pelvis held — Right/i.test(s.getAttribute("aria-label") ?? ""),
+      /pelvis held · Right/i.test(s.getAttribute("aria-label") ?? ""),
     ),
     false,
     "the right leg reached it, so ask nothing",

@@ -99,7 +99,7 @@ export const PROFILE_FIELDS: ProfileField[] = [
   // physical
   { key: "heightIn", label: "Height", kind: "number", section: "physical",
     athleteCanSee: true, athleteCanEdit: true, required: true,
-    min: 30, max: 90, unit: "in", help: "Inches — 6'0\" is 72" },
+    min: 30, max: 90, unit: "in", help: "Inches. 6'0\" is 72" },
   { key: "weightLb", label: "Weight", kind: "number", section: "physical",
     athleteCanSee: true, athleteCanEdit: true, required: true,
     min: 50, max: 500, decimals: 1, unit: "lb" },

@@ -149,7 +149,7 @@ export default function Leaderboard() {
 
           {board.you && (
             <p className="lb-standing">
-              You&apos;re {ordinal(board.you.rank)} — <b>{fmt(board.you.velocity)}</b>
+              You&apos;re {ordinal(board.you.rank)} with <b>{fmt(board.you.velocity)}</b>
             </p>
           )}
         </section>

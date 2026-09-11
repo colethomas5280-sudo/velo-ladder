@@ -85,14 +85,14 @@ const SEED_LIFTS: ExerciseDef[] = [
     name: "Prone 1-arm trap raise",
     group: "Shoulder care",
     mode: "load",
-    help: "Per side — the load in one hand, not the total",
+    help: "Per side: the load in one hand, not the total",
   },
   {
     key: "reverse-lunge",
     name: "Reverse lunge",
     group: "Lower body",
     mode: "load",
-    help: "Per side — the load you carried, not the total",
+    help: "Per side: the load you carried, not the total",
   },
   {
     key: "three-point-db-row",
@@ -184,7 +184,7 @@ const SEED_LIFTS: ExerciseDef[] = [
     name: "Max pull-ups",
     group: "Pull",
     mode: "reps",
-    help: "Strict, neutral grip, from a dead hang — log the reps, and any weight you hung on",
+    help: "Strict, neutral grip, from a dead hang. Log the reps, and any weight you hung on",
   },
   {
     key: "single-leg-pallof-press",

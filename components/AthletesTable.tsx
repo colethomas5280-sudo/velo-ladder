@@ -51,7 +51,7 @@ export default function AthletesTable() {
       !confirm(
         `Remove ${a.name} from the active roster?\n\n` +
           `Their sessions are kept, and any leaderboard records they set stay ` +
-          `on the boards under their name — every athlete in the facility still ` +
+          `on the boards under their name. Every athlete in the facility still ` +
           `sees them there. Taking them off the leaderboard needs a full delete, ` +
           `not this.`,
       )
@@ -95,7 +95,7 @@ export default function AthletesTable() {
       }
       await mutate();
       if (copied)
-        show(`Invite link copied — good for ${res.expiresInDays} days`);
+        show(`Invite link copied. Good for ${res.expiresInDays} days`);
       else window.prompt("Copy this invite link and send it:", res.url);
     } catch (e) {
       errMsg(e);

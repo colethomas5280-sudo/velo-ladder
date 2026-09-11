@@ -115,7 +115,7 @@ export default function ProfileModal({
           {!isCoach && (
             <p className="cz-note">
               Your coach needs these once. You can close this and come back to
-              it — it&apos;ll be here next time until it&apos;s done.
+              it. It&apos;ll be here next time until it&apos;s done.
             </p>
           )}
 

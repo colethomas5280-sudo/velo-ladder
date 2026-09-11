@@ -65,9 +65,9 @@ const GAP_LABEL: Record<GapTrend, string> = {
 /** The nearer of the two clocks, in a sentence. */
 function nextUp(plan: ReturnType<typeof retestPlan>): string {
   const lead = leadClock(plan.full, plan.spot, plan.trigger);
-  if (lead.kind === "trigger") return "Re-screen called — regardless of the clock";
+  if (lead.kind === "trigger") return "Re-screen called, regardless of the clock";
   if (lead.state === "paused")
-    return "In-season — full screens paused, spot-checks only";
+    return "In-season: full screens paused, spot-checks only";
   const what =
     lead.kind === "spot"
       ? `spot-check (${lead.tests.length} ${lead.tests.length === 1 ? "test" : "tests"})`
@@ -291,7 +291,7 @@ export default function ScreenPanel({
             <p className="sc-called" role="status">
               <span className="eyebrow">Re-screen called</span>
               {standingCall.reason} · {fmtDate(standingCall.since)}. Regardless
-              of the clock — a new block or a new movement pattern can expose or
+              of the clock. A new block or a new movement pattern can expose or
               resolve a limitation, so the whole sheet is worth re-asking.
             </p>
           )}
@@ -341,7 +341,7 @@ export default function ScreenPanel({
                   {g.optional && (
                     <span className="cz-note">
                       Non-throwing arm. Symmetry here is nice to have, not a
-                      prerequisite for performance — worth watching, not worth
+                      prerequisite for performance. Worth watching, not worth
                       chasing.
                     </span>
                   )}
@@ -391,7 +391,7 @@ export default function ScreenPanel({
               <CarryBlock
                 title="Left blank this time"
                 list={carried}
-                note="Recorded as a deviation before, and this screen opened the test but left the reading empty — so nothing here has been shown to have changed either way."
+                note="Recorded as a deviation before, and this screen opened the test but left the reading empty, so nothing here has been shown to have changed either way."
               />
             </>
           )}
@@ -486,7 +486,7 @@ function CallRescreen({
     <div className="sc-call">
       <input
         className="tin sc-call-why"
-        placeholder="Why — e.g. new arm slot with Cole"
+        placeholder="Why, e.g. new arm slot with Cole"
         value={reason}
         onChange={(e) => setReason(e.target.value)}
       />
@@ -596,7 +596,7 @@ function CarryBlock({
           const side = sideLabel(d);
           return (
             <li key={d.field.key}>
-              {d.field.test.label} — {d.finding.label}
+              {d.field.test.label} · {d.finding.label}
               {side && ` (${side.toLowerCase()})`}
             </li>
           );

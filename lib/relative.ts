@@ -541,7 +541,7 @@ function resolveGraduating(
         toGo: Math.max(0, target - loaded.e1rm),
         unit: "lb",
         level: null,
-        note: `Total load — you plus the ${trimAdded(loaded.added)} you hung on.`,
+        note: `Total load: you plus the ${trimAdded(loaded.added)} you hung on.`,
       };
   }
 
@@ -555,7 +555,7 @@ function resolveGraduating(
     s.reps,
     tierOf(s),
     cleared
-      ? "Cleared — start adding weight, and this turns into a loaded ratio."
+      ? "Cleared. Start adding weight and this turns into a loaded ratio."
       : s.note,
   );
 }

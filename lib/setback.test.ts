@@ -231,7 +231,7 @@ test("evaluate opens an injury flag carrying the severity that caused it", () =>
 test("evaluate quotes the athlete's note on an injury, capped at 140 chars", () => {
   const long = "x".repeat(200);
   const f = evaluate([], [arm(0, 2, { notes: long })], CNS_DEFAULT_PCT, TODAY);
-  assert.match(f[0].detail, /Pain reported .* \(not limiting movement\) — "x{140}"$/);
+  assert.match(f[0].detail, /Pain reported .* \(not limiting movement\): "x{140}"$/);
 });
 
 test("being a little sore raises no flag on its own", () => {
@@ -269,7 +269,7 @@ test("a run that outlasts its threshold says so in the detail", () => {
   );
   assert.equal(
     f[0].detail,
-    "A little sore 4 days running — past the point where it should be settling",
+    "A little sore 4 days running, past the point where it should be settling",
   );
 });
 

@@ -203,7 +203,7 @@ export function evaluate(
         (state === "pain-limiting"
           ? `Pain limiting movement on ${latest!.date}`
           : `Pain reported ${latest!.date} (not limiting movement)`) +
-        (latest!.notes ? ` — "${latest!.notes.slice(0, 140)}"` : ""),
+        (latest!.notes ? `: "${latest!.notes.slice(0, 140)}"` : ""),
     });
 
   /*
@@ -225,7 +225,7 @@ export function evaluate(
       kind: "soreness",
       detail:
         `${label} ${plural}${easing}` +
-        (run.escalated ? " — past the point where it should be settling" : ""),
+        (run.escalated ? ", past the point where it should be settling" : ""),
     });
   }
 
@@ -275,13 +275,13 @@ export function guidance(
         level: "stop",
         kind: "injury",
         title: "Stop throwing",
-        body: "Pain that limits how you move isn't something to work around. No throwing until a trainer or doctor has looked at it — your coach clears this, not the app.",
+        body: "Pain that limits how you move isn't something to work around. No throwing until a trainer or doctor has looked at it. Your coach clears this, not the app.",
       };
     return {
       level: "caution",
       kind: "injury",
       title: "Recovery day",
-      body: "You flagged pain, not soreness. That doesn't get thrown through, but it isn't a reason to panic either — recovery work today. Your coach has been told and is the one who clears this, so keep checking in until they do.",
+      body: "You flagged pain, not soreness. That doesn't get thrown through, but it isn't a reason to panic either. Recovery work today. Your coach has been told and is the one who clears this, so keep checking in until they do.",
     };
   }
 
@@ -290,7 +290,7 @@ export function guidance(
       level: "caution",
       kind: "cns",
       title: "Deload week",
-      body: "Your last max day came in well under your own normal. That's your nervous system, not your effort — usually training load, sleep debt, or a rough stretch of eating. Expect 3–7 days of lighter work before you chase a number again.",
+      body: "Your last max day came in well under your own normal. That's your nervous system, not your effort. Usually it's training load, sleep debt, or a rough stretch of eating. Expect 3–7 days of lighter work before you chase a number again.",
     };
 
   /*
@@ -315,7 +315,7 @@ export function guidance(
       title: run.days === 1 ? "Recovery day" : "Your call on intensity",
       body:
         run.days === 1
-          ? "Sore after a hard day is exactly what's supposed to happen. Today is recovery work — don't chase a number."
+          ? "Sore after a hard day is exactly what's supposed to happen. Today is recovery work, so don't chase a number."
           : "Second day sore. Throw, but pick your own comfortable effort rather than going after max.",
     };
   }
@@ -326,13 +326,13 @@ export function guidance(
         level: "caution",
         kind: "soreness",
         title: "Recovery day",
-        body: `Day ${run.days} of a sore arm. It's only a little, but it should have settled by now — recovery work today instead of throwing, and tell your coach it's been hanging around.`,
+        body: `Day ${run.days} of a sore arm. It's only a little, but it should have settled by now. Recovery work today instead of throwing, and tell your coach it's been hanging around.`,
       };
     return {
       level: "recovery",
       kind: "soreness",
       title: "Hybrid day",
-      body: "A little sore after throwing is normal — it isn't a reason to shut down, and it isn't a reason to chase a number either. Plyos and catch play today, no ladder. Keep the arm moving without loading it.",
+      body: "A little sore after throwing is normal. It isn't a reason to shut down, and it isn't a reason to chase a number either. Plyos and catch play today, no ladder. Keep the arm moving without loading it.",
     };
   }
 
@@ -345,7 +345,7 @@ export function guidance(
       level: "recovery",
       kind: null,
       title: "Recovery day",
-      body: "You threw max-intent yesterday. Today is recovery work by default — back on it tomorrow.",
+      body: "You threw max-intent yesterday. Today is recovery work by default. Back on it tomorrow.",
     };
 
   return {
@@ -360,7 +360,7 @@ export function guidance(
 export const EXPLAINER = {
   title: "Why this score isn't judging you",
   intro:
-    "Your recovery score isn't grading your effort. It's telling you which body showed up today — because \"I don't feel good\" means three completely different things depending on which one it is.",
+    "Your recovery score isn't grading your effort. It's telling you which body showed up today, because \"I don't feel good\" means three completely different things depending on which one it is.",
   cards: [
     {
       n: "1",
@@ -370,16 +370,16 @@ export const EXPLAINER = {
     {
       n: "2",
       head: "The CNS crash",
-      body: "This one's sneaky, because you can feel completely fine walking in and still throw 5+ mph under your normal number. That's not you being soft, and it's not \"in your head\" — it's your nervous system telling you it hasn't recovered from training load, sleep debt, or a stretch of eating like garbage, even if your muscles don't feel tired. This is why the tracker watches your numbers instead of just asking how you feel.",
+      body: "This one's sneaky, because you can feel completely fine walking in and still throw 5+ mph under your normal number. That's not you being soft, and it's not \"in your head\". It's your nervous system telling you it hasn't recovered from training load, sleep debt, or a stretch of eating like garbage, even if your muscles don't feel tired. This is why the tracker watches your numbers instead of just asking how you feel.",
     },
     {
       n: "3",
       head: "Actually hurt",
-      body: "Different from sore. A strain or a tweak doesn't get pushed through — it gets checked out and rebuilt on a real timeline. No shortcuts here, no exceptions.",
+      body: "Different from sore. A strain or a tweak doesn't get pushed through. It gets checked out and rebuilt on a real timeline. No shortcuts here, no exceptions.",
     },
   ],
   close:
-    "Before every 100%-effort day, ask yourself: am I sore, am I gassed, or am I actually hurt? Answer that honestly and the tracker does its job — tells you to push, pull back, or shut it down.",
+    "Before every 100%-effort day, ask yourself: am I sore, am I gassed, or am I actually hurt? Answer that honestly and the tracker does its job: it tells you to push, pull back, or shut it down.",
   kicker:
     "Your ceiling isn't built on the days you throw hard. It's built on whether you actually recover from them.",
 };
