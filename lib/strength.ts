@@ -193,6 +193,23 @@ const SEED_LIFTS: ExerciseDef[] = [
   },
 ];
 
+/**
+ * Seeded lifts absent from a live menu.
+ *
+ * Pure so it can be tested without a database, and named because the failure
+ * it catches is silent: the lift menu grows by INSERT ... ON CONFLICT DO
+ * NOTHING, so a rejected insert and a successful one produce the same output.
+ * That is not hypothetical — a CHECK constraint on `mode` once rejected every
+ * `time` lift, and nothing said so.
+ *
+ * Retired lifts are ARCHIVED rather than deleted, so their keys are still
+ * present; only a genuine insert failure shows up here.
+ */
+export function missingSeedLifts(present: readonly string[]): string[] {
+  const have = new Set(present);
+  return SEED_LIFTS.filter((l) => !have.has(l.key)).map((l) => l.key);
+}
+
 /** The seed as real rows: position by declaration order, none archived. */
 export function seedLifts(): Lift[] {
   return SEED_LIFTS.map((e, i) => ({

@@ -1,5 +1,6 @@
 import { execScript, assertDbConfigured, sql } from "@/lib/db";
 import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
+import { missingSeedLifts, seedLifts } from "@/lib/strength";
 import { json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -38,12 +39,34 @@ async function verify() {
   `) as { table_name: string }[];
 
   const present = new Set(rows.map((r) => r.table_name));
+  const tablesMissing = EXPECTED_TABLES.filter((t) => !present.has(t));
+
+  /*
+   * Whether the SEED landed, which "tables" cannot answer.
+   *
+   * The lift menu grows by INSERT ... ON CONFLICT (key) DO NOTHING on every
+   * run, and that reports nothing either way — so a deploy adding three lifts
+   * looked identical to one adding none, on the response Cole reads after
+   * every deploy. Deletes are soft (archived), so a seeded key never leaves
+   * this table: anything named here genuinely failed to insert.
+   */
+  const menu = present.has("lifts")
+    ? ((await sql`SELECT key, archived FROM lifts`) as {
+        key: string;
+        archived: boolean;
+      }[])
+    : [];
   return {
     ...meta,
     tables: Object.fromEntries(
       EXPECTED_TABLES.map((t) => [t, present.has(t)]),
     ) as Record<string, boolean>,
-    missing: EXPECTED_TABLES.filter((t) => !present.has(t)),
+    missing: tablesMissing,
+    lifts: {
+      live: menu.filter((r) => !r.archived).length,
+      archived: menu.filter((r) => r.archived).length,
+      missingSeed: missingSeedLifts(menu.map((r) => r.key)),
+    },
   };
 }
 
@@ -123,6 +146,15 @@ export async function GET(request: Request) {
       ok: true,
       schema: "applied",
       seed,
+      // Named rather than left in the numbers: a lift that failed to insert
+      // is a lift athletes cannot log, and a standard with nothing to bind to.
+      ...(state.lifts.missingSeed.length
+        ? {
+            warning:
+              `${state.lifts.missingSeed.length} seed lift(s) are not in the menu: ` +
+              `${state.lifts.missingSeed.join(", ")}. Athletes cannot log them.`,
+          }
+        : {}),
       // Bumped whenever the schema changes, so a stale deployment is obvious
       // from the response rather than looking like a fresh failure.
       schemaVersion: SCHEMA_VERSION,
