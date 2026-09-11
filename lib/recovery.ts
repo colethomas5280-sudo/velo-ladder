@@ -139,11 +139,11 @@ export const WELLNESS_SECTIONS: WellnessSection[] = [
          * reads cleanly once an answer is picked.
          */
         anchors: [
-          "Very poor — long struggle to fall asleep, up repeatedly, exhausted",
-          "Poor — over 30 min and restless, several wake-ups, unrefreshed",
-          "Fair — 20-30 min to fall asleep, a couple of wake-ups, a bit groggy",
-          "Good — asleep under 20 min, woke once and resettled, rested",
-          "Excellent — asleep in 10-20 min, slept through, wake refreshed",
+          "Very poor: long struggle to fall asleep, up repeatedly, exhausted",
+          "Poor: over 30 min and restless, several wake-ups, unrefreshed",
+          "Fair: 20-30 min to fall asleep, a couple of wake-ups, a bit groggy",
+          "Good: asleep under 20 min, woke once and resettled, rested",
+          "Excellent: asleep in 10-20 min, slept through, wake refreshed",
         ],
       },
       {

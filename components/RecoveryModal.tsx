@@ -205,7 +205,7 @@ export default function RecoveryModal({
                       <option value="">Choose…</option>
                       {item.anchors.map((a, i) => (
                         <option key={i} value={i + 1}>
-                          {i + 1} — {a}
+                          {i + 1} · {a}
                         </option>
                       ))}
                     </select>
@@ -250,8 +250,9 @@ export default function RecoveryModal({
               </label>
             </div>
             <p className="cz-note">
-              Tracked and charted, but kept out of the score — these are personal
-              baselines, not something to compare between athletes.
+              Tracked and charted, but kept out of the score. These only mean
+              anything against your own baseline, so there is nothing to
+              compare between athletes.
             </p>
           </details>
 
