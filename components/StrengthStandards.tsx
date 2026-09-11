@@ -248,6 +248,16 @@ function Bodyweight({ s }: { s: BodyweightStanding }) {
           ? `${Math.round(s.next.toGo)} lb from ${s.next.anchor.label.toLowerCase()} for your height.`
           : "You're at or above every mark on this scale for your height."}
       </p>
+      {/*
+        * The page told him he was fourteen pounds light and then stopped,
+        * which is the half of the answer nobody needs. Most of the work of
+        * putting weight on happens in the kitchen.
+        */}
+      {s.next && (
+        <Link href="/resources/nutrition" className="ss-how">
+          How to eat for it →
+        </Link>
+      )}
     </div>
   );
 }

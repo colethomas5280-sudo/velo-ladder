@@ -1,0 +1,131 @@
+import "./testDom";
+import { test, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import type { Recipe } from "@/lib/types";
+import { withSwr } from "./testSwr";
+import Nutrition from "./Nutrition";
+
+/* ------------------------------------------------------------------ *
+ * Eating to gain
+ *
+ * Built around the calorie count because that is the question an athlete
+ * arrives with: he has just been told he is fourteen pounds light and wants
+ * to know what gets him there.
+ * ------------------------------------------------------------------ */
+
+let n = 0;
+const recipe = (over: Partial<Recipe> = {}): Recipe => ({
+  id: `r${n++}`,
+  title: "Gainer shake",
+  kind: "smoothie",
+  calories: 1100,
+  proteinG: 55,
+  ingredients: ["2 cups whole milk", "1 cup oats"],
+  method: "Blend the liquids first.",
+  notes: "",
+  position: 0,
+  archived: false,
+  ...over,
+});
+
+const page = (rows: Recipe[], role: "coach" | "athlete" = "athlete") =>
+  render(
+    withSwr({ "/api/me": { role }, "/api/recipes": rows }, <Nutrition />),
+  );
+
+beforeEach(cleanup);
+
+test("the calorie count leads each row", () => {
+  page([recipe({ title: "Peanut butter bomb", calories: 1250 })]);
+  const head = document.querySelector(".nu-cal")!.textContent!;
+  assert.match(head, /1250/);
+  assert.match(head, /kcal/i);
+});
+
+test("a row summarises without being opened", () => {
+  page([recipe()]);
+  const meta = document.querySelector(".nu-meta")!.textContent!;
+  assert.match(meta, /Smoothie/);
+  assert.match(meta, /55g protein/);
+  assert.match(meta, /2 ingredients/);
+  assert.equal(document.querySelector(".nu-ing"), null, "closed until asked");
+});
+
+test("opening one shows the ingredients and the method", () => {
+  page([recipe()]);
+  fireEvent.click(document.querySelector(".nu-head")!);
+  assert.ok(screen.getByText("2 cups whole milk"));
+  assert.ok(screen.getByText(/blend the liquids first/i));
+});
+
+/*
+ * The filter is the point of the page: "what gets me 1000 calories". The
+ * middle case is the one that matters — "1000+" has to include 1000, or the
+ * label is lying about what it filters.
+ */
+test("filtering by size keeps only what clears it, boundary included", () => {
+  page([
+    recipe({ title: "Big", calories: 1200 }),
+    recipe({ title: "Exactly", calories: 1000 }),
+    recipe({ title: "Just under", calories: 999 }),
+    recipe({ title: "Small", calories: 450 }),
+  ]);
+  fireEvent.click(screen.getByText("1000+ kcal"));
+  assert.ok(screen.getByText("Big"));
+  assert.ok(screen.getByText("Exactly"), "1000+ means 1000 or more");
+  assert.equal(screen.queryByText("Just under"), null);
+  assert.equal(screen.queryByText("Small"), null);
+});
+
+/*
+ * A recipe nobody has counted is not a 1000 calorie recipe. Showing it under
+ * that filter would answer a different question from the one asked.
+ */
+test("an uncounted recipe is not offered as an answer to a calorie question", () => {
+  page([recipe({ title: "Uncounted", calories: null })]);
+  assert.ok(screen.getByText("Uncounted"), "visible at any size");
+  fireEvent.click(screen.getByText("1000+ kcal"));
+  assert.equal(screen.queryByText("Uncounted"), null);
+});
+
+test("filtering by kind works alongside size", () => {
+  page([
+    recipe({ title: "Shake", kind: "smoothie", calories: 1100 }),
+    recipe({ title: "Plate", kind: "meal", calories: 1100 }),
+  ]);
+  fireEvent.click(screen.getByText("Meal"));
+  assert.ok(screen.getByText("Plate"));
+  assert.equal(screen.queryByText("Shake"), null);
+});
+
+test("a filter that matches nothing says so rather than showing a blank", () => {
+  page([recipe({ calories: 400 })]);
+  fireEvent.click(screen.getByText("1000+ kcal"));
+  assert.ok(screen.getByText(/nothing that big yet/i));
+});
+
+/* ---------------- who can write ---------------- */
+
+test("an athlete is offered no way to change a recipe", () => {
+  page([recipe()]);
+  fireEvent.click(document.querySelector(".nu-head")!);
+  assert.equal(screen.queryByText(/\+ Add recipe/i), null);
+  assert.equal(screen.queryByText(/^Edit$/), null);
+  assert.equal(screen.queryByText(/^Remove$/), null);
+});
+
+test("a coach can add and edit", () => {
+  page([recipe()], "coach");
+  assert.ok(screen.getByText(/\+ Add recipe/i));
+  fireEvent.click(document.querySelector(".nu-head")!);
+  assert.ok(screen.getByText(/^Edit$/));
+});
+
+test("an empty library tells each role something different", () => {
+  page([], "coach");
+  assert.ok(screen.getByText(/add the smoothies you already give athletes/i));
+  cleanup();
+  page([], "athlete");
+  assert.ok(screen.getByText(/hasn't put any recipes up yet/i));
+});

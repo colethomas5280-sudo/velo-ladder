@@ -187,6 +187,7 @@ test("the schema applies to an empty database", async () => {
     "lift_sessions",
     "lifts",
     "movement_screens",
+    "recipes",
     "recovery_entries",
     "resources",
     "setbacks",

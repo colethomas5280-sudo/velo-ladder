@@ -89,6 +89,17 @@ export default function Resources() {
         <span className="sl-go">Open →</span>
       </Link>
 
+      <Link href="/resources/nutrition" className="card pad screen-link">
+        <div>
+          <div className="eyebrow">Reference</div>
+          <b>Eating to gain</b>
+          <span className="cz-note">
+            Recipes built round the calories, biggest first
+          </span>
+        </div>
+        <span className="sl-go">Open →</span>
+      </Link>
+
       <Link href="/resources/recovery" className="card pad screen-link">
         <div>
           <div className="eyebrow">Reference</div>

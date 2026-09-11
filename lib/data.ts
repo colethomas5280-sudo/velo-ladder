@@ -11,6 +11,8 @@ import type {
   Setback,
   MovementScreen,
   LiftSession,
+  Recipe,
+  RecipeKind,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
 import { liftKeyFrom, type Lift, type LiftMode } from "@/lib/strength";
@@ -1156,4 +1158,84 @@ export async function liftUsage(key: string): Promise<number> {
     SELECT count(*)::int AS n FROM lift_sessions WHERE lifts ? ${key}
   `) as { n: number }[];
   return Number(row?.n ?? 0);
+}
+
+/* ------------------------------------------------------------------ *
+ * Recipes
+ * ------------------------------------------------------------------ */
+
+function toRecipe(r: Record<string, unknown>): Recipe {
+  return {
+    id: String(r.id),
+    title: String(r.title),
+    kind: (r.kind as RecipeKind) ?? "smoothie",
+    // Null, never 0. "Nobody has worked this out" and "zero calories" are
+    // different facts, and an athlete sorting by calories needs them apart.
+    calories: r.calories == null ? null : Number(r.calories),
+    proteinG: r.protein_g == null ? null : Number(r.protein_g),
+    ingredients: (r.ingredients ?? []) as string[],
+    method: String(r.method ?? ""),
+    notes: String(r.notes ?? ""),
+    position: Number(r.position ?? 0),
+    archived: Boolean(r.archived),
+  };
+}
+
+/** Biggest first, which is the order an athlete trying to gain wants. */
+export async function listRecipes(): Promise<Recipe[]> {
+  const rows = (await sql`
+    SELECT * FROM recipes WHERE archived = false
+    ORDER BY calories DESC NULLS LAST, position, lower(title)
+  `) as Record<string, unknown>[];
+  return rows.map(toRecipe);
+}
+
+export interface RecipeInput {
+  title: string;
+  kind?: RecipeKind;
+  calories?: number | null;
+  proteinG?: number | null;
+  ingredients?: string[];
+  method?: string;
+  notes?: string;
+}
+
+export async function createRecipe(input: RecipeInput): Promise<Recipe> {
+  const id = crypto.randomUUID();
+  const rows = (await sql`
+    INSERT INTO recipes (id, title, kind, calories, protein_g, ingredients, method, notes)
+    VALUES (${id}, ${input.title.trim()}, ${input.kind ?? "smoothie"},
+            ${input.calories ?? null}, ${input.proteinG ?? null},
+            ${JSON.stringify(input.ingredients ?? [])}::jsonb,
+            ${input.method ?? ""}, ${input.notes ?? ""})
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toRecipe(rows[0]);
+}
+
+export async function updateRecipe(
+  id: string,
+  patch: Partial<RecipeInput> & { position?: number; archived?: boolean },
+): Promise<Recipe | null> {
+  const rows = (await sql`SELECT * FROM recipes WHERE id = ${id}`) as Record<
+    string,
+    unknown
+  >[];
+  if (!rows[0]) return null;
+  const cur = toRecipe(rows[0]);
+  const out = (await sql`
+    UPDATE recipes SET
+      title = ${patch.title?.trim() ?? cur.title},
+      kind = ${patch.kind ?? cur.kind},
+      calories = ${patch.calories === undefined ? cur.calories : patch.calories},
+      protein_g = ${patch.proteinG === undefined ? cur.proteinG : patch.proteinG},
+      ingredients = ${JSON.stringify(patch.ingredients ?? cur.ingredients)}::jsonb,
+      method = ${patch.method ?? cur.method},
+      notes = ${patch.notes ?? cur.notes},
+      position = ${patch.position ?? cur.position},
+      archived = ${patch.archived ?? cur.archived},
+      updated_at = now()
+    WHERE id = ${id} RETURNING *
+  `) as Record<string, unknown>[];
+  return out[0] ? toRecipe(out[0]) : null;
 }
