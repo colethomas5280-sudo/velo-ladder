@@ -568,14 +568,31 @@ export const BODYWEIGHT_ANCHORS: readonly BodyweightAnchor[] = [
   { per: 2.8, label: "Pro average", note: "the average MLB player" },
 ];
 
-/** The anchors as actual pounds at a given height. */
+/**
+ * The anchors as actual pounds at a given height, rounded UP to the nearest 5.
+ *
+ * Cole's call, and it is about being memorable: "you want to be 200" is a
+ * number an athlete carries around, where 197.1 is one he has to look up
+ * again. Up rather than nearest because these are minimums — rounding a
+ * floor down moves the floor.
+ *
+ * Rounded HERE rather than at the point of display, so everything derived
+ * from a mark agrees with the mark shown. Rounding in the component would
+ * print "target 200" beside "11 lb to go" and leave the athlete to notice
+ * that 186 + 11 is not 200.
+ */
 export function bodyweightMarks(
   heightIn: number,
 ): { anchor: BodyweightAnchor; lb: number }[] {
   return BODYWEIGHT_ANCHORS.map((anchor) => ({
     anchor,
-    lb: anchor.per * heightIn,
+    lb: roundUp5(anchor.per * heightIn),
   }));
+}
+
+/** Up to the nearest 5. A target you can hold in your head. */
+export function roundUp5(lb: number): number {
+  return Math.ceil(lb / 5) * 5;
 }
 
 export interface BodyweightStanding {
