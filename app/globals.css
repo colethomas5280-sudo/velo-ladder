@@ -3578,3 +3578,27 @@ table.roster-table {
   font-size: 11px;
   color: var(--ink-faint);
 }
+.sd-level {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-right: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  color: var(--ink-dim);
+  border: 1px solid var(--line);
+}
+/* Only the two bands Cole is aiming between get a colour. Painting all five
+   turns the scale into a league table, which is the opposite of a target. */
+.sd-level.lv-intermediate {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+.sd-level.lv-advanced,
+.sd-level.lv-elite {
+  color: var(--good);
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+}

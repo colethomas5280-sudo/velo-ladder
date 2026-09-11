@@ -1,8 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  STRENGTH_CHART,
+  STRENGTH_LEVELS,
   STRENGTH_STANDARDS,
+  TARGET_BAND,
   bodyWeightOn,
+  levelReached,
+  targetFor,
   fmtToGo,
   fmtValue,
   fmtTarget,
@@ -138,11 +143,11 @@ test("short of the target, what is left is pounds on the bar", () => {
 test("a standard with no lift behind it is absent, not failed", () => {
   const got = relativeStrength(
     MENU,
-    [day("2026-09-05", { "db-bench-press": [set(80, 5)] })],
+    [day("2026-09-05", { bench: [set(225, 3) ] })],
     steady(180),
     null,
   );
-  assert.deepEqual(got.map((r) => r.liftKey), ["db-bench-press"]);
+  assert.deepEqual(got.map((r) => r.liftKey), ["bench"]);
 });
 
 /*
@@ -180,16 +185,13 @@ test("a lift measured in reps or seconds has no max to take a ratio of", () => {
 test("the list leads with whichever standard is nearest", () => {
   const days = [
     day("2026-09-05", {
-      deadlift: [set(300, 1)], //        1.67 of 2    → 83%
-      "db-bench-press": [set(86, 1)], // 0.48 of 0.5  → 96%
-      "front-squat": [set(200, 1)], //   1.11 of 1.5  → 74%
+      deadlift: [set(300, 1)], //      1.67 of 2.25 → 74%
+      bench: [set(260, 1)], //          1.44 of 1.5  → 96%
+      "front-squat": [set(225, 1)], //  1.25 of 1.5  → 83%
     }),
   ];
   const got = relativeStrength(MENU, days, steady(180), null);
-  assert.deepEqual(
-    got.map((r) => r.liftKey),
-    ["db-bench-press", "deadlift", "front-squat"],
-  );
+  assert.deepEqual(got.map((r) => r.liftKey), ["bench", "front-squat", "deadlift"]);
 });
 
 /* ---------------- rep standards ---------------- */
@@ -282,7 +284,7 @@ test("every standard names a menu lift whose mode matches its kind", () => {
 test("the standards are exactly the lifts Cole watches", () => {
   assert.deepEqual(
     [...STRENGTH_STANDARDS.map((s) => s.liftKey)].sort(),
-    ["back-squat", "db-bench-press", "deadlift", "front-squat", "pull-up"],
+    ["back-squat", "bench", "deadlift", "front-squat", "pull-up"],
   );
 });
 
@@ -309,4 +311,58 @@ test("the meter fills towards the target and stops there", () => {
   assert.equal(progressTo(near), 0.5);
   const over = relativeStrength(MENU, lifted(set(500, 1)), steady(180), null, only(2))[0];
   assert.equal(progressTo(over), 1, "past the target the bar is full, not overflowing");
+});
+
+/* ---------------- the chart ---------------- */
+
+test("every chart row names a lift on the menu", () => {
+  for (const key of Object.keys(STRENGTH_CHART))
+    assert.ok(MENU.get(key), `${key} has a chart row but is not a lift`);
+});
+
+test("a chart row climbs — no band is easier than the one below it", () => {
+  for (const [key, row] of Object.entries(STRENGTH_CHART)) {
+    for (let i = 1; i < STRENGTH_LEVELS.length; i++) {
+      const lower = row[STRENGTH_LEVELS[i - 1]];
+      const upper = row[STRENGTH_LEVELS[i]];
+      assert.ok(upper > lower, `${key}: ${STRENGTH_LEVELS[i]} (${upper}) <= ${STRENGTH_LEVELS[i - 1]} (${lower})`);
+    }
+  }
+});
+
+/*
+ * The targets are DERIVED, not typed. This is the test that would fail if
+ * someone "simplified" targetFor into five literals and then moved the band.
+ */
+test("a ratio target is the midpoint of the band Cole is aiming between", () => {
+  assert.deepEqual([...TARGET_BAND], ["intermediate", "advanced"]);
+  assert.equal(targetFor("deadlift"), (2 + 2.5) / 2);
+  assert.equal(targetFor("back-squat"), (1.75 + 2.25) / 2);
+  assert.equal(targetFor("bench"), (1.25 + 1.75) / 2);
+  assert.equal(targetFor("front-squat"), (1.25 + 1.75) / 2);
+  assert.equal(targetFor("push-up"), null, "a lift with no chart row has no target");
+
+  for (const s of STRENGTH_STANDARDS)
+    if (s.kind === "ratio")
+      assert.equal(s.target, targetFor(s.liftKey), `${s.liftKey} was typed, not derived`);
+});
+
+test("leg press is off the chart on purpose", () => {
+  assert.equal("leg-press" in STRENGTH_CHART, false, "Cole: non-machine lifts are the priority");
+});
+
+/*
+ * The band an athlete has REACHED, never the one he is nearest. Rounding him
+ * up would be the app flattering him about where he stands.
+ */
+test("the band is the highest one actually cleared", () => {
+  assert.equal(levelReached("deadlift", 1.0), "beginner");
+  assert.equal(levelReached("deadlift", 1.99), "novice", "not rounded up to intermediate");
+  assert.equal(levelReached("deadlift", 2.0), "intermediate", "exactly on it counts");
+  assert.equal(levelReached("deadlift", 3.5), "elite", "and it stops at the top");
+});
+
+test("below the first band is no band at all, not 'beginner'", () => {
+  assert.equal(levelReached("deadlift", 0.9), null);
+  assert.equal(levelReached("pull-up", 5), null, "and a lift with no row has none either");
 });
