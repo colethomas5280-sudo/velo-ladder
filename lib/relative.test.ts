@@ -639,3 +639,20 @@ test("a height reads in feet and inches", () => {
   assert.equal(fmtHeight(74), "6'2\"");
   assert.equal(fmtHeight(68), "5'8\"");
 });
+
+/*
+ * Notes are rendered on the athlete's own page, so they are written FOR him.
+ * "Cole's number, not the chart's" shipped to a sixteen-year-old's screen —
+ * true, useful to whoever maintains the config, and meaningless to the reader.
+ */
+test("no standard's note talks about the config instead of to the athlete", () => {
+  const internal = /chart's|not the chart|cole|config|TODO|standard's|proposed/i;
+  for (const s of STRENGTH_STANDARDS) {
+    if (!s.note) continue;
+    assert.equal(
+      internal.test(s.note),
+      false,
+      `${s.liftKey}: "${s.note}" is addressed to the wrong person`,
+    );
+  }
+});
