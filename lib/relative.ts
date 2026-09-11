@@ -51,48 +51,98 @@ export type Standard =
       note?: string;
     };
 
+/* ------------------------------------------------------------------ *
+ * The chart
+ *
+ * Male strength standards as Cole sent them: estimated 1RM divided by
+ * bodyweight, across five bands. Stored whole rather than reduced to the one
+ * number the page shows, because the band an athlete has REACHED is the more
+ * motivating half — "you are intermediate on this, advanced on that" says
+ * more than a single distance from a single target.
+ *
+ * Leg press is deliberately absent. Cole: the priority is non-machine lifts.
+ *
+ * Overhead press and barbell row are absent for a different reason — his
+ * program runs a half-kneeling landmine press and cable/DB rows, which are
+ * not the barbell lifts those rows are measured on. A chart row with no lift
+ * to bind to would be a standard nobody can ever meet.
+ * ------------------------------------------------------------------ */
+
+export const STRENGTH_LEVELS = [
+  "beginner",
+  "novice",
+  "intermediate",
+  "advanced",
+  "elite",
+] as const;
+
+export type StrengthLevel = (typeof STRENGTH_LEVELS)[number];
+
+/** Keyed by the menu's lift key, so a row can only describe a real lift. */
+export const STRENGTH_CHART: Record<string, Record<StrengthLevel, number>> = {
+  bench: { beginner: 0.5, novice: 0.75, intermediate: 1.25, advanced: 1.75, elite: 2 },
+  "back-squat": { beginner: 0.75, novice: 1, intermediate: 1.75, advanced: 2.25, elite: 2.5 },
+  deadlift: { beginner: 1, novice: 1.25, intermediate: 2, advanced: 2.5, elite: 3 },
+  "front-squat": { beginner: 0.6, novice: 0.85, intermediate: 1.25, advanced: 1.75, elite: 2 },
+  "barbell-hip-thrust": { beginner: 0.75, novice: 1.25, intermediate: 1.75, advanced: 2.25, elite: 2.75 },
+};
+
 /**
- * PROPOSED, NOT COLE'S. These are the commonly cited relative-strength marks
- * for pitchers, put here so there is something to train against on day one —
- * they are his to correct, and changing one is a one-line edit.
+ * Where Cole wants his athletes: between these two bands.
  *
- * One target for everyone, by his call: a ratio is a ratio, and splitting it
- * by level would mean deciding that a sixteen-year-old should want less.
+ * The target is the midpoint, DERIVED rather than typed. Five typed midpoints
+ * would lose their connection to the chart, and moving the ambition to
+ * "advanced" would then be five edits that could disagree with each other.
+ */
+export const TARGET_BAND: readonly [StrengthLevel, StrengthLevel] = [
+  "intermediate",
+  "advanced",
+];
+
+/** The multiple to chase on a lift, or null if the chart has no row for it. */
+export function targetFor(liftKey: string): number | null {
+  const row = STRENGTH_CHART[liftKey];
+  if (!row) return null;
+  return (row[TARGET_BAND[0]] + row[TARGET_BAND[1]]) / 2;
+}
+
+/**
+ * The highest band a ratio has reached, or null when it is below the first.
  *
- * These are the five lifts Cole says he watches, and no others. The barbell
- * bench on his sheet is deliberately absent — he named the DB press, and a
- * standard on every accessory would turn a target into a scoreboard.
+ * Null rather than "beginner" on purpose: an athlete under the beginner mark
+ * has not reached beginner, and labelling him with it would be the app
+ * telling him he is somewhere he is not.
+ */
+export function levelReached(liftKey: string, ratio: number): StrengthLevel | null {
+  const row = STRENGTH_CHART[liftKey];
+  if (!row) return null;
+  let reached: StrengthLevel | null = null;
+  for (const level of STRENGTH_LEVELS) if (ratio >= row[level]) reached = level;
+  return reached;
+}
+
+/**
+ * The lifts actually tracked — the five Cole watches.
+ *
+ * Every ratio target comes off the chart; nothing here is a number I chose.
+ * The one exception is max pull-ups, which is measured in REPS: the chart's
+ * pull-up row is a weighted 1RM ratio and Cole wants the rep test instead, so
+ * that mark is mine and says so.
+ *
+ * The DB bench press is on the menu for logging but carries no standard —
+ * the chart's bench row is a barbell lift, and converting it per-dumbbell
+ * would be my arithmetic rather than his chart. Cole's call.
  */
 export const STRENGTH_STANDARDS: Standard[] = [
-  {
-    liftKey: "deadlift",
-    kind: "ratio",
-    target: 2,
-    note: "Twice your bodyweight off the floor.",
-  },
-  {
-    liftKey: "back-squat",
-    kind: "ratio",
-    target: 1.75,
-    note: "The heavier of the two squats, so the heavier mark.",
-  },
-  {
-    liftKey: "front-squat",
-    kind: "ratio",
-    target: 1.5,
-    note: "A front squat runs about 85% of a back squat — same effort, lower number.",
-  },
-  {
-    liftKey: "db-bench-press",
-    kind: "ratio",
-    target: 0.5,
-    note: "Per dumbbell, not the pair — 90s at 180 lb bodyweight.",
-  },
+  { liftKey: "deadlift", kind: "ratio", target: targetFor("deadlift")! },
+  { liftKey: "back-squat", kind: "ratio", target: targetFor("back-squat")! },
+  { liftKey: "front-squat", kind: "ratio", target: targetFor("front-squat")! },
+  { liftKey: "bench", kind: "ratio", target: targetFor("bench")! },
   {
     liftKey: "pull-up",
     kind: "reps",
     target: 10,
-    note: "Strict, from a dead hang. Ten is the mark.",
+    note: "Strict, from a dead hang. This mark is not off the chart.",
   },
 ];
 
@@ -189,6 +239,8 @@ export interface Relative {
   toGo: number;
   /** The unit `toGo` is counted in, so the page can never mislabel it. */
   unit: "lb" | "reps";
+  /** Band reached on the chart. Null for a rep standard, which has no row. */
+  level: StrengthLevel | null;
   note?: string;
 }
 
@@ -237,6 +289,7 @@ export function relativeStrength(
         met: best.value >= s.target,
         toGo: Math.max(0, s.target - best.value),
         unit: "reps",
+        level: null,
         note: s.note,
       });
       continue;
@@ -256,6 +309,7 @@ export function relativeStrength(
       met: value >= s.target,
       toGo: Math.max(0, s.target * weight.lb - best.value),
       unit: "lb",
+      level: levelReached(s.liftKey, value),
       note: s.note,
     });
   }

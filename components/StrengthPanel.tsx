@@ -290,7 +290,15 @@ function StandardRow({ r, name }: { r: Relative; name: string }) {
         <span className="sd-fill" style={{ width: `${progressTo(r) * 100}%` }} />
       </div>
       <div className="sd-foot">
-        <span className="sd-gap">{r.met ? "Cleared" : fmtToGo(r)}</span>
+        <span className="sd-gap">
+          {/*
+            * The band leads when there is one. "Intermediate" is a place on
+            * a scale an athlete can see himself moving along; "38 lb to go"
+            * is the next step. The distance alone reads as a deficit.
+            */}
+          {r.level && <em className={`sd-level lv-${r.level}`}>{r.level}</em>}
+          {r.met ? "Cleared" : fmtToGo(r)}
+        </span>
         {/*
           * Always says where the number came from. A ratio is two
           * measurements and an athlete should be able to check either —

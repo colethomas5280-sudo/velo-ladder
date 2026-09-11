@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { render, screen, cleanup } from "@testing-library/react";
 import type { LiftSession, RecoveryEntry } from "@/lib/types";
 import { e1rm } from "@/lib/strength";
+import { targetFor } from "@/lib/relative";
 import { withSwr } from "./testSwr";
 import { daysAgo, LIFT_ROWS, TODAY } from "./testRender";
 import StrengthPanel from "./StrengthPanel";
@@ -185,19 +186,32 @@ test("a session the chart can't plot is still counted as a session done", () => 
  * tests hold it to being honest about both halves of the ratio.
  * ------------------------------------------------------------------ */
 
+/*
+ * Read off the chart rather than typed, so a change of ambition — Cole
+ * moving the band, say — cannot leave this test asserting an old number
+ * while the page shows a new one.
+ */
+const DL_TARGET = targetFor("deadlift")!;
+
 test("a ratio shows against its target, with the gap in pounds on the bar", () => {
   panel([day(daysAgo(3), { deadlift: [{ w: 320, r: 1 }] })], true, {
     weighIns: weighing(180),
   });
   const row = document.querySelector(".sd")!.textContent!;
   assert.match(row, /1\.78×/);
-  assert.match(row, /of 2× bodyweight/i);
-  // 2 × 180 = 360, so 40 lb short. That line is the training target.
-  assert.match(row, /40 lb to go/);
+  assert.match(row, new RegExp(`of ${DL_TARGET}× bodyweight`, "i"));
+  assert.match(row, new RegExp(`${Math.ceil(DL_TARGET * 180 - 320)} lb to go`));
+  /*
+   * 1.78x is above the chart's novice deadlift (1.25x) and below its
+   * intermediate (2x). The band is the one he has REACHED, not the one he is
+   * nearest — rounding him up to intermediate would be the app flattering him.
+   */
+  assert.match(row, /novice/i, "the band he has actually reached");
+  assert.equal(/intermediate/i.test(row), false);
 });
 
 test("clearing the standard says so rather than showing a negative gap", () => {
-  panel([day(daysAgo(3), { deadlift: [{ w: 400, r: 1 }] })], true, {
+  panel([day(daysAgo(3), { deadlift: [{ w: Math.ceil(DL_TARGET * 180) + 5, r: 1 }] })], true, {
     weighIns: weighing(180),
   });
   const row = document.querySelector(".sd")!;
@@ -221,7 +235,7 @@ test("the row says where both numbers came from", () => {
 });
 
 test("with no check-ins it falls back to the profile weight and marks it", () => {
-  panel([day(daysAgo(3), { deadlift: [{ w: 360, r: 1 }] })], true, {
+  panel([day(daysAgo(3), { deadlift: [{ w: 320, r: 1 }] })], true, {
     profileWeight: 180,
   });
   assert.match(document.querySelector(".sd")!.textContent!, /from your profile/i);
