@@ -109,8 +109,8 @@ export function parseProfilePatch(
       return {
         ok: false,
         error: setOnce
-          ? `${f.label} is already set — ask your coach to change it`
-          : `You can't change ${f.label.toLowerCase()} — ask your coach`,
+          ? `${f.label} is already set. Ask your coach to change it`
+          : `You can't change ${f.label.toLowerCase()}. Ask your coach`,
       };
     }
 

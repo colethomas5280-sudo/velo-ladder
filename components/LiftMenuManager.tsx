@@ -24,9 +24,9 @@ import {
  * ------------------------------------------------------------------ */
 
 const MODE_HELP: Record<LiftMode, string> = {
-  load: "Weight on the bar — tracked as an estimated 1RM",
-  reps: "Bodyweight — tracked as reps, with any added load noted",
-  time: "A hold — tracked in seconds, like a plank",
+  load: "Weight on the bar, tracked as an estimated 1RM",
+  reps: "Bodyweight, tracked as reps, with any added load noted",
+  time: "A hold, tracked in seconds, like a plank",
 };
 
 const MODES: LiftMode[] = ["load", "reps", "time"];
@@ -212,7 +212,7 @@ export default function LiftMenuManager({
           <span>Note for the athlete (optional)</span>
           <input
             value={draft.help}
-            placeholder="Log one side — the load, not the total"
+            placeholder="Log one side: the load, not the total"
             onChange={(e) => setDraft((p) => ({ ...p, help: e.target.value }))}
           />
         </label>
@@ -247,7 +247,7 @@ export default function LiftMenuManager({
             ))}
           </ul>
           <p className="cz-note">
-            Still named everywhere they were logged — taking a lift off the menu
+            Still named everywhere they were logged. Taking a lift off the menu
             stops it being offered, it never rewrites history.
           </p>
         </div>
@@ -333,7 +333,7 @@ function LiftEditor({
         />
       </label>
       <p className="cz-note">
-        Renaming is safe — every session ever logged against this lift follows
+        Renaming is safe. Every session ever logged against this lift follows
         the new name. Changing how it&rsquo;s measured is refused once there is
         history, because it would re-read all of it.
       </p>

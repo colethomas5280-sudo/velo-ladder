@@ -185,7 +185,7 @@ export default function LiftModal({
 
           {shown.length === 0 && (
             <p className="widget-empty">
-              Pick a lift below and put in what you did — weight and reps, one
+              Pick a lift below and put in what you did: weight and reps, one
               row per working set.
             </p>
           )}

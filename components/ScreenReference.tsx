@@ -61,7 +61,7 @@ export default function ScreenReference() {
         <p className="sr-lede">
           Every test, every question and every answer, with the colour it
           carries. Generated from the app&rsquo;s own configuration, so what
-          you read here is what the form records — there is no second copy to
+          you read here is what the form records. There is no second copy to
           fall out of step.
         </p>
         <div className="sr-tally">
@@ -115,7 +115,7 @@ function TestCard({ test }: { test: ScreenTest }) {
           * out loud here because an absence is the one thing a reader can't
           * tell apart from an oversight.
           */}
-        {noYellow && <span className="pill">no yellow — pass or fail</span>}
+        {noYellow && <span className="pill">no yellow, pass or fail</span>}
       </div>
 
       {test.video && (

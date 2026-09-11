@@ -136,7 +136,7 @@ export default function GroupSession({
       setSaveError(
         e instanceof ApiError
           ? `Couldn't save (${e.status}): ${e.message}`
-          : "Couldn't save — check your connection. Your numbers are still here.",
+          : "Couldn't save. Check your connection. Your numbers are still here.",
       );
     } finally {
       setSaving(false);
@@ -162,14 +162,14 @@ export default function GroupSession({
       if (count) showToast(`Saved ${count} session${count === 1 ? "" : "s"}`);
       else
         setSaveError(
-          "Nothing to save — enter at least one 100% throw for someone first.",
+          "Nothing to save. Enter at least one 100% throw for someone first.",
         );
     } catch (e) {
       console.error("[velo] group save failed", e);
       setSaveError(
         e instanceof ApiError
           ? `Couldn't save (${e.status}): ${e.message}`
-          : "Couldn't save the group — check your connection. Your numbers are still here.",
+          : "Couldn't save the group. Check your connection. Your numbers are still here.",
       );
     } finally {
       setSaving(false);

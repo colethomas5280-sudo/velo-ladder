@@ -151,7 +151,7 @@ export default function InviteAthleteModal({
                 {busy ? "Creating…" : "Create & copy invite link"}
               </button>
               <p className="type-pick-note">
-                No password needed — they choose their own from the link.
+                No password needed. They choose their own from the link.
               </p>
             </>
           )}

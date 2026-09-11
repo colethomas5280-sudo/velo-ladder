@@ -143,7 +143,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
       setSaveError(
         e instanceof ApiError
           ? `Couldn't save (${e.status}): ${e.message}`
-          : "Couldn't save — check your connection and try again. Your numbers are still here.",
+          : "Couldn't save. Check your connection and try again. Your numbers are still here.",
       );
     } finally {
       setSaving(false);

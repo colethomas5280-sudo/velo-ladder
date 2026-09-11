@@ -90,7 +90,7 @@ export default function LiftChart({
   if (!geometry)
     return (
       <p className="widget-empty">
-        One session logged — {fmtMetric(points[0].value, mode)} on{" "}
+        One session logged: {fmtMetric(points[0].value, mode)} on{" "}
         {fmtDateShort(points[0].date)}. The line starts at two.
       </p>
     );

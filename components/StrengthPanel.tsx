@@ -172,7 +172,7 @@ export default function StrengthPanel({
             <p className="widget-empty">
               {weighed
                 ? "Log one of the lifts that carries a standard and your ratio shows up here."
-                : "Put your weight on a recovery check-in and these turn into ratios — what you lift against what you weigh."}
+                : "Put your weight on a recovery check-in and these turn into ratios: what you lift against what you weigh."}
             </p>
           )}
         </>
