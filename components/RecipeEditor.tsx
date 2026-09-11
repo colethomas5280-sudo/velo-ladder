@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Recipe, RecipeKind } from "@/lib/types";
-import { RECIPE_KINDS } from "@/lib/types";
+import type { MealTime, Recipe, RecipeKind } from "@/lib/types";
+import { MEAL_TIMES, RECIPE_KINDS } from "@/lib/types";
 import { MAX_INGREDIENTS, MAX_STEPS } from "@/lib/recipeInput";
 import { api, ApiError } from "@/lib/fetcher";
 
@@ -14,6 +14,8 @@ interface Draft {
   title: string;
   kind: RecipeKind;
   blurb: string;
+  meals: MealTime[];
+  servingsText: string;
   calories: string;
   proteinG: string;
   carbsG: string;
@@ -28,6 +30,8 @@ function draftFrom(r: Recipe | null): Draft {
     title: r?.title ?? "",
     kind: r?.kind ?? "smoothie",
     blurb: r?.blurb ?? "",
+    meals: r?.meals ? [...r.meals] : [],
+    servingsText: r?.servings != null ? String(r.servings) : "",
     calories: r?.calories != null ? String(r.calories) : "",
     proteinG: r?.proteinG != null ? String(r.proteinG) : "",
     carbsG: r?.carbsG != null ? String(r.carbsG) : "",
@@ -71,6 +75,8 @@ export default function RecipeEditor({
       title: d.title.trim(),
       kind: d.kind,
       blurb: d.blurb,
+      meals: d.meals,
+      servings: num(d.servingsText),
       calories: num(d.calories),
       proteinG: num(d.proteinG),
       carbsG: num(d.carbsG),
@@ -125,7 +131,42 @@ export default function RecipeEditor({
             />
           </label>
 
+          <div className="field">
+            <span>Eaten at</span>
+            <div className="chips">
+              {MEAL_TIMES.map((m) => (
+                <button
+                  key={m}
+                  className="chip"
+                  aria-pressed={d.meals.includes(m)}
+                  onClick={() =>
+                    setD((p) => ({
+                      ...p,
+                      meals: p.meals.includes(m)
+                        ? p.meals.filter((x) => x !== m)
+                        : [...p.meals, m],
+                    }))
+                  }
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="nu-nums">
+            <label className="field">
+              <span>Makes</span>
+              <input
+                className="tin"
+                inputMode="numeric"
+                placeholder="10"
+                value={d.servingsText}
+                onChange={(e) =>
+                  setD((p) => ({ ...p, servingsText: digits(e.target.value) }))
+                }
+              />
+            </label>
             <label className="field">
               <span>Kind</span>
               <select

@@ -224,9 +224,21 @@ export interface StrengthOverviewRow {
   records: { key: string; date: string; value: number }[];
 }
 
-/** What a recipe is for. Kept small: an athlete picks by meal, not by cuisine. */
+/** What a recipe IS. The form of the thing, not when you eat it. */
 export const RECIPE_KINDS = ["smoothie", "meal", "snack"] as const;
 export type RecipeKind = (typeof RECIPE_KINDS)[number];
+
+/**
+ * WHEN you would eat it, which is a different question from what it is.
+ *
+ * A recipe belongs to as many of these as fit, and most belong to two. Cole's
+ * own cookbook groups its 43 mains under one heading, "Lunch Dinner Meals",
+ * because a slow cooker chili is both; and he described the shakes himself as
+ * "breakfast or supplementing lunch". Forcing a single choice would mean
+ * inventing a distinction neither he nor his source makes.
+ */
+export const MEAL_TIMES = ["breakfast", "lunch", "dinner"] as const;
+export type MealTime = (typeof MEAL_TIMES)[number];
 
 /**
  * One recipe. Calories and protein are entered, not computed: working them
@@ -240,6 +252,8 @@ export interface Recipe {
   blurb: string;
   /** Servings a batch makes. Calories are PER SERVING, so this is not decoration. */
   servings: number | null;
+  /** When you would eat it. Empty means it has not been sorted yet. */
+  meals: MealTime[];
   /** null when nobody has worked it out yet, never 0 as a stand-in */
   calories: number | null;
   proteinG: number | null;

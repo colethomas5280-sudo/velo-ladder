@@ -1,4 +1,4 @@
-import { RECIPE_KINDS, type RecipeKind } from "./types";
+import { MEAL_TIMES, RECIPE_KINDS, type MealTime, type RecipeKind } from "./types";
 
 /* ------------------------------------------------------------------ *
  * Validating a recipe before it is stored
@@ -23,6 +23,7 @@ export interface RecipeFields {
   title: string;
   kind: RecipeKind;
   blurb: string;
+  meals: MealTime[];
   servings: number | null;
   calories: number | null;
   proteinG: number | null;
@@ -112,6 +113,15 @@ function read(b: Record<string, unknown>): Parsed<RecipePatch> {
       .filter(Boolean);
   }
 
+  if (b.meals !== undefined) {
+    if (!Array.isArray(b.meals)) return { ok: false, error: "meals must be a list" };
+    const bad = b.meals.find((m) => !MEAL_TIMES.includes(m as MealTime));
+    if (bad !== undefined)
+      return { ok: false, error: `'${String(bad)}' is not a meal time` };
+    // Order and repeats belong to the form, not the record.
+    out.meals = MEAL_TIMES.filter((m) => (b.meals as MealTime[]).includes(m));
+  }
+
   if (b.blurb !== undefined)
     out.blurb = typeof b.blurb === "string" ? b.blurb.trim().slice(0, 300) : "";
   if (b.notes !== undefined)
@@ -136,6 +146,7 @@ export function parseNewRecipe(body: unknown): Parsed<RecipeFields> {
       title: v.title,
       kind: v.kind ?? "smoothie",
       blurb: v.blurb ?? "",
+      meals: v.meals ?? [],
       servings: v.servings ?? null,
       calories: v.calories ?? null,
       proteinG: v.proteinG ?? null,

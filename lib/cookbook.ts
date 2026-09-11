@@ -22,6 +22,7 @@ import type { SeedRecipe } from "./recipes";
 export const COOKBOOK: SeedRecipe[] = [
   {
     id: "cook-queso-chicken-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Queso Chicken Mac n’ Cheese",
     kind: "meal",
     servings: 10,
@@ -60,6 +61,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-peanut-miso-chicken-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Peanut Miso Chicken Rice Bowls",
     kind: "meal",
     servings: 7,
@@ -92,6 +94,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-pineapple-teriyaki-pulled-pork-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Pineapple Teriyaki Pulled Pork Rice Bowls",
     kind: "meal",
     servings: 10,
@@ -127,6 +130,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-green-enchilada-chicken-rice-soup",
+    meals: ["lunch", "dinner"],
     title: "Green Enchilada Chicken & Rice Soup",
     kind: "meal",
     servings: 10,
@@ -158,6 +162,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-frozen-cheesy-chicken-rice-burritos",
+    meals: ["lunch", "dinner"],
     title: "Frozen Cheesy Chicken & Rice Burritos",
     kind: "meal",
     servings: 18,
@@ -196,6 +201,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-sundried-tomato-spinach-feta-pasta",
+    meals: ["lunch", "dinner"],
     title: "Sundried Tomato Spinach Feta Pasta",
     kind: "meal",
     servings: 10,
@@ -232,6 +238,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-garlic-butter-chicken-alfredo",
+    meals: ["lunch", "dinner"],
     title: "Garlic Butter Chicken Alfredo",
     kind: "meal",
     servings: 10,
@@ -268,6 +275,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chili-garlic-chicken-fried-rice",
+    meals: ["lunch", "dinner"],
     title: "Chili Garlic Chicken Fried Rice",
     kind: "meal",
     servings: 10,
@@ -310,6 +318,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-butter-chicken-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Butter Chicken Rice Bowls",
     kind: "meal",
     servings: 7,
@@ -349,6 +358,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-brisket-queso-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Brisket Queso Mac n’ Cheese",
     kind: "meal",
     servings: 10,
@@ -383,6 +393,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-avocado-chicken-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Avocado Chicken Rice Bowls",
     kind: "meal",
     servings: 9,
@@ -417,6 +428,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-hawaiian-bbq-chicken-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Hawaiian BBQ Chicken Rice Bowls",
     kind: "meal",
     servings: 10,
@@ -448,6 +460,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-spicy-steak-pasta",
+    meals: ["lunch", "dinner"],
     title: "Spicy Steak Pasta",
     kind: "meal",
     servings: 10,
@@ -485,6 +498,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chicken-tinga-green-rice",
+    meals: ["lunch", "dinner"],
     title: "Chicken Tinga & Green Rice",
     kind: "meal",
     servings: 7,
@@ -523,6 +537,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-teriyaki-chicken-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Teriyaki Chicken Rice Bowls",
     kind: "meal",
     servings: 8,
@@ -560,6 +575,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-cheesy-chipotle-chicken-pasta",
+    meals: ["lunch", "dinner"],
     title: "Cheesy Chipotle Chicken Pasta",
     kind: "meal",
     servings: 10,
@@ -597,6 +613,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-lemon-harissa-chicken-pasta",
+    meals: ["lunch", "dinner"],
     title: "Lemon Harissa Chicken Pasta",
     kind: "meal",
     servings: 10,
@@ -636,6 +653,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-honey-chipotle-chicken-burrito-bowls",
+    meals: ["lunch", "dinner"],
     title: "Honey Chipotle Chicken Burrito Bowls",
     kind: "meal",
     servings: 7,
@@ -673,6 +691,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chorizo-queso-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Chorizo Queso Mac n’ Cheese",
     kind: "meal",
     servings: 10,
@@ -715,6 +734,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-lasagna-bowls",
+    meals: ["lunch", "dinner"],
     title: "Lasagna Bowls",
     kind: "meal",
     servings: 10,
@@ -752,6 +772,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chicken-bacon-ranch-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Chicken Bacon Ranch Mac n’ Cheese",
     kind: "meal",
     servings: 11,
@@ -788,6 +809,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chimichurri-steak-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Chimichurri Steak Rice Bowls",
     kind: "meal",
     servings: 9,
@@ -831,6 +853,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-buffalo-chicken-bacon-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Buffalo Chicken & Bacon Mac n’ Cheese",
     kind: "meal",
     servings: 11,
@@ -867,6 +890,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-korean-bbq-beef-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Korean BBQ Beef Rice Bowls",
     kind: "meal",
     servings: 10,
@@ -903,6 +927,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-spicy-chicken-alfredo",
+    meals: ["lunch", "dinner"],
     title: "Spicy Chicken Alfredo",
     kind: "meal",
     servings: 10,
@@ -945,6 +970,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-slow-cooker-chili",
+    meals: ["lunch", "dinner"],
     title: "Slow Cooker Chili",
     kind: "meal",
     servings: 12,
@@ -983,6 +1009,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-slow-cooker-chili-mac",
+    meals: ["lunch", "dinner"],
     title: "Slow Cooker Chili Mac",
     kind: "meal",
     servings: 12,
@@ -1027,6 +1054,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-butter-chicken-chili",
+    meals: ["lunch", "dinner"],
     title: "Butter Chicken Chili",
     kind: "meal",
     servings: 7,
@@ -1065,6 +1093,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-frozen-cheesy-buffalo-chicken-burritos",
+    meals: ["lunch", "dinner"],
     title: "Frozen Cheesy Buffalo Chicken Burritos",
     kind: "meal",
     servings: 14,
@@ -1102,6 +1131,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-miso-mac",
+    meals: ["lunch", "dinner"],
     title: "Miso Mac",
     kind: "meal",
     servings: 10,
@@ -1133,6 +1163,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-cheesy-southwestern-chicken-orzo",
+    meals: ["lunch", "dinner"],
     title: "Cheesy Southwestern Chicken Orzo",
     kind: "meal",
     servings: 12,
@@ -1165,6 +1196,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-jalape-o-popper-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Jalapeño Popper Mac n’ Cheese",
     kind: "meal",
     servings: 10,
@@ -1204,6 +1236,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-honey-harissa-chicken-rice-bowls",
+    meals: ["lunch", "dinner"],
     title: "Honey Harissa Chicken Rice Bowls",
     kind: "meal",
     servings: 10,
@@ -1239,6 +1272,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-buffalo-chicken-mac-n-cheese",
+    meals: ["lunch", "dinner"],
     title: "Buffalo Chicken Mac n’ Cheese",
     kind: "meal",
     servings: 10,
@@ -1274,6 +1308,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chicken-enchilada-soup",
+    meals: ["lunch", "dinner"],
     title: "Chicken Enchilada Soup",
     kind: "meal",
     servings: 10,
@@ -1316,6 +1351,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-pasta-bolognese",
+    meals: ["lunch", "dinner"],
     title: "Pasta Bolognese",
     kind: "meal",
     servings: 12,
@@ -1354,6 +1390,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-carnitas-inspired-pulled-pork-burritos",
+    meals: ["lunch", "dinner"],
     title: "Carnitas-Inspired Pulled Pork Burritos",
     kind: "meal",
     servings: 15,
@@ -1395,6 +1432,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-thai-red-curry-peanut-chicken-bowls",
+    meals: ["lunch", "dinner"],
     title: "Thai Red Curry Peanut Chicken Bowls",
     kind: "meal",
     servings: 10,
@@ -1427,6 +1465,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-chicken-parmesan-pasta",
+    meals: ["lunch", "dinner"],
     title: "Chicken Parmesan Pasta",
     kind: "meal",
     servings: 10,
@@ -1464,6 +1503,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-street-taco-chicken-chipotle-lime-rice",
+    meals: ["lunch", "dinner"],
     title: "Street Taco Chicken & Chipotle Lime Rice",
     kind: "meal",
     servings: 10,
@@ -1502,6 +1542,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-cheesy-chili-crisp-miso-orzo",
+    meals: ["lunch", "dinner"],
     title: "Cheesy Chili Crisp Miso Orzo",
     kind: "meal",
     servings: 10,
@@ -1536,6 +1577,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-korean-beef-noodles",
+    meals: ["lunch", "dinner"],
     title: "Korean Beef Noodles",
     kind: "meal",
     servings: 7,
@@ -1572,6 +1614,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-red-enchilada-chicken-soup",
+    meals: ["lunch", "dinner"],
     title: "Red Enchilada Chicken Soup",
     kind: "meal",
     servings: 8,
@@ -1602,6 +1645,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-crockpot-breakfast-casserole",
+    meals: ["breakfast"],
     title: "Crockpot Breakfast Casserole",
     kind: "meal",
     servings: 8,
@@ -1634,6 +1678,7 @@ export const COOKBOOK: SeedRecipe[] = [
   },
   {
     id: "cook-hearty-slow-cooker-breakfast-hash",
+    meals: ["breakfast"],
     title: "Hearty Slow-Cooker Breakfast Hash",
     kind: "meal",
     servings: 8,

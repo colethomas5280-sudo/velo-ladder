@@ -7,7 +7,7 @@ import { ALL_SEED_RECIPES } from "./recipes";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 23;
+export const SCHEMA_VERSION = 24;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -36,12 +36,29 @@ const LIFT_SEED_SQL = seedLifts()
  * recipe is on his database it is his to edit, and a deploy never overwrites
  * it. The ids are stable and readable for exactly that reason.
  */
+/**
+ * Teach the recipes already on Cole's database their meal times.
+ *
+ * The seed below is ON CONFLICT (id) DO NOTHING, which is what keeps his edits
+ * safe and also means a row that already exists never learns a new column. So
+ * v24 would have shipped 51 recipes that belong to no meal at all.
+ *
+ * Guarded on the column still being empty, so a recipe he has since re-sorted
+ * himself is left exactly as he left it.
+ */
+const RECIPE_MEALS_SQL = ALL_SEED_RECIPES.map(
+  (r) =>
+    `UPDATE recipes SET meals = ${q(JSON.stringify(r.meals))}::jsonb` +
+    ` WHERE id = ${q(r.id)} AND meals = '[]'::jsonb;`,
+).join("\n");
+
 const RECIPE_SEED_SQL = ALL_SEED_RECIPES.map((r, i) => {
   const n = (v: number | null) => (v == null ? "NULL" : String(v));
   return (
-    `INSERT INTO recipes (id, title, kind, blurb, servings, calories, protein_g,` +
-    ` carbs_g, fat_g, ingredients, steps, notes, position) VALUES (` +
-    `${q(r.id)}, ${q(r.title)}, ${q(r.kind)}, ${q(r.blurb)}, ${n(r.servings)}, ` +
+    `INSERT INTO recipes (id, title, kind, blurb, meals, servings, calories,` +
+    ` protein_g, carbs_g, fat_g, ingredients, steps, notes, position) VALUES (` +
+    `${q(r.id)}, ${q(r.title)}, ${q(r.kind)}, ${q(r.blurb)}, ` +
+    `${q(JSON.stringify(r.meals))}::jsonb, ${n(r.servings)}, ` +
     `${n(r.calories)}, ${n(r.proteinG)}, ${n(r.carbsG)}, ${n(r.fatG)}, ` +
     `${q(JSON.stringify(r.ingredients))}::jsonb, ${q(JSON.stringify(r.steps))}::jsonb, ` +
     `${q(r.notes)}, ${i}) ON CONFLICT (id) DO NOTHING;`
@@ -350,6 +367,11 @@ ALTER TABLE recipes ADD COLUMN IF NOT EXISTS steps jsonb NOT NULL DEFAULT '[]'::
 -- meal prep and every one of them says so, and the calories are PER SERVING,
 -- which is not a safe thing to leave implicit next to a number like 700.
 ALTER TABLE recipes ADD COLUMN IF NOT EXISTS servings int;
+-- v24: when you would eat it, which is a different question from what it is.
+-- A list, because most recipes are more than one: Cole's cookbook groups its
+-- mains as "Lunch Dinner Meals" and he described the shakes as breakfast or
+-- a lunch supplement.
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS meals jsonb NOT NULL DEFAULT '[]'::jsonb;
 
 -- Carry any prose method into the first step before the column goes, so no
 -- recipe written against v20 loses its instructions. Production had none,
@@ -402,6 +424,7 @@ ALTER TABLE lifts ADD CONSTRAINT lifts_mode_check
   CHECK (mode IN ('load','reps','time'));
 ${LIFT_SEED_SQL}
 ${RECIPE_SEED_SQL}
+${RECIPE_MEALS_SQL}
 `;
 
 /** The one real session already logged, imported so there is live data on day one. */

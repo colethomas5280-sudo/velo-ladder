@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
-import type { Recipe, RecipeKind } from "@/lib/types";
-import { RECIPE_KINDS } from "@/lib/types";
+import type { MealTime, Recipe, RecipeKind } from "@/lib/types";
+import { MEAL_TIMES, RECIPE_KINDS } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import useSWR from "swr";
 import RecipeEditor from "./RecipeEditor";
@@ -41,6 +41,12 @@ const KIND_LABEL: Record<RecipeKind, string> = {
   snack: "Snack",
 };
 
+const MEAL_LABEL: Record<MealTime, string> = {
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+};
+
 export default function Nutrition() {
   const { data: me } = useSWR<Me>("/api/me", fetcher);
   const { data, mutate, isLoading } = useSWR<Recipe[]>("/api/recipes", fetcher);
@@ -63,6 +69,7 @@ export default function Nutrition() {
 
   const [floor, setFloor] = useState<number>(0);
   const [kind, setKind] = useState<RecipeKind | "all">("all");
+  const [meal, setMeal] = useState<MealTime | "all">("all");
   const [editing, setEditing] = useState<Recipe | "new" | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
@@ -74,6 +81,13 @@ export default function Nutrition() {
   const shown = rows.filter(
     (r) =>
       (kind === "all" || r.kind === kind) &&
+      /*
+       * A recipe sits in every meal it fits, so this is membership rather than
+       * equality. One that has not been sorted yet stays out of a meal filter
+       * for the same reason an uncounted recipe stays out of a calorie one:
+       * it is not an answer to the question that was asked.
+       */
+      (meal === "all" || r.meals.includes(meal)) &&
       /*
        * A recipe with no calories on it is shown at every floor except when
        * one is asked for. Filtering to "1000+" and being handed something
@@ -159,6 +173,25 @@ export default function Nutrition() {
               </button>
             ))}
           </div>
+          <div className="chips" role="group" aria-label="Meal">
+            <button
+              className="chip"
+              aria-pressed={meal === "all"}
+              onClick={() => setMeal("all")}
+            >
+              Any meal
+            </button>
+            {MEAL_TIMES.map((m) => (
+              <button
+                key={m}
+                className="chip"
+                aria-pressed={m === meal}
+                onClick={() => setMeal(m)}
+              >
+                {MEAL_LABEL[m]}
+              </button>
+            ))}
+          </div>
           <div className="chips" role="group" aria-label="Kind of recipe">
             <button
               className="chip"
@@ -212,7 +245,8 @@ export default function Nutrition() {
                 <span className="nu-title">
                   {r.title}
                   <span className="nu-meta">
-                    {KIND_LABEL[r.kind]}
+                    {r.meals.length ? r.meals.map((m) => MEAL_LABEL[m]).join(" / ") : KIND_LABEL[r.kind]}
+                    {r.servings != null && r.servings > 1 && ` · makes ${r.servings}`}
                     {r.proteinG != null && ` · ${r.proteinG}g protein`}
                     {r.carbsG != null && ` · ${r.carbsG}g carbs`}
                     {r.fatG != null && ` · ${r.fatG}g fat`}
