@@ -19,6 +19,7 @@ import {
   liftStats,
   liftsDone,
   liftsEverDone,
+  topSet,
 } from "@/lib/strength";
 import { fmtDate, todayISO } from "@/lib/velo";
 import LiftChart from "./LiftChart";
@@ -125,11 +126,7 @@ export default function StrengthPanel({
               const mode = menu.mode(key);
               const best = liftBest(menu, days, key, mode);
               const last = liftLast(menu, days, key);
-              const lastSet = last
-                ? mode === "reps"
-                  ? last.stats.longest
-                  : last.stats.top
-                : null;
+              const lastSet = last ? topSet(last.stats, mode) : null;
               return (
                 <li key={key}>
                   <button
@@ -175,8 +172,7 @@ export default function StrengthPanel({
                       {liftsDone(menu, d)
                         .map((k) => {
                           const mode = menu.mode(k);
-                          const s = liftStats(d.lifts[k]);
-                          const top = mode === "reps" ? s.longest : s.top;
+                          const top = topSet(liftStats(d.lifts[k]), mode);
                           return `${menu.name(k)} ${top ? fmtSet(top, mode) : ""}`.trim();
                         })
                         .join(" · ") || (d.notes ? "note only" : "—")}

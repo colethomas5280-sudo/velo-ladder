@@ -26,7 +26,10 @@ import {
 const MODE_HELP: Record<LiftMode, string> = {
   load: "Weight on the bar — tracked as an estimated 1RM",
   reps: "Bodyweight — tracked as reps, with any added load noted",
+  time: "A hold — tracked in seconds, like a plank",
 };
+
+const MODES: LiftMode[] = ["load", "reps", "time"];
 
 interface Draft {
   name: string;
@@ -265,7 +268,7 @@ function ModePicker({
 }) {
   return (
     <div className="lmm-modes" role="group" aria-label="How it's measured">
-      {(["load", "reps"] as LiftMode[]).map((m) => (
+      {MODES.map((m) => (
         <button
           key={m}
           className="chip lmm-mode-pick"

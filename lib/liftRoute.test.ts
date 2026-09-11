@@ -77,7 +77,7 @@ const del = (id: string, date: string) =>
 const TODAY = "2026-09-01";
 const aDay = (over: Record<string, unknown> = {}) => ({
   date: TODAY,
-  lifts: { "back-squat": [{ w: 225, r: 5 }] },
+  lifts: { "front-squat": [{ w: 225, r: 5 }] },
   notes: "",
   ...over,
 });
@@ -90,7 +90,7 @@ test("an athlete logs their own day and reads it back", async () => {
   const back = (await (await get(mineId)).json()) as { date: string; lifts: unknown }[];
   assert.equal(back.length, 1);
   assert.equal(back[0].date, TODAY, "the date comes back as the day it was sent");
-  assert.deepEqual(back[0].lifts, { "back-squat": [{ w: 225, r: 5 }] });
+  assert.deepEqual(back[0].lifts, { "front-squat": [{ w: 225, r: 5 }] });
 });
 
 /*
@@ -100,10 +100,10 @@ test("an athlete logs their own day and reads it back", async () => {
  */
 test("saving the same date replaces the day rather than adding a second", async () => {
   signedInAs = MINE;
-  await post(mineId, aDay({ lifts: { "back-squat": [{ w: 235, r: 5 }] } }));
+  await post(mineId, aDay({ lifts: { "front-squat": [{ w: 235, r: 5 }] } }));
   const back = (await (await get(mineId)).json()) as { lifts: Record<string, unknown> }[];
   assert.equal(back.length, 1, "one day, not two");
-  assert.deepEqual(back[0].lifts, { "back-squat": [{ w: 235, r: 5 }] });
+  assert.deepEqual(back[0].lifts, { "front-squat": [{ w: 235, r: 5 }] });
 });
 
 test("a coach can write for an athlete", async () => {
@@ -137,7 +137,7 @@ test("a bad day is refused with a message, and nothing is stored", async () => {
     aDay({ date: "2026-02-30" }),
     aDay({ date: "2099-01-01" }),
     aDay({ lifts: { "power-snatch": [{ w: 135, r: 3 }] } }),
-    aDay({ lifts: { "back-squat": [{ w: 5000, r: 5 }] } }),
+    aDay({ lifts: { "front-squat": [{ w: 5000, r: 5 }] } }),
     aDay({ lifts: {}, notes: "" }),
   ]) {
     const res = await post(mineId, body);
