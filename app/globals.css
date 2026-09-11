@@ -3942,3 +3942,45 @@ table.roster-table {
 .nu-steps li {
   margin-bottom: 6px;
 }
+.nu-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.nu-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-bottom: 4px;
+}
+.nu-figure {
+  display: flex;
+  flex-direction: column;
+}
+.nu-figure .n {
+  font-family: var(--font-teko), system-ui, sans-serif;
+  font-size: 34px;
+  line-height: 1;
+}
+.nu-figure .l {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.nu-target-why {
+  flex: 1 1 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.nu-share {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 2px;
+}

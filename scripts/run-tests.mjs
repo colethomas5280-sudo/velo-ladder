@@ -29,6 +29,10 @@ const args = [
   "--experimental-test-module-mocks",
   "lib/**/*.test.ts",
   "components/**/*.test.tsx",
+  // A component test does not have to render anything. bodyStore is browser
+  // plumbing shared by two pages, and it sat uncollected for a whole run
+  // because the pattern above only ever looked for .tsx.
+  "components/**/*.test.ts",
 ];
 
 const child = spawn(process.execPath, args, { stdio: ["inherit", "pipe", "inherit"] });
