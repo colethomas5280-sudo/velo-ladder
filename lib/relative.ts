@@ -539,3 +539,164 @@ export function fmtToGo(r: Relative): string {
 export function progressTo(r: Relative): number {
   return Math.max(0, Math.min(1, r.value / r.target));
 }
+
+/* ------------------------------------------------------------------ *
+ * Carrying enough weight
+ *
+ * Cole's rule, in his words: "athletes need to be height(inches) x2.5 at
+ * minimum, and ideally they are around 2.7x. The average MLB player is 2.8x,
+ * while the average HS draftee is 2.5x."
+ *
+ * Presented as a RANGE with its anchors named, never as a verdict — his call,
+ * and it sits right with the rest of the app. The recovery card already
+ * refuses to score bodyweight so it never puts a value judgement on a
+ * teenager's body; naming what 2.5x and 2.8x actually ARE lets an athlete
+ * place himself without being told he is wrong.
+ * ------------------------------------------------------------------ */
+
+export interface BodyweightAnchor {
+  /** Pounds per inch of height. */
+  per: number;
+  label: string;
+  /** What that number is, so the scale explains itself. */
+  note: string;
+}
+
+export const BODYWEIGHT_ANCHORS: readonly BodyweightAnchor[] = [
+  { per: 2.5, label: "Minimum", note: "about where the average high-school draftee sits" },
+  { per: 2.7, label: "Target", note: "where you want to be" },
+  { per: 2.8, label: "Pro average", note: "the average MLB player" },
+];
+
+/** The anchors as actual pounds at a given height. */
+export function bodyweightMarks(
+  heightIn: number,
+): { anchor: BodyweightAnchor; lb: number }[] {
+  return BODYWEIGHT_ANCHORS.map((anchor) => ({
+    anchor,
+    lb: anchor.per * heightIn,
+  }));
+}
+
+export interface BodyweightStanding {
+  heightIn: number;
+  weightLb: number;
+  /** Pounds per inch — the number the anchors are in. */
+  per: number;
+  marks: { anchor: BodyweightAnchor; lb: number }[];
+  /** The highest anchor reached, or null when below the first. */
+  reached: BodyweightAnchor | null;
+  /**
+   * Pounds to the next anchor up, and which. Null once past the last —
+   * there is nothing above "pro average" to chase, and inventing one would
+   * push a teenager past where anyone is asking him to be.
+   */
+  next: { anchor: BodyweightAnchor; lb: number; toGo: number } | null;
+}
+
+export function bodyweightStanding(
+  heightIn: number,
+  weightLb: number,
+): BodyweightStanding | null {
+  if (!(heightIn > 0) || !(weightLb > 0)) return null;
+  const marks = bodyweightMarks(heightIn);
+
+  let reached: BodyweightAnchor | null = null;
+  for (const m of marks) if (weightLb >= m.lb) reached = m.anchor;
+
+  const upcoming = marks.find((m) => weightLb < m.lb);
+
+  return {
+    heightIn,
+    weightLb,
+    per: weightLb / heightIn,
+    marks,
+    reached,
+    next: upcoming
+      ? { anchor: upcoming.anchor, lb: upcoming.lb, toGo: upcoming.lb - weightLb }
+      : null,
+  };
+}
+
+/* ------------------------------------------------------------------ *
+ * What the standards come to, in pounds
+ * ------------------------------------------------------------------ */
+
+export interface LiftTarget {
+  liftKey: string;
+  /** What to aim for: pounds on the bar, or reps in a set. */
+  amount: number;
+  unit: "lb" | "reps";
+  /** The ratio it came from, so the page can show its working. */
+  ratio: number | null;
+  /**
+   * The rung after this one. Only the pull-up has one: clear the reps, then
+   * start hanging weight on.
+   */
+  then?: { added: number; note: string };
+}
+
+/**
+ * Every standard as a number an athlete can walk up to a bar and try.
+ *
+ * A ratio is abstract — "2.25x bodyweight" is not something you load. This
+ * turns the whole chart into pounds at one specific bodyweight, which is what
+ * Cole asked the resource page to do.
+ */
+export function targetsAt(
+  weightLb: number,
+  standards: readonly Standard[] = STRENGTH_STANDARDS,
+): LiftTarget[] {
+  const out: LiftTarget[] = [];
+  for (const s of standards) {
+    if (s.kind === "ratio") {
+      out.push({
+        liftKey: s.liftKey,
+        amount: s.target * weightLb,
+        unit: "lb",
+        ratio: s.target,
+      });
+      continue;
+    }
+    if (s.kind === "reps") {
+      out.push({ liftKey: s.liftKey, amount: s.target, unit: "reps", ratio: null });
+      continue;
+    }
+    // reps-then-load: the reps are the target, the load is the rung after.
+    const loaded = s.loadedBand
+      ? markFor(s.liftKey, s.loadedBand)
+      : targetFor(s.liftKey);
+    out.push({
+      liftKey: s.liftKey,
+      amount: s.reps,
+      unit: "reps",
+      ratio: null,
+      then:
+        loaded == null
+          ? undefined
+          : {
+              /*
+               * What to HANG ON, not the total. The ratio counts the athlete
+               * too, so at 1.5x he is already carrying 1x of it himself —
+               * telling him to load 1.5x bodyweight would be half again as
+               * much as anyone is asking for.
+               */
+              added: (loaded - 1) * weightLb,
+              note: "once you can do the reps",
+            },
+    });
+  }
+  return out;
+}
+
+/** 74 -> 6'2" */
+export function fmtHeight(inches: number): string {
+  const ft = Math.floor(inches / 12);
+  const inch = Math.round(inches - ft * 12);
+  return `${ft}'${inch}"`;
+}
+
+/** Targets are rounded to the nearest 5 lb — nobody loads a bar to 403.7. */
+export function roundLoad(lb: number): number {
+  return Math.round(lb / 5) * 5;
+}

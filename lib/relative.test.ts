@@ -1,11 +1,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  BODYWEIGHT_ANCHORS,
   STRENGTH_CHART,
   STRENGTH_LEVELS,
   STRENGTH_STANDARDS,
   TARGET_BAND,
   bodyWeightOn,
+  bodyweightMarks,
+  bodyweightStanding,
+  fmtHeight,
+  roundLoad,
+  targetsAt,
   levelReached,
   markFor,
   targetFor,
@@ -493,4 +499,105 @@ test("the loaded ratio reads loaded sets only, even when a rep set estimates hig
   assert.equal(r.kind, "ratio");
   assert.equal(fmtValue(r), "1.22×", "the 20 lb triple, not the bodyweight ten");
   assert.match(r.note!, /20 lb/);
+});
+
+/* ---------------- carrying enough weight ---------------- */
+
+/*
+ * Cole's rule: height in inches x2.5 at minimum, ~2.7x ideally, 2.8x being
+ * the average MLB player and 2.5x the average high-school draftee.
+ */
+test("the anchors are pounds per inch, so they scale with height", () => {
+  const short = bodyweightMarks(68).map((m) => Math.round(m.lb));
+  const tall = bodyweightMarks(76).map((m) => Math.round(m.lb));
+  assert.deepEqual(short, [170, 184, 190]);
+  assert.deepEqual(tall, [190, 205, 213]);
+});
+
+test("every anchor says what it is, not just what it is worth", () => {
+  for (const a of BODYWEIGHT_ANCHORS) {
+    assert.ok(a.note.length > 10, `${a.label} has no explanation`);
+    assert.ok(a.per > 0);
+  }
+  assert.deepEqual(
+    BODYWEIGHT_ANCHORS.map((a) => a.per),
+    [2.5, 2.7, 2.8],
+    "Cole's numbers",
+  );
+});
+
+test("the anchors climb, so 'the highest reached' means something", () => {
+  const pers = BODYWEIGHT_ANCHORS.map((a) => a.per);
+  for (let i = 1; i < pers.length; i++) assert.ok(pers[i] > pers[i - 1]);
+});
+
+test("an athlete under the minimum has reached nothing, and is pointed at it", () => {
+  const b = bodyweightStanding(72, 170)!;
+  assert.equal(b.reached, null, "not rounded up to 'Minimum'");
+  assert.equal(b.next!.anchor.label, "Minimum");
+  assert.equal(Math.round(b.next!.toGo), 10, "180 is 2.5 x 72");
+});
+
+test("exactly on an anchor counts as reaching it", () => {
+  const b = bodyweightStanding(72, 180)!;
+  assert.equal(b.reached!.label, "Minimum");
+  assert.equal(b.next!.anchor.label, "Target");
+});
+
+/*
+ * Nothing above the top anchor. Inventing a rung past "average MLB player"
+ * would push a teenager beyond anywhere anyone is asking him to be.
+ */
+test("past the last anchor there is nothing left to chase", () => {
+  const b = bodyweightStanding(72, 230)!;
+  assert.equal(b.reached!.label, "Pro average");
+  assert.equal(b.next, null);
+});
+
+test("nonsense in gives nothing back rather than a divide by zero", () => {
+  assert.equal(bodyweightStanding(0, 180), null);
+  assert.equal(bodyweightStanding(72, 0), null);
+  assert.equal(bodyweightStanding(-72, 180), null);
+  assert.equal(bodyweightStanding(NaN, 180), null);
+});
+
+/* ---------------- the standards, in pounds ---------------- */
+
+test("a ratio becomes a weight an athlete can actually load", () => {
+  const at180 = targetsAt(180);
+  const dl = at180.find((t) => t.liftKey === "deadlift")!;
+  assert.equal(dl.unit, "lb");
+  assert.equal(dl.amount, 2.25 * 180);
+  assert.equal(dl.ratio, targetFor("deadlift"));
+});
+
+test("every target scales with the athlete in front of it", () => {
+  const light = targetsAt(150).find((t) => t.liftKey === "deadlift")!.amount;
+  const heavy = targetsAt(200).find((t) => t.liftKey === "deadlift")!.amount;
+  assert.ok(heavy > light);
+  assert.equal(heavy / light, 200 / 150);
+});
+
+/*
+ * The pull-up's second rung is what to HANG ON, not the total. The ratio
+ * counts the athlete, so at 1.5x he is already carrying 1x himself — telling
+ * him to load 1.5x bodyweight would be half again what anyone is asking.
+ */
+test("the pull-up's next rung is the plate, not the plate plus the athlete", () => {
+  const pu = targetsAt(180).find((t) => t.liftKey === "pull-up")!;
+  assert.equal(pu.unit, "reps");
+  assert.equal(pu.amount, 14);
+  assert.equal(pu.then!.added, 90, "1.5x of 180 is 270 total, and he is 180 of it");
+});
+
+test("the pounds shown are loadable, not spurious to a decimal", () => {
+  assert.equal(roundLoad(403.7), 405);
+  assert.equal(roundLoad(267.5), 270);
+  assert.equal(roundLoad(0), 0);
+});
+
+test("a height reads in feet and inches", () => {
+  assert.equal(fmtHeight(72), "6'0\"");
+  assert.equal(fmtHeight(74), "6'2\"");
+  assert.equal(fmtHeight(68), "5'8\"");
 });

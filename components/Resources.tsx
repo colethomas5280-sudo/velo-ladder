@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import useSWR from "swr";
 import type { Resource } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
+import Link from "next/link";
 import RichText from "./RichText";
 
 type Me = { role: "coach" | "athlete" | "none" };
@@ -71,6 +72,22 @@ export default function Resources() {
           )}
         </div>
       </div>
+
+      {/*
+        * Built in, above whatever Cole has written. It is the one reference
+        * here that computes rather than reads, and burying it under a search
+        * box full of protocols would mean nobody found it.
+        */}
+      <Link href="/resources/standards" className="card pad screen-link">
+        <div>
+          <div className="eyebrow">Reference</div>
+          <b>Strength standards</b>
+          <span className="cz-note">
+            Put in your height and weight to see what you are aiming at
+          </span>
+        </div>
+        <span className="sl-go">Open →</span>
+      </Link>
 
       {isLoading && (
         <div className="card pad" style={{ color: "var(--ink-dim)" }}>
