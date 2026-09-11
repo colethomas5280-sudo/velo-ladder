@@ -99,6 +99,9 @@ export default function StrengthPanel({
     () => relativeStrength(menu, days, checkins ?? [], athlete?.weightLb ?? null),
     [menu, days, checkins, athlete],
   );
+  // Cole reads the main markers first; the subs are kept, and kept underneath.
+  const mainStandards = standards.filter((r) => r.tier === "main");
+  const subStandards = standards.filter((r) => r.tier === "sub");
   const weighed =
     (checkins ?? []).some((e) => typeof e.bodyWeight === "number" && e.bodyWeight > 0) ||
     !!athlete?.weightLb;
@@ -148,11 +151,23 @@ export default function StrengthPanel({
         <>
           <div className="eyebrow">Strength standards</div>
           {standards.length > 0 ? (
-            <ul className="st-standards">
-              {standards.map((r) => (
-                <StandardRow key={r.liftKey} r={r} name={menu.name(r.liftKey)} />
-              ))}
-            </ul>
+            <>
+              <ul className="st-standards">
+                {mainStandards.map((r) => (
+                  <StandardRow key={r.liftKey} r={r} name={menu.name(r.liftKey)} />
+                ))}
+              </ul>
+              {subStandards.length > 0 && (
+                <>
+                  <div className="eyebrow st-sub-head">Also tracked</div>
+                  <ul className="st-standards st-subs">
+                    {subStandards.map((r) => (
+                      <StandardRow key={r.liftKey} r={r} name={menu.name(r.liftKey)} />
+                    ))}
+                  </ul>
+                </>
+              )}
+            </>
           ) : (
             <p className="widget-empty">
               {weighed
