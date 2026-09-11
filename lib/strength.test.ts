@@ -13,6 +13,7 @@ import {
   liftMetric,
   liftKeyFrom,
   liftMenu,
+  seedLifts,
   liftSeries,
   liftStats,
   liftsDone,
@@ -23,7 +24,6 @@ import {
   type DatedLifts,
   type LiftSet,
 } from "@/lib/strength";
-import { programLifts } from "@/lib/program";
 
 /* ------------------------------------------------------------------ *
  * Strength
@@ -41,7 +41,7 @@ const day = (date: string, lifts: Record<string, LiftSet[]>): DatedLifts => ({
 const set = (w: number, r: number): LiftSet => ({ w, r });
 
 /* The menu a fresh database starts with — what these tests read keys against. */
-const LIFTS = programLifts();
+const LIFTS = seedLifts();
 const LIFT_GROUPS = [...new Set(LIFTS.map((l) => l.group))];
 const menu = liftMenu(LIFTS);
 const liftName = (k: string) => menu.name(k);
@@ -337,7 +337,7 @@ test("the stats say which set the estimate came from", () => {
 
 /* ---------------- the menu ---------------- */
 
-const lift = (over: Partial<ReturnType<typeof programLifts>[number]>) => ({
+const lift = (over: Partial<ReturnType<typeof seedLifts>[number]>) => ({
   key: "x",
   name: "X",
   group: "Lower body",
