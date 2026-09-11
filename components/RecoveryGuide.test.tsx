@@ -94,7 +94,7 @@ test("it names the two things that do carry consequences", () => {
   assert.match(body, /arm question/i, "pain raises a flag on its own");
   assert.match(body, new RegExp(`${CNS_DEFAULT_PCT}%`), "and a velocity drop does");
   assert.match(body, /30-day average/i);
-  assert.match(body, /against you, never\s+against anybody else/i);
+  assert.match(body, /against you, never\s+against anyone else/i);
 });
 
 test("it explains what is tracked but deliberately unscored", () => {
@@ -102,7 +102,7 @@ test("it explains what is tracked but deliberately unscored", () => {
   const body = document.body.textContent!;
   for (const thing of [/bodyweight/i, /resting heart rate/i, /HRV/])
     assert.match(body, thing);
-  assert.match(body, /personal baselines/i, "and why, not merely that");
+  assert.match(body, /against your own baseline/i, "and why, not merely that");
 });
 
 test("reset puts the example back", () => {

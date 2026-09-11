@@ -101,7 +101,7 @@ export default function StrengthStandards() {
         <h2>Strength standards</h2>
         <p className="sr-lede">
           Put in your height and weight and this works out what you are aiming
-          at — what to carry, and what to eventually put on the bar. Nothing is
+          at: what to carry, and what to eventually put on the bar. Nothing is
           saved anywhere but this browser.
         </p>
       </div>
@@ -160,8 +160,8 @@ export default function StrengthStandards() {
         <section className="card pad">
           <div className="eyebrow">What to put on the bar</div>
           <p className="cz-note ss-basis">
-            At {Math.round(weightLb)} lb. These move with you — put weight on and
-            the targets go up with it, which is the point of a ratio.
+            At {Math.round(weightLb)} lb. These move with you, so put weight on
+            and the targets go up with it. That is the point of a ratio.
           </p>
           <ul className="ss-targets">
             {targets.map((t) => (

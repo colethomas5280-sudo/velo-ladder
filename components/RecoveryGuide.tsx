@@ -35,8 +35,8 @@ const allMiddle = (): Answers =>
   Object.fromEntries(QUESTIONS.map((q) => [q.key, MIDDLE]));
 
 const BAND_COPY: Record<ReturnType<typeof scoreBand>, string> = {
-  high: "You answered near the top of most questions.",
-  mid: "A normal day — some things good, some less so.",
+  high: "You put yourself near the top on most of it.",
+  mid: "A normal day. Some stuff good, some not.",
   low: "You answered low on most of it.",
 };
 
@@ -58,9 +58,9 @@ export default function RecoveryGuide() {
         <div className="eyebrow">Reference</div>
         <h2>What your recovery score means</h2>
         <p className="sr-lede">
-          The number on your check-in is the average of the questions you
-          answered, put on a scale of 100. Move the answers below to see how it
-          is built — nothing here is saved, and it is not your real check-in.
+          The number on your check-in is just the average of the questions you
+          answered, scaled to 100. Move the answers below and watch it change.
+          Nothing here gets saved, and this is not your real check-in.
         </p>
       </div>
 
@@ -78,8 +78,8 @@ export default function RecoveryGuide() {
                 * sleep does not count for more than diet. It is a plain mean
                 * of whatever you filled in.
                 */}
-              Every question counts the same. Skip one and it simply is not
-              part of the average — a half-finished check-in still scores.
+              Every question counts the same. Skip one and it just is not part
+              of the average, so a half-finished check-in still scores.
             </span>
             <button className="btn sm ghost" onClick={() => setAnswers(allMiddle())}>
               Reset
@@ -114,7 +114,7 @@ export default function RecoveryGuide() {
                   >
                     {item.anchors.map((a, i) => (
                       <option key={i} value={i + 1}>
-                        {i + 1} — {a}
+                        {i + 1} · {a}
                       </option>
                     ))}
                   </select>
@@ -128,23 +128,23 @@ export default function RecoveryGuide() {
       <section className="card pad">
         <div className="eyebrow">What the score does not do</div>
         <p className="rg-p">
-          <b>It does not decide anything.</b> Nothing is flagged, cancelled or
-          changed because your score is low. It is there to be watched over
-          weeks — one bad morning is a bad morning, and a fortnight of them is
-          worth a conversation.
+          <b>It does not decide anything.</b> Nothing gets flagged, cancelled
+          or changed because your score is low. It is there to watch over time.
+          One rough morning is just a rough morning. Two weeks of them is worth
+          talking about.
         </p>
         <p className="rg-p">Two things do carry consequences, and neither is the score:</p>
         <ul className="rg-list">
           <li>
-            <b>The arm question.</b> Reporting pain — rather than soreness —
+            <b>The arm question.</b> Saying you are in pain, not just sore,
             raises a flag on its own, whatever the rest of the check-in says.
-            That one is answered honestly or it is worthless.
+            Answer that one straight or it is useless.
           </li>
           <li>
-            <b>Your velocity against your own recent average.</b> A max-intent
-            session landing more than {CNS_DEFAULT_PCT}% below your own 30-day
-            average raises a flag too. It is measured against you, never
-            against anybody else.
+            <b>Your velo against your own recent average.</b> If a max-effort
+            session comes in more than {CNS_DEFAULT_PCT}% below your own 30-day
+            average, that raises a flag too. It is measured against you, never
+            against anyone else.
           </li>
         </ul>
       </section>
@@ -152,17 +152,17 @@ export default function RecoveryGuide() {
       <section className="card pad">
         <div className="eyebrow">Tracked, but never scored</div>
         <p className="rg-p">
-          Bodyweight, resting heart rate and HRV are all recorded and charted,
-          and none of them touches the score. That is deliberate. They are
-          personal baselines — one athlete&rsquo;s resting 48 and
-          another&rsquo;s 62 mean the same thing about their own bodies and
-          nothing at all about each other, so averaging them into a shared
-          number would produce a figure that means nothing. And there is no
-          good or bad bodyweight to fold into a wellness score.
+          Bodyweight, resting heart rate and HRV all get recorded and charted,
+          and none of them touch the score. That is on purpose. They only mean
+          anything against your own baseline. One guy&rsquo;s resting heart
+          rate of 48 and another guy&rsquo;s 62 can say exactly the same thing
+          about their own bodies and nothing at all about each other, so mixing
+          them into one number would give you a figure that means nothing. And
+          there is no good or bad bodyweight to score.
         </p>
         <p className="rg-p">
-          They are worth logging anyway: each one is only useful as{" "}
-          <em>your</em> trend, which is exactly how the tracker shows them.
+          Log them anyway. Each one is only useful as <em>your own</em> trend,
+          which is how the tracker shows them.
         </p>
       </section>
     </div>

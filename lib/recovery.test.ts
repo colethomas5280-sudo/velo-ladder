@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  scoreTrend,
+  ANSWERED_ITEMS,  scoreTrend,
   weightTrend,
   windowLabel,
   windowPhrase,
@@ -128,4 +128,22 @@ test("windowPhrase reads as a noun phrase, so labels are grammatical", () => {
   assert.equal(windowPhrase(7), "7 days");
   assert.equal(windowPhrase(14), "2 weeks");
   assert.equal(windowPhrase(28), "4 weeks");
+});
+
+/*
+ * Cole, on the recovery reference: "get rid of the em dashes and the use of
+ * fortnight is very 19th century, not language a teenager in the 2020s use."
+ *
+ * These anchors are the one piece of athlete-facing copy that lives in config
+ * rather than in a component, so they are the piece most likely to be missed
+ * next time. They render on the check-in AND on the reference page.
+ */
+test("no answer an athlete picks is written in em dashes", () => {
+  for (const item of ANSWERED_ITEMS)
+    for (const anchor of item.anchors)
+      assert.equal(
+        anchor.includes("—"),
+        false,
+        `${item.key}: "${anchor}"`,
+      );
 });
