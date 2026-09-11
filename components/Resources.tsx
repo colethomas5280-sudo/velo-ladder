@@ -89,6 +89,17 @@ export default function Resources() {
         <span className="sl-go">Open →</span>
       </Link>
 
+      <Link href="/resources/recovery" className="card pad screen-link">
+        <div>
+          <div className="eyebrow">Reference</div>
+          <b>What your recovery score means</b>
+          <span className="cz-note">
+            How the number is built, and what it does not decide
+          </span>
+        </div>
+        <span className="sl-go">Open →</span>
+      </Link>
+
       {isLoading && (
         <div className="card pad" style={{ color: "var(--ink-dim)" }}>
           Loading…
