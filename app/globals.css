@@ -3754,3 +3754,14 @@ table.roster-table {
   font-size: 26px;
   line-height: 1;
 }
+.st-sub-head {
+  margin: 18px 0 8px;
+}
+/* A sub marker is kept, and kept underneath — smaller type rather than a
+   different colour, so it reads as secondary without reading as a warning. */
+.st-subs .sd-ratio {
+  font-size: 23px;
+}
+.st-subs .sd-lift {
+  font-size: 12px;
+}

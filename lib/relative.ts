@@ -36,10 +36,19 @@ import {
  * sentence. The discriminant is explicit rather than inferred from the lift's
  * mode so the config says out loud what `target: 10` means.
  */
+/**
+ * Whether a lift is one of the markers Cole reads first, or one tracked
+ * alongside it. Barbell bench is the case that created the distinction: he
+ * watches the DB press for horizontal pushing and wants the barbell number
+ * kept, but kept underneath.
+ */
+export type Tier = "main" | "sub";
+
 export type Standard =
   | {
       liftKey: string;
       kind: "ratio";
+      tier?: Tier;
       /** Multiple of bodyweight. */
       target: number;
       note?: string;
@@ -47,6 +56,7 @@ export type Standard =
   | {
       liftKey: string;
       kind: "reps";
+      tier?: Tier;
       /** Reps in one set. */
       target: number;
       note?: string;
@@ -65,13 +75,17 @@ export type Standard =
   | {
       liftKey: string;
       kind: "reps-then-load";
+      tier?: Tier;
       /** Strict bodyweight reps to clear before added load is the point. */
       reps: number;
       /**
-       * Band for the loaded stage, when the usual target band would land
-       * somewhere the rep gate has already carried the athlete past.
+       * Total load — the athlete PLUS what is hung on — to work up to once
+       * the reps are cleared. An absolute number, not a ratio, because the
+       * point it marks is absolute: Cole puts diminishing returns at 250 lb,
+       * and a ratio would keep asking a heavier athlete for more pulling
+       * strength exactly where more stops helping him.
        */
-      loadedBand?: StrengthLevel;
+      loadedTotal: number;
       note?: string;
     };
 
@@ -86,10 +100,11 @@ export type Standard =
  *
  * Leg press is deliberately absent. Cole: the priority is non-machine lifts.
  *
- * Overhead press and barbell row are absent for a different reason — his
- * program runs a half-kneeling landmine press and cable/DB rows, which are
- * not the barbell lifts those rows are measured on. A chart row with no lift
- * to bind to would be a standard nobody can ever meet.
+ * Overhead press is absent for a different reason — his program runs a
+ * half-kneeling landmine press, which is not the barbell lift that row is
+ * measured on, and a chart row with no lift to bind to is a standard nobody
+ * can ever meet. Barbell row was excluded on the same grounds and has since
+ * come back: Cole added it as a marker, so the lift joined the menu with it.
  * ------------------------------------------------------------------ */
 
 export const STRENGTH_LEVELS = [
@@ -109,12 +124,14 @@ export const STRENGTH_CHART: Record<string, Record<StrengthLevel, number>> = {
   deadlift: { beginner: 1, novice: 1.25, intermediate: 2, advanced: 2.5, elite: 3 },
   "front-squat": { beginner: 0.6, novice: 0.85, intermediate: 1.25, advanced: 1.75, elite: 2 },
   "barbell-hip-thrust": { beginner: 0.75, novice: 1.25, intermediate: 1.75, advanced: 2.25, elite: 2.75 },
+  "barbell-row": { beginner: 0.5, novice: 0.75, intermediate: 1, advanced: 1.4, elite: 1.75 },
   /*
-   * Total load INCLUDING the athlete, over bodyweight — so 1.25x is a single
-   * with a quarter of your bodyweight hanging off you. This row only comes
-   * into play once the rep mark is cleared; see the two-stage standard below.
+   * The chart's pull-up row is deliberately absent. It is a ratio, and Cole's
+   * loaded pull-up target is an ABSOLUTE 250 lb — past which, in his words,
+   * "we start reaching the point of diminishing returns". A ratio cannot say
+   * that: it would keep asking a heavier athlete for more pulling strength
+   * exactly where more stops helping him.
    */
-  "pull-up": { beginner: 0.1, novice: 0.5, intermediate: 1, advanced: 1.25, elite: 1.5 },
 };
 
 /**
@@ -128,11 +145,6 @@ export const TARGET_BAND: readonly [StrengthLevel, StrengthLevel] = [
   "intermediate",
   "advanced",
 ];
-
-/** One band's mark for a lift, or null if the chart has no row for it. */
-export function markFor(liftKey: string, level: StrengthLevel): number | null {
-  return STRENGTH_CHART[liftKey]?.[level] ?? null;
-}
 
 /** The multiple to chase on a lift, or null if the chart has no row for it. */
 export function targetFor(liftKey: string): number | null {
@@ -172,24 +184,19 @@ export const STRENGTH_STANDARDS: Standard[] = [
   { liftKey: "deadlift", kind: "ratio", target: targetFor("deadlift")! },
   { liftKey: "back-squat", kind: "ratio", target: targetFor("back-squat")! },
   { liftKey: "front-squat", kind: "ratio", target: targetFor("front-squat")! },
-  { liftKey: "bench", kind: "ratio", target: targetFor("bench")! },
+  /*
+   * Per dumbbell, not the pair — the way every other dumbbell lift on the
+   * menu is logged. 0.5x is Cole's number: 95 lb dumbbells at 186 lb
+   * bodyweight. It is NOT derived from the barbell figure below; he turned
+   * that conversion down, and it would have been my arithmetic rather than
+   * his judgement.
+   */
+  { liftKey: "db-bench-press", kind: "ratio", target: 0.5 },
+  { liftKey: "barbell-row", kind: "ratio", target: targetFor("barbell-row")! },
   {
     liftKey: "pull-up",
     kind: "reps-then-load",
     reps: 14,
-    /*
-     * ELITE, not the usual intermediate-advanced midpoint, and this is the one
-     * place the target band is overridden.
-     *
-     * The rep gate has already carried the athlete past it. Fourteen strict
-     * pull-ups puts a 180 lb athlete around 1.33x on this row — above the
-     * chart's advanced (1.25x) — so the midpoint target of 1.125x would
-     * arrive already met, which is not a target at all. In pounds: the
-     * midpoint asks for 23 lb hung on for a single, elite asks for 90.
-     *
-     * Cole's to move, like every other number here.
-     */
-    loadedBand: "elite",
     /*
      * 14 is Cole's number, not the chart's — its pull-up row is a weighted
      * 1RM ratio and he wants the rep test. That provenance belongs HERE and
@@ -197,8 +204,14 @@ export const STRENGTH_STANDARDS: Standard[] = [
      * not the chart's" is a sentence written for the person maintaining the
      * config, which a sixteen-year-old reading his own page has no use for.
      */
-    note: "Strict, from a dead hang.",
+    loadedTotal: 250,
+    note: "Strict, neutral grip, from a dead hang.",
   },
+  /*
+   * The sub marker. Cole reads the DB press for horizontal pushing; the
+   * barbell number is worth keeping and worth keeping underneath.
+   */
+  { liftKey: "bench", kind: "ratio", tier: "sub", target: targetFor("bench")! },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -338,7 +351,16 @@ export function bodyweightReps(
 
 export interface Relative {
   liftKey: string;
-  kind: Standard["kind"];
+  /**
+   * What the number IS, which is not the same as what the standard was
+   * declared as — a `reps-then-load` standard produces a `reps` row or a
+   * `total` one depending on where the athlete has got to.
+   *
+   * `total` is its own kind rather than a ratio with different units: the
+   * loaded pull-up is measured in absolute pounds, and labelling it as a
+   * ratio put "of 250x bodyweight" on the page.
+   */
+  kind: "ratio" | "reps" | "total";
   /** What they actually did: an estimated max in lb, or reps in a set. */
   achieved: number;
   /** The day it came from. */
@@ -364,6 +386,8 @@ export interface Relative {
   unit: "lb" | "reps";
   /** Band reached on the chart. Null for a rep standard, which has no row. */
   level: StrengthLevel | null;
+  /** Whether this is one of the markers Cole reads first. */
+  tier: Tier;
   note?: string;
 }
 
@@ -407,13 +431,17 @@ export function relativeStrength(
     const weight = bodyWeightOn(entries, best.date, profileWeight);
 
     if (s.kind === "reps") {
-      out.push(repsRow(s.liftKey, best.value, best.date, weight, s.target, s.note));
+      out.push(
+        repsRow(s.liftKey, best.value, best.date, weight, s.target, tierOf(s), s.note),
+      );
       continue;
     }
 
     // A ratio with no denominator is not a ratio.
     if (!weight) continue;
-    out.push(ratioRow(s.liftKey, best.value, best.date, weight, s.target, s.note));
+    out.push(
+      ratioRow(s.liftKey, best.value, best.date, weight, s.target, tierOf(s), s.note),
+    );
   }
 
   // Closest to the target first — the one worth a push this block.
@@ -426,10 +454,12 @@ function repsRow(
   on: string,
   weight: BodyWeight | null,
   target: number,
+  tier: Tier,
   note?: string,
 ): Relative {
   return {
     liftKey,
+    tier,
     kind: "reps",
     achieved: reps,
     on,
@@ -450,11 +480,13 @@ function ratioRow(
   on: string,
   weight: BodyWeight,
   target: number,
+  tier: Tier,
   note?: string,
 ): Relative {
   const value = e1rmLb / weight.lb;
   return {
     liftKey,
+    tier,
     kind: "ratio",
     achieved: e1rmLb,
     on,
@@ -487,21 +519,30 @@ function resolveGraduating(
 ): Relative | null {
   const strict = bodyweightReps(days, s.liftKey);
   const cleared = !!strict && strict.reps >= s.reps;
-  const target = s.loadedBand
-    ? markFor(s.liftKey, s.loadedBand)
-    : targetFor(s.liftKey);
+  const target = s.loadedTotal;
 
-  if (cleared && target != null) {
+  if (cleared) {
     const loaded = loadedBest(days, s.liftKey, entries, profileWeight);
     if (loaded)
-      return ratioRow(
-        s.liftKey,
-        loaded.e1rm,
-        loaded.on,
-        loaded.weight,
+      /*
+       * An absolute total, so this is NOT a ratio row: the number shown is
+       * pounds on the bar plus the athlete, measured against Cole's 250.
+       */
+      return {
+        liftKey: s.liftKey,
+        tier: tierOf(s),
+        kind: "total",
+        achieved: loaded.e1rm,
+        on: loaded.on,
+        weight: loaded.weight,
+        value: loaded.e1rm,
         target,
-        `Total load — you plus the ${trimAdded(loaded.added)} you hung on.`,
-      );
+        met: loaded.e1rm >= target,
+        toGo: Math.max(0, target - loaded.e1rm),
+        unit: "lb",
+        level: null,
+        note: `Total load — you plus the ${trimAdded(loaded.added)} you hung on.`,
+      };
   }
 
   if (!strict) return null;
@@ -512,25 +553,31 @@ function resolveGraduating(
     strict.on,
     weight,
     s.reps,
+    tierOf(s),
     cleared
       ? "Cleared — start adding weight, and this turns into a loaded ratio."
       : s.note,
   );
 }
 
+/** Main unless a standard says otherwise — most of them are. */
+const tierOf = (s: Standard): Tier => s.tier ?? "main";
+
 const trimAdded = (lb: number) =>
   `${Number.isInteger(lb) ? lb : Math.round(lb * 10) / 10} lb`;
 
-/** "1.72×" for a ratio, "8" for reps — the number as its own kind reads. */
+/** The number as its own kind reads: "1.72×", "8", "253 lb". */
 export function fmtValue(r: Relative): string {
-  return r.kind === "reps" ? String(r.value) : `${r.value.toFixed(2)}×`;
+  if (r.kind === "reps") return String(r.value);
+  if (r.kind === "total") return `${Math.round(r.value)} lb`;
+  return `${r.value.toFixed(2)}×`;
 }
 
-/** "of 2× bodyweight" / "of 10 reps" — what is being chased. */
+/** What is being chased: "of 2× bodyweight", "of 14 reps", "of 250 lb total". */
 export function fmtTarget(r: Relative): string {
-  return r.kind === "reps"
-    ? `of ${r.target} reps`
-    : `of ${r.target}× bodyweight`;
+  if (r.kind === "reps") return `of ${r.target} reps`;
+  if (r.kind === "total") return `of ${r.target} lb total`;
+  return `of ${r.target}× bodyweight`;
 }
 
 /**
@@ -699,27 +746,22 @@ export function targetsAt(
       continue;
     }
     // reps-then-load: the reps are the target, the load is the rung after.
-    const loaded = s.loadedBand
-      ? markFor(s.liftKey, s.loadedBand)
-      : targetFor(s.liftKey);
     out.push({
       liftKey: s.liftKey,
       amount: s.reps,
       unit: "reps",
       ratio: null,
-      then:
-        loaded == null
-          ? undefined
-          : {
-              /*
-               * What to HANG ON, not the total. The ratio counts the athlete
-               * too, so at 1.5x he is already carrying 1x of it himself —
-               * telling him to load 1.5x bodyweight would be half again as
-               * much as anyone is asking for.
-               */
-              added: (loaded - 1) * weightLb,
-              note: "once you can do the reps",
-            },
+      then: {
+        /*
+         * What to HANG ON, not the total. The athlete is already most of the
+         * load — telling a 186 lb kid to load 250 would be asking for a third
+         * again what anyone wants. Floored at zero: an athlete who already
+         * weighs more than the total has nothing to add, and a negative
+         * plate is not a coaching cue.
+         */
+        added: Math.max(0, s.loadedTotal - weightLb),
+        note: "once you can do the reps",
+      },
     });
   }
   return out;

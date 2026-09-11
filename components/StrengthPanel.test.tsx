@@ -301,8 +301,53 @@ test("once loaded, the row turns into a ratio of total load", () => {
   const row = [...document.querySelectorAll(".sd")].find((e) =>
     /pull/i.test(e.textContent!),
   )!;
-  assert.match(row.textContent!, /of 1\.5× bodyweight/i);
-  assert.match(row.textContent!, /advanced/i);
+  assert.match(row.textContent!, /of 250 lb total/i);
   assert.match(row.textContent!, /45 lb/, "and names what was hung on");
   assert.equal(/of 14 reps/i.test(row.textContent!), false, "the rep stage is behind him");
+});
+
+/*
+ * Cole reads the DB press for horizontal pushing and wants the barbell number
+ * kept underneath, not beside it. Nothing but the rendering enforces that —
+ * the tier on the config is inert if the page ignores it.
+ */
+test("a sub marker is shown apart from the main ones, not among them", () => {
+  panel(
+    [
+      day(daysAgo(2), {
+        deadlift: [{ w: 355, r: 3 }],
+        bench: [{ w: 225, r: 3 }],
+        "db-bench-press": [{ w: 80, r: 5 }],
+      }),
+    ],
+    true,
+    { weighIns: weighing(180) },
+  );
+  assert.ok(screen.getByText(/also tracked/i));
+
+  const subs = document.querySelector(".st-subs")!.textContent!;
+  assert.match(subs, /Bench/);
+  assert.equal(/Deadlift/.test(subs), false, "the mains are not down here");
+
+  const mains = document.querySelectorAll(".st-standards:not(.st-subs) .sd");
+  const mainLifts = [...mains].map((e) => e.querySelector(".sd-lift")!.textContent!);
+  assert.ok(mainLifts.includes("DB bench press"), "the dumbbells are the marker");
+  assert.ok(mainLifts.includes("Deadlift"));
+  /*
+   * The one that matters: filtering only the SUB list still leaves the
+   * barbell press sitting among the mains, which is the arrangement Cole
+   * asked to change.
+   */
+  assert.equal(
+    mainLifts.includes("Bench"),
+    false,
+    `barbell bench is still a main marker: ${mainLifts.join(", ")}`,
+  );
+});
+
+test("with no sub marker logged, no second section appears", () => {
+  panel([day(daysAgo(2), { deadlift: [{ w: 355, r: 3 }] })], true, {
+    weighIns: weighing(180),
+  });
+  assert.equal(screen.queryByText(/also tracked/i), null);
 });

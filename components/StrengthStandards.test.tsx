@@ -70,8 +70,8 @@ test("the pull-up target is reps first, then the plate to hang on", () => {
     .map((l) => l.textContent!)
     .find((r) => /pull-up/i.test(r))!;
   assert.match(pu, /14 reps/);
-  assert.match(pu, /\+90 lb/, "half of 180, not 270");
-  assert.equal(/270/.test(pu), false);
+  assert.match(pu, /\+70 lb/, "250 total, and he is 180 of it");
+  assert.equal(/250 lb/.test(pu), false, "the plate, not the total");
 });
 
 /* ---------------- bodyweight, as a scale ---------------- */

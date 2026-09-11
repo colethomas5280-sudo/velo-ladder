@@ -163,13 +163,15 @@ const SEED_LIFTS: ExerciseDef[] = [
     mode: "reps",
   },
   /*
-   * The last three are NOT off the Driveline sheet. Cole named Back Squat, DB
-   * Bench Press and Max Pull-ups among the five he watches, and none was in
-   * the cycle he sent — the sheet's "Bench" is a separate barbell lift, which
-   * is why this does not reuse that key. Appended rather than slotted in, so
+   * The last four are NOT off the Driveline sheet. Cole named Back Squat, DB
+   * Bench Press, Max Pull-ups and a Barbell Row as lifts he watches, and none
+   * was in the cycle he sent — the sheet's "Bench" is a separate barbell lift,
+   * which is why this does not reuse that key, and its row work is the three
+   * point DB row, which stays alongside. Appended rather than slotted in, so
    * nothing above them shifts position.
    */
   { key: "back-squat", name: "Back squat", group: "Lower body", mode: "load" },
+  { key: "barbell-row", name: "Barbell row", group: "Pull", mode: "load" },
   {
     key: "db-bench-press",
     name: "DB bench press",
@@ -182,7 +184,7 @@ const SEED_LIFTS: ExerciseDef[] = [
     name: "Max pull-ups",
     group: "Pull",
     mode: "reps",
-    help: "Strict, from a dead hang — log the reps, and any weight you hung on",
+    help: "Strict, neutral grip, from a dead hang — log the reps, and any weight you hung on",
   },
   {
     key: "single-leg-pallof-press",

@@ -13,7 +13,6 @@ import {
   roundUp5,
   targetsAt,
   levelReached,
-  markFor,
   targetFor,
   fmtToGo,
   fmtValue,
@@ -292,12 +291,17 @@ test("every standard names a menu lift whose mode matches its kind", () => {
 test("the standards are exactly the lifts Cole watches", () => {
   assert.deepEqual(
     [...STRENGTH_STANDARDS.map((s) => s.liftKey)].sort(),
-    ["back-squat", "bench", "deadlift", "front-squat", "pull-up"],
+    ["back-squat", "barbell-row", "bench", "db-bench-press", "deadlift", "front-squat", "pull-up"],
+  );
+  assert.deepEqual(
+    STRENGTH_STANDARDS.filter((s) => s.tier === "sub").map((s) => s.liftKey),
+    ["bench"],
+    "the barbell press is the sub marker; Cole reads the dumbbells",
   );
 });
 
 test("the standards stay few — a target on everything is a scoreboard", () => {
-  assert.ok(STRENGTH_STANDARDS.length <= 6, `${STRENGTH_STANDARDS.length} standards`);
+  assert.ok(STRENGTH_STANDARDS.length <= 8, `${STRENGTH_STANDARDS.length} standards`);
 });
 
 /* ---------------- how it reads ---------------- */
@@ -348,11 +352,22 @@ test("a ratio target is the midpoint of the band Cole is aiming between", () => 
   assert.equal(targetFor("back-squat"), (1.75 + 2.25) / 2);
   assert.equal(targetFor("bench"), (1.25 + 1.75) / 2);
   assert.equal(targetFor("front-squat"), (1.25 + 1.75) / 2);
+  assert.equal(targetFor("barbell-row"), (1 + 1.4) / 2);
   assert.equal(targetFor("push-up"), null, "a lift with no chart row has no target");
 
   for (const s of STRENGTH_STANDARDS)
-    if (s.kind === "ratio")
+    if (s.kind === "ratio" && STRENGTH_CHART[s.liftKey])
       assert.equal(s.target, targetFor(s.liftKey), `${s.liftKey} was typed, not derived`);
+
+  /*
+   * The DB press is the exception and has to be: the chart's bench row is a
+   * barbell lift, and Cole turned down converting it per-dumbbell because
+   * that would have been my arithmetic rather than his judgement. 0.5x is his.
+   */
+  assert.equal(STRENGTH_CHART["db-bench-press"], undefined);
+  const db = STRENGTH_STANDARDS.find((s) => s.liftKey === "db-bench-press")!;
+  assert.equal(db.kind, "ratio");
+  assert.equal(db.kind === "ratio" && db.target, 0.5);
 });
 
 test("leg press is off the chart on purpose", () => {
@@ -383,7 +398,7 @@ test("below the first band is no band at all, not 'beginner'", () => {
  * work decides which one he is looking at.
  */
 const graduating: Standard[] = [
-  { liftKey: "pull-up", kind: "reps-then-load", reps: 14, loadedBand: "elite" },
+  { liftKey: "pull-up", kind: "reps-then-load", reps: 14, loadedTotal: 250 },
 ];
 const pullDay = (date: string, sets: LiftSet[]): DatedLifts => ({
   date,
@@ -420,14 +435,35 @@ test("exactly the rep mark clears it", () => {
  * The athlete IS most of the load. Ignoring his own bodyweight would call a
  * 45 lb pull-up a 0.25× lift; the real total is 180 + 45.
  */
-test("once loaded, the ratio counts the athlete as well as the plate", () => {
+/*
+ * The loaded stage is an absolute total, not a ratio — Cole puts diminishing
+ * returns at 250 lb, and a ratio would keep asking a heavier athlete for more
+ * pulling strength exactly where more stops helping him.
+ */
+test("once loaded, the number is total load against an absolute 250", () => {
   const days = [pullDay("2026-09-05", [{ w: 0, r: 15 }, { w: 45, r: 3 }])];
   const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
-  assert.equal(r.kind, "ratio");
+  assert.equal(r.kind, "total", "not a ratio — the label would read 'of 250× bodyweight'");
   assert.equal(Math.round(r.achieved), Math.round(e1rmOf(225, 3)!), "225 on the bar, not 45");
-  assert.equal(r.target, 1.5);
-  assert.equal(fmtValue(r), "1.38×");
+  assert.equal(r.target, 250);
+  assert.equal(fmtValue(r), "248 lb");
+  assert.equal(fmtTarget(r), "of 250 lb total");
+  assert.equal(r.met, false, "248 is two short");
   assert.match(r.note!, /45 lb/, "and it names what was hung on");
+});
+
+/*
+ * The consequence of an absolute target, stated rather than discovered: a
+ * heavier athlete has less to add. That is the point — 250 is where more
+ * stops helping, whoever is hanging off the bar.
+ */
+test("a heavier athlete has less to hang on, which is what absolute means", () => {
+  const days = [pullDay("2026-09-05", [{ w: 0, r: 15 }, { w: 40, r: 1 }])];
+  const light = relativeStrength(MENU, days, steady(165), null, graduating)[0];
+  const heavy = relativeStrength(MENU, days, steady(215), null, graduating)[0];
+  assert.ok(heavy.toGo < light.toGo, "255 total clears it; 205 does not");
+  assert.equal(heavy.met, true);
+  assert.equal(light.met, false);
 });
 
 /* Reps first, in Cole's order: loaded work before the gate does not skip it. */
@@ -472,14 +508,14 @@ test("no pull-ups logged at all shows no row", () => {
 });
 
 /*
- * The reason the loaded stage is ELITE rather than the usual band. Fourteen
- * strict pull-ups already puts an athlete past the chart's advanced mark, so
- * the intermediate-advanced midpoint would arrive pre-met — not a target.
+ * The loaded target has to be ahead of an athlete who has only just cleared
+ * the reps, or it is not a target. 250 lb total clears that for anyone under
+ * about 190 lb bodyweight — and for a heavier athlete it is deliberately
+ * closer, because Cole puts diminishing returns at 250 whoever you are.
  */
-test("the loaded pull-up target is one an athlete who just cleared 14 has not met", () => {
-  const justCleared = e1rmOf(180, 10)! / 180; // ~1.33x, on bodyweight alone
-  assert.ok(justCleared > targetFor("pull-up")!, "the usual midpoint is already behind him");
-  assert.ok(justCleared < markFor("pull-up", "elite")!, "elite is still ahead");
+test("the loaded pull-up target is still ahead of someone who just cleared 14", () => {
+  const justCleared = e1rmOf(180, 10)!; // ~240 lb of total load, bodyweight only
+  assert.ok(justCleared < 250, `a 180 lb athlete estimates to ${Math.round(justCleared)}`);
 });
 
 /*
@@ -490,14 +526,14 @@ test("the loaded pull-up target is one an athlete who just cleared 14 has not me
  * would never ask him to hang a plate on, which is the whole point of the
  * stage Cole described.
  */
-test("the loaded ratio reads loaded sets only, even when a rep set estimates higher", () => {
+test("the loaded total reads loaded sets only, even when a rep set estimates higher", () => {
   const days = [
     pullDay("2026-09-01", [{ w: 0, r: 15 }]), // clears the gate
     pullDay("2026-09-05", [{ w: 0, r: 10 }, { w: 20, r: 3 }]),
   ];
   const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
-  assert.equal(r.kind, "ratio");
-  assert.equal(fmtValue(r), "1.22×", "the 20 lb triple, not the bodyweight ten");
+  assert.equal(r.kind, "total");
+  assert.equal(fmtValue(r), "220 lb", "the 20 lb triple, not the bodyweight ten");
   assert.match(r.note!, /20 lb/);
 });
 
@@ -619,7 +655,13 @@ test("the pull-up's next rung is the plate, not the plate plus the athlete", () 
   const pu = targetsAt(180).find((t) => t.liftKey === "pull-up")!;
   assert.equal(pu.unit, "reps");
   assert.equal(pu.amount, 14);
-  assert.equal(pu.then!.added, 90, "1.5x of 180 is 270 total, and he is 180 of it");
+  assert.equal(pu.then!.added, 70, "250 total, and he is 180 of it");
+});
+
+/* An athlete already past the total has nothing to add, not a negative plate. */
+test("an athlete heavier than the total is asked for nothing extra", () => {
+  const pu = targetsAt(265).find((t) => t.liftKey === "pull-up")!;
+  assert.equal(pu.then!.added, 0);
 });
 
 /*
@@ -655,4 +697,28 @@ test("no standard's note talks about the config instead of to the athlete", () =
       `${s.liftKey}: "${s.note}" is addressed to the wrong person`,
     );
   }
+});
+
+/*
+ * Exactly on the total, not past it. Same boundary the rep mark had: an
+ * athlete whose single lands on 250 has hit Cole's number, and telling him he
+ * has "0 lb to go" would be the app quibbling over a rep he just did.
+ */
+test("landing exactly on the loaded total clears it", () => {
+  // A single at bodyweight + 70 estimates to exactly 250 at 180 lb.
+  const days = [pullDay("2026-09-05", [{ w: 0, r: 15 }, { w: 70, r: 1 }])];
+  const [r] = relativeStrength(MENU, days, steady(180), null, graduating);
+  assert.equal(r.value, 250);
+  assert.equal(r.met, true, "250 is 250");
+  assert.equal(r.toGo, 0);
+
+  const under = relativeStrength(
+    MENU,
+    [pullDay("2026-09-05", [{ w: 0, r: 15 }, { w: 69, r: 1 }])],
+    steady(180),
+    null,
+    graduating,
+  )[0];
+  assert.equal(under.met, false);
+  assert.equal(under.toGo, 1);
 });
