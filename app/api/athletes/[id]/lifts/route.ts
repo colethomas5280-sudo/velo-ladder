@@ -1,6 +1,7 @@
 import { getScope, canSeeAthlete } from "@/lib/scope";
-import { listLiftDays, upsertLiftDay, deleteLiftDay } from "@/lib/data";
+import { listLiftDays, upsertLiftDay, deleteLiftDay, listLifts } from "@/lib/data";
 import { parseLiftInput } from "@/lib/liftInput";
+import { liftMenu } from "@/lib/strength";
 import { isCalendarDate, todayISO } from "@/lib/velo";
 import { json, unauthorized, forbidden, badRequest, guard } from "@/lib/http";
 
@@ -39,9 +40,13 @@ export async function POST(
   if (!scope) return unauthorized();
   if (!canSeeAthlete(scope, id)) return forbidden();
 
+  // The menu comes from the database now, so what is loggable is whatever
+  // the coach currently has on it.
+  const menu = liftMenu(await listLifts());
   const parsed = parseLiftInput(
     await request.json().catch(() => ({})),
     todayISO(),
+    menu,
   );
   if (!parsed.ok) return badRequest(parsed.error ?? "Invalid lifting day");
 

@@ -1,7 +1,8 @@
 import { getScope } from "@/lib/scope";
-import { listAllLiftDays } from "@/lib/data";
+import { listAllLiftDays, listLifts } from "@/lib/data";
 import {
   STRENGTH_WINDOW,
+  liftMenu,
   liftsEverDone,
   recentRecords,
 } from "@/lib/strength";
@@ -36,14 +37,15 @@ export async function GET() {
      * loop would put rows either side of a midnight the request straddled.
      */
     const since = shiftDate(todayISO(), -STRENGTH_WINDOW);
+    const menu = liftMenu(await listLifts());
 
     const out: StrengthOverviewRow[] = (await listAllLiftDays()).map((a) => ({
       athleteId: a.athleteId,
       name: a.name,
       last: a.days.length ? a.days[a.days.length - 1].date : null,
       recentDays: a.days.filter((d) => d.date >= since).length,
-      lifts: liftsEverDone(a.days).length,
-      records: recentRecords(a.days, since),
+      lifts: liftsEverDone(menu, a.days).length,
+      records: recentRecords(menu, a.days, since),
     }));
     return json(out);
   }, "Loading the strength overview failed");

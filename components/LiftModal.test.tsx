@@ -2,8 +2,8 @@ import "./testDom";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import { LIFTS, MAX_SETS, e1rm, type DatedLifts } from "@/lib/strength";
-import { daysAgo, TODAY } from "./testRender";
+import { MAX_SETS, e1rm, type DatedLifts } from "@/lib/strength";
+import { daysAgo, LIFT_ROWS, MENU, TODAY } from "./testRender";
 import LiftModal from "./LiftModal";
 
 /* ------------------------------------------------------------------ *
@@ -24,6 +24,7 @@ function open(history: DatedLifts[] = [], existing: Parameters<typeof LiftModal>
       existing={existing}
       date={TODAY}
       history={history}
+      menu={MENU}
       onClose={noop}
       onSaved={noop}
     />,
@@ -45,7 +46,7 @@ test("the form opens empty rather than listing every lift on the menu", () => {
   assert.ok(screen.getByText(/pick a lift below/i));
   // But every lift is one pick away.
   const options = [...document.querySelectorAll(".lm-add option")].map((o) => o.textContent);
-  for (const l of LIFTS) assert.ok(options.includes(l.name), l.name);
+  for (const l of LIFT_ROWS) assert.ok(options.includes(l.name), l.name);
 });
 
 test("picking a lift opens it with one empty set", () => {

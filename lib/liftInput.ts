@@ -1,13 +1,12 @@
 import { isCalendarDate } from "./velo";
 import {
-  LIFTS,
   MAX_REPS,
   MAX_SETS,
   MAX_WEIGHT,
-  liftName,
   type Lift,
   type LiftSet,
   type Lifts,
+  type Menu,
 } from "./strength";
 
 /* ------------------------------------------------------------------ *
@@ -76,7 +75,7 @@ function parseSet(
 export function parseLiftInput(
   body: unknown,
   today: string,
-  lifts: Lift[] = LIFTS,
+  menu: Menu,
 ): ParsedLiftDay {
   if (!body || typeof body !== "object")
     return { ok: false, error: "Body must be an object" };
@@ -92,11 +91,12 @@ export function parseLiftInput(
   const raw = (b.lifts ?? {}) as Record<string, unknown>;
 
   /*
-   * The allowed list is passed in rather than read from the module so a test
-   * can drive this with its own menu — and so retiring a lift from LIFTS
-   * closes the write path for it in the same edit.
+   * Only LIVE lifts can be written to. Retiring one closes its write path in
+   * the same action that takes it off the form — otherwise a stale tab, or
+   * anyone with the endpoint, could keep filing sets under a movement the
+   * coach has removed from the program.
    */
-  const allowed = new Map(lifts.map((l) => [l.key, l]));
+  const allowed = new Map(menu.lifts.map((l) => [l.key, l]));
   const out: Lifts = {};
 
   for (const [key, value] of Object.entries(raw)) {
@@ -104,7 +104,7 @@ export function parseLiftInput(
     if (!lift) return { ok: false, error: `unknown lift '${key}'` };
     if (value === null) continue; // cleared
     if (!Array.isArray(value))
-      return { ok: false, error: `'${liftName(key)}' must be a list of sets` };
+      return { ok: false, error: `'${menu.name(key)}' must be a list of sets` };
     if (value.length > MAX_SETS)
       return {
         ok: false,

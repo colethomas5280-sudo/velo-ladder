@@ -13,6 +13,7 @@ import type {
   LiftSession,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
+import { liftKeyFrom, type Lift, type LiftMode } from "@/lib/strength";
 import { joinName, splitName } from "./profile";
 import { todayISO } from "./velo";
 import type { LeaderboardAthlete } from "./leaderboard";
@@ -1058,4 +1059,101 @@ export async function listAllLiftDays(): Promise<AthleteLifts[]> {
       });
   }
   return [...byAthlete.values()];
+}
+
+/* ---------------- the lift menu ---------------- */
+
+function toLift(r: Record<string, unknown>): Lift {
+  return {
+    key: String(r.key),
+    name: String(r.name),
+    group: String(r.lift_group ?? ""),
+    mode: (r.mode as LiftMode) ?? "load",
+    help: String(r.help ?? ""),
+    position: Number(r.position ?? 0),
+    archived: Boolean(r.archived),
+  };
+}
+
+/**
+ * Every lift, archived ones included.
+ *
+ * The archived ones are not padding: a retired lift still has to be NAMED
+ * wherever it shows up in an athlete's history, and a menu built from live
+ * rows alone would relabel a year of benching as `bench-press`.
+ */
+export async function listLifts(): Promise<Lift[]> {
+  const rows = (await sql`
+    SELECT * FROM lifts ORDER BY position, name
+  `) as Record<string, unknown>[];
+  return rows.map(toLift);
+}
+
+export async function createLift(input: {
+  name: string;
+  group?: string;
+  mode?: LiftMode;
+  help?: string;
+}): Promise<Lift> {
+  const existing = (await sql`SELECT key FROM lifts`) as { key: string }[];
+  const key = liftKeyFrom(input.name, existing.map((r) => r.key));
+  /*
+   * Added to the end of the menu. `position` is a plain integer rather than a
+   * fraction because the coach reorders by moving rows, and the whole menu is
+   * a dozen entries — renumbering them is cheaper than explaining a gap.
+   */
+  const [{ next }] = (await sql`
+    SELECT COALESCE(MAX(position), -1) + 1 AS next FROM lifts
+  `) as { next: number }[];
+  const rows = (await sql`
+    INSERT INTO lifts (key, name, lift_group, mode, help, position)
+    VALUES (${key}, ${input.name.trim()}, ${input.group?.trim() || ""},
+            ${input.mode ?? "load"}, ${input.help?.trim() || ""}, ${Number(next)})
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toLift(rows[0]);
+}
+
+/**
+ * Edit a lift. The key is deliberately absent from the patch: it is what
+ * every logged set is filed under, so a rename changes what the lift is
+ * CALLED and never where its history lives.
+ */
+export async function updateLift(
+  key: string,
+  patch: {
+    name?: string;
+    group?: string;
+    mode?: LiftMode;
+    help?: string;
+    position?: number;
+    archived?: boolean;
+  },
+): Promise<Lift | null> {
+  const rows = (await sql`SELECT * FROM lifts WHERE key = ${key}`) as Record<
+    string,
+    unknown
+  >[];
+  if (!rows[0]) return null;
+  const cur = toLift(rows[0]);
+  const out = (await sql`
+    UPDATE lifts SET
+      name = ${patch.name?.trim() || cur.name},
+      lift_group = ${patch.group === undefined ? cur.group : patch.group.trim()},
+      mode = ${patch.mode ?? cur.mode},
+      help = ${patch.help === undefined ? cur.help : patch.help.trim()},
+      position = ${patch.position ?? cur.position},
+      archived = ${patch.archived ?? cur.archived},
+      updated_at = now()
+    WHERE key = ${key} RETURNING *
+  `) as Record<string, unknown>[];
+  return out[0] ? toLift(out[0]) : null;
+}
+
+/** How many days have ever recorded this lift — what makes a delete a soft one. */
+export async function liftUsage(key: string): Promise<number> {
+  const [row] = (await sql`
+    SELECT count(*)::int AS n FROM lift_sessions WHERE lifts ? ${key}
+  `) as { n: number }[];
+  return Number(row?.n ?? 0);
 }

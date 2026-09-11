@@ -4,7 +4,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { LiftSession } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
-import { liftsEverDone } from "@/lib/strength";
+import { liftMenu, liftsEverDone, type Lift } from "@/lib/strength";
 import { fmtDate } from "@/lib/velo";
 
 /**
@@ -19,9 +19,10 @@ export default function StrengthLink({ athleteId }: { athleteId: string }) {
     `/api/athletes/${athleteId}/lifts`,
     fetcher,
   );
+  const { data: liftRows } = useSWR<Lift[]>("/api/lifts", fetcher);
   const days = data ?? [];
   const last = days.length ? days[days.length - 1] : null;
-  const lifts = liftsEverDone(days).length;
+  const lifts = liftsEverDone(liftMenu(liftRows ?? []), days).length;
 
   return (
     <Link href={`/strength/${athleteId}`} className="card pad screen-link">

@@ -1,7 +1,8 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { splitStatements } from "@/lib/db";
 import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
+import { seedLifts } from "@/lib/strength";
 
 /* ------------------------------------------------------------------ *
  * The gap these tests close
@@ -22,10 +23,22 @@ import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema
 
 type Db = { query: (t: string) => Promise<{ rows: Record<string, unknown>[] }> };
 
+/*
+ * Every database this file opens, so they can all be shut afterwards. An
+ * in-memory PGlite is still a live WASM instance holding the event loop open,
+ * and this file opens one per test.
+ */
+const opened: { close(): Promise<void> }[] = [];
+after(async () => {
+  for (const db of opened) await db.close().catch(() => {});
+});
+
 /** A brand-new in-memory Postgres. Never touches ./.pglite-data. */
 async function freshDb(): Promise<Db> {
   const { PGlite } = await import("@electric-sql/pglite");
-  return new PGlite() as unknown as Db;
+  const db = new PGlite();
+  opened.push(db as unknown as { close(): Promise<void> });
+  return db as unknown as Db;
 }
 
 /** Apply a script the way production does: split, then one statement at a time. */
@@ -172,6 +185,7 @@ test("the schema applies to an empty database", async () => {
   assert.deepEqual(await tablesIn(db), [
     "athletes",
     "lift_sessions",
+    "lifts",
     "movement_screens",
     "recovery_entries",
     "resources",
@@ -190,6 +204,58 @@ test("the tables the setup check looks for are the tables the schema creates", a
   await applyAsProduction(db, SCHEMA_SQL);
   assert.deepEqual(schemaTables(), await tablesIn(db));
   assert.ok(schemaTables().includes("lift_sessions"), "the one the typed list missed");
+});
+
+/*
+ * The seed INSERTs are generated from `seedLifts()`, so this is what stops
+ * "what the code says a new database starts with" and "what it actually
+ * starts with" from drifting — including the `lift_group` column name, which
+ * differs from the field it carries because `group` is reserved in SQL.
+ */
+test("a fresh database starts with exactly the seeded lift menu", async () => {
+  const db = await freshDb();
+  await applyAsProduction(db, SCHEMA_SQL);
+  const rows = (
+    await db.query(
+      "SELECT key, name, lift_group, mode, help, position, archived FROM lifts ORDER BY position",
+    )
+  ).rows;
+  assert.deepEqual(
+    rows.map((r) => ({
+      key: String(r.key),
+      name: String(r.name),
+      group: String(r.lift_group),
+      mode: String(r.mode),
+      help: String(r.help),
+      position: Number(r.position),
+      archived: Boolean(r.archived),
+    })),
+    seedLifts(),
+  );
+});
+
+/*
+ * Cole edits the menu himself, and setup runs again on every schema change.
+ * A seed that re-inserted would resurrect lifts he had removed — which is the
+ * whole reason removing one archives it rather than deleting the row.
+ */
+test("re-running setup does not resurrect a lift the coach retired", async () => {
+  const db = await freshDb();
+  await applyAsProduction(db, SCHEMA_SQL);
+  await db.query("UPDATE lifts SET archived = true WHERE key = 'hip-thrust'");
+  await db.query("UPDATE lifts SET name = 'Trap bar pull' WHERE key = 'trap-bar-deadlift'");
+  await applyAsProduction(db, SCHEMA_SQL);
+
+  const rows = (
+    await db.query("SELECT key, name, archived FROM lifts WHERE key IN ('hip-thrust','trap-bar-deadlift')")
+  ).rows;
+  const byKey = new Map(rows.map((r) => [String(r.key), r]));
+  assert.equal(Boolean(byKey.get("hip-thrust")!.archived), true, "still retired");
+  assert.equal(
+    String(byKey.get("trap-bar-deadlift")!.name),
+    "Trap bar pull",
+    "and his rename survived too",
+  );
 });
 
 test("every ALTER lands, so no column is added before its table exists", async () => {

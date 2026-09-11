@@ -5,9 +5,15 @@ import Link from "next/link";
 import useSWR from "swr";
 import type { Athlete, StrengthOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
-import { STRENGTH_WINDOW, fmtMetric, liftMode, liftName } from "@/lib/strength";
+import {
+  STRENGTH_WINDOW,
+  fmtMetric,
+  liftMenu,
+  type Lift,
+} from "@/lib/strength";
 import { daysBetween, todayISO } from "@/lib/velo";
 import StrengthPanel from "./StrengthPanel";
+import LiftMenuManager from "./LiftMenuManager";
 
 /* ------------------------------------------------------------------ *
  * Strength
@@ -71,6 +77,12 @@ function Roster() {
     fetcher,
   );
   const rows = useMemo(() => data ?? [], [data]);
+  // Records come back as lift KEYS; the menu is what turns them into names.
+  const { data: liftRows, mutate: mutateLifts } = useSWR<Lift[]>(
+    "/api/lifts",
+    fetcher,
+  );
+  const menu = useMemo(() => liftMenu(liftRows ?? []), [liftRows]);
   const today = todayISO();
 
   /*
@@ -105,6 +117,8 @@ function Roster() {
           <span>Personal bests and recent work, last {STRENGTH_WINDOW / 7} weeks</span>
         </div>
       </div>
+
+      <LiftMenuManager lifts={liftRows ?? []} mutate={mutateLifts} />
 
       {isLoading && <p className="widget-empty">Loading…</p>}
       {error != null && (
@@ -143,8 +157,8 @@ function Roster() {
                   {r.records[0] && (
                     <em>
                       {" · "}
-                      {liftName(r.records[0].key)}{" "}
-                      {fmtMetric(r.records[0].value, liftMode(r.records[0].key))}
+                      {menu.name(r.records[0].key)}{" "}
+                      {fmtMetric(r.records[0].value, menu.mode(r.records[0].key))}
                     </em>
                   )}
                 </span>

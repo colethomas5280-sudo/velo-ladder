@@ -3402,3 +3402,100 @@ table.roster-table {
 .lm-drop {
   padding: 4px 9px;
 }
+
+/* ---------- the coach's lift menu ---------- */
+.lmm {
+  margin-bottom: 16px;
+}
+.lmm-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+}
+.lmm-list li {
+  border-bottom: 1px solid var(--line-soft);
+}
+.lmm-list li:last-child {
+  border-bottom: 0;
+}
+.lmm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+}
+.lmm-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.lmm-name em {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-left: 8px;
+}
+.lmm-name.dim {
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+.lmm-mode {
+  flex: 0 0 auto;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.lmm-fields {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 10px;
+}
+/* The one choice with teeth: pounds or reps. Sized so the consequence is
+   read, not just the label. */
+.lmm-modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+.lmm-mode-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  height: auto;
+  padding: 9px 11px;
+  text-align: left;
+  white-space: normal;
+}
+.lmm-mode-pick span {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.lmm-mode-pick[aria-pressed="true"] span {
+  color: inherit;
+  opacity: 0.75;
+}
+.lmm-add,
+.lmm-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+.lmm-edit {
+  margin: 8px 0;
+}
+.lmm-actions {
+  display: flex;
+  gap: 8px;
+}
+.lmm-retired {
+  margin-top: 18px;
+}

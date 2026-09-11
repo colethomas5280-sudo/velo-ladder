@@ -1,10 +1,32 @@
+import { seedLifts } from "./strength";
+
 /**
  * Canonical database schema. Run once (and after any schema change) via
  * GET /api/setup?key=SETUP_KEY. Every statement is idempotent.
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
+
+/** Single-quote a value for inline SQL. Only ever sees our own constants. */
+const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
+
+/**
+ * The starting lift menu, as INSERTs.
+ *
+ * Generated from `seedLifts()` rather than typed out, so the list a fresh
+ * database gets and the list the code describes cannot drift apart. Every row
+ * is `ON CONFLICT DO NOTHING`: on Cole's database, which already has a menu
+ * he has edited, this whole block is a no-op.
+ */
+const LIFT_SEED_SQL = seedLifts()
+  .map(
+    (l) =>
+      `INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES (` +
+      `${q(l.key)}, ${q(l.name)}, ${q(l.group)}, ${q(l.mode)}, ${q(l.help)}, ${l.position})` +
+      ` ON CONFLICT (key) DO NOTHING;`,
+  )
+  .join("\n");
 
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS athletes (
@@ -263,6 +285,29 @@ CREATE TABLE IF NOT EXISTS lift_sessions (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS lift_athlete_date_uidx
   ON lift_sessions(athlete_id, date);
+
+-- v19: the lift menu became Cole's to edit rather than a constant in the
+-- code. Keyed by the slug, because that slug is what every logged set is
+-- filed under in lift_sessions.lifts — a surrogate id here would leave two
+-- ways to name the same lift and no guarantee they agreed.
+--
+-- Retiring a lift archives it. That is what makes the seed below safe to
+-- re-run: a lift Cole has removed stays in the table with archived = true,
+-- so ON CONFLICT DO NOTHING cannot resurrect it on the next deploy.
+CREATE TABLE IF NOT EXISTS lifts (
+  key        text PRIMARY KEY,
+  name       text NOT NULL,
+  lift_group text NOT NULL DEFAULT '',
+  mode       text NOT NULL DEFAULT 'load' CHECK (mode IN ('load','reps')),
+  help       text NOT NULL DEFAULT '',
+  position   int NOT NULL DEFAULT 0,
+  archived   boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lifts_order_idx ON lifts(position, name)
+  WHERE archived = false;
+${LIFT_SEED_SQL}
 `;
 
 /** The one real session already logged, imported so there is live data on day one. */

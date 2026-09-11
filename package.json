@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test --test-force-exit --experimental-test-module-mocks \"lib/**/*.test.ts\" \"components/**/*.test.tsx\"",
-    "verify": "npm run lint && tsc --noEmit && npm test && npm run build"
+    "test": "node scripts/run-tests.mjs",
+    "verify": "npm run lint && tsc --noEmit && npm test && npm run build",
+    "test:raw": "node --import tsx --test --experimental-test-module-mocks \"lib/**/*.test.ts\" \"components/**/*.test.tsx\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

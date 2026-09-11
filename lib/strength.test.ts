@@ -2,8 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   E1RM_MAX_REPS,
-  LIFTS,
-  LIFT_GROUPS,
   STRENGTH_WINDOW,
   dayTotals,
   defaultLift,
@@ -13,13 +11,14 @@ import {
   liftBest,
   liftLast,
   liftMetric,
-  liftMode,
-  liftName,
+  liftKeyFrom,
+  liftMenu,
   liftSeries,
   liftStats,
   liftsDone,
   liftsEverDone,
   recentRecords,
+  seedLifts,
   type DatedLifts,
   type LiftSet,
 } from "@/lib/strength";
@@ -38,6 +37,13 @@ const day = (date: string, lifts: Record<string, LiftSet[]>): DatedLifts => ({
   lifts,
 });
 const set = (w: number, r: number): LiftSet => ({ w, r });
+
+/* The menu a fresh database starts with — what these tests read keys against. */
+const LIFTS = seedLifts();
+const LIFT_GROUPS = [...new Set(LIFTS.map((l) => l.group))];
+const menu = liftMenu(LIFTS);
+const liftName = (k: string) => menu.name(k);
+const liftMode = (k: string) => menu.mode(k);
 
 /* ---------------- the config ---------------- */
 
@@ -139,7 +145,7 @@ test("a day's totals add up across every lift", () => {
     "bench-press": [set(185, 5)],
     "chin-up": [],
   });
-  assert.deepEqual(dayTotals(d), { lifts: 2, sets: 3, reps: 15, volume: 3175 });
+  assert.deepEqual(dayTotals(menu, d), { lifts: 2, sets: 3, reps: 15, volume: 3175 });
 });
 
 test("lifts done come back in menu order, with anything retired at the end", () => {
@@ -149,7 +155,7 @@ test("lifts done come back in menu order, with anything retired at the end", () 
     "back-squat": [set(225, 5)],
     "trap-bar-deadlift": [],
   });
-  assert.deepEqual(liftsDone(d), ["back-squat", "bench-press", "zz-retired"]);
+  assert.deepEqual(liftsDone(menu, d), ["back-squat", "bench-press", "zz-retired"]);
 });
 
 /* ---------------- reading a lift across days ---------------- */
@@ -163,12 +169,12 @@ const history: DatedLifts[] = [
 ];
 
 test("a series is oldest first and skips days the lift wasn't done", () => {
-  const s = liftSeries([...history].reverse(), "back-squat");
+  const s = liftSeries(menu, [...history].reverse(), "back-squat");
   assert.deepEqual(
     s.map((p) => p.date),
     ["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-09-01"],
   );
-  assert.equal(liftSeries(history, "bench-press").length, 0);
+  assert.equal(liftSeries(menu, history, "bench-press").length, 0);
 });
 
 /*
@@ -176,11 +182,11 @@ test("a series is oldest first and skips days the lift wasn't done", () => {
  * badge on it would fire on every new lift and mean nothing.
  */
 test("the first day of a lift is not a personal best", () => {
-  assert.equal(liftSeries(history, "back-squat")[0].record, false);
+  assert.equal(liftSeries(menu, history, "back-squat")[0].record, false);
 });
 
 test("repeating the best is not a new best", () => {
-  const s = liftSeries(history, "back-squat");
+  const s = liftSeries(menu, history, "back-squat");
   assert.equal(s[1].record, true, "235 beat 225");
   assert.equal(s[2].record, false, "235 again is a good day, not a new one");
   assert.equal(s[3].record, false, "and 215 is not");
@@ -193,7 +199,7 @@ test("repeating the best is not a new best", () => {
  * record would be silently suppressed.
  */
 test("a day that charts nothing doesn't reset the record clock", () => {
-  const s = liftSeries(
+  const s = liftSeries(menu, 
     [
       day("2026-08-01", { "back-squat": [set(135, 20)] }),
       day("2026-08-08", { "back-squat": [set(225, 5)] }),
@@ -205,10 +211,10 @@ test("a day that charts nothing doesn't reset the record clock", () => {
 });
 
 test("the best day is the best number and the set behind it", () => {
-  const best = liftBest(history, "back-squat")!;
+  const best = liftBest(menu, history, "back-squat")!;
   assert.equal(best.date, "2026-09-01");
   assert.deepEqual(best.set, set(245, 5));
-  assert.equal(liftBest(history, "bench-press"), null);
+  assert.equal(liftBest(menu, history, "bench-press"), null);
 });
 
 test("a bodyweight best reports the longest set, not the heaviest", () => {
@@ -216,14 +222,14 @@ test("a bodyweight best reports the longest set, not the heaviest", () => {
     day("2026-08-01", { "chin-up": [set(0, 8)] }),
     day("2026-08-08", { "chin-up": [set(45, 3), set(0, 12)] }),
   ];
-  const best = liftBest(days, "chin-up")!;
+  const best = liftBest(menu, days, "chin-up")!;
   assert.equal(best.value, 12);
   assert.deepEqual(best.set, set(0, 12), "the 45lb triple is heavier and shorter");
 });
 
 test("the last day is the most recent one, whatever order the rows arrive in", () => {
-  assert.equal(liftLast([...history].reverse(), "back-squat")!.date, "2026-09-01");
-  assert.equal(liftLast(history, "bench-press"), null);
+  assert.equal(liftLast(menu, [...history].reverse(), "back-squat")!.date, "2026-09-01");
+  assert.equal(liftLast(menu, history, "bench-press"), null);
 });
 
 test("every lift ever done comes back once, in menu order", () => {
@@ -231,7 +237,7 @@ test("every lift ever done comes back once, in menu order", () => {
     day("2026-08-01", { "bench-press": [set(185, 5)] }),
     day("2026-08-02", { "back-squat": [set(225, 5)], "bench-press": [set(190, 5)] }),
   ];
-  assert.deepEqual(liftsEverDone(days), ["back-squat", "bench-press"]);
+  assert.deepEqual(liftsEverDone(menu, days), ["back-squat", "bench-press"]);
 });
 
 /*
@@ -248,7 +254,7 @@ test("recent records are inside the window and newest first", () => {
     day("2026-09-05", { "bench-press": [set(185, 5)] }), // first bench: not a record
   ];
   assert.deepEqual(
-    recentRecords(days, "2026-08-20").map((r) => [r.key, r.date]),
+    recentRecords(menu, days, "2026-08-20").map((r) => [r.key, r.date]),
     [
       ["back-squat", "2026-09-01"],
       ["back-squat", "2026-08-20"],
@@ -289,7 +295,7 @@ test("the lift shown first is the one with the most behind it", () => {
     day("2026-08-05", { "back-squat": [set(245, 5)] }),
     day("2026-08-26", { "back-squat": [set(255, 5)] }),
   ];
-  assert.equal(defaultLift(days), "back-squat");
+  assert.equal(defaultLift(menu, days), "back-squat");
 });
 
 test("a tie goes to whichever was lifted most recently", () => {
@@ -297,12 +303,12 @@ test("a tie goes to whichever was lifted most recently", () => {
     day("2026-07-15", { "trap-bar-deadlift": [set(315, 5)] }),
     day("2026-08-26", { "back-squat": [set(225, 5)] }),
   ];
-  assert.equal(defaultLift(days), "back-squat", "one session each");
+  assert.equal(defaultLift(menu, days), "back-squat", "one session each");
 });
 
 test("nothing logged leads with nothing", () => {
-  assert.equal(defaultLift([]), null);
-  assert.equal(defaultLift([day("2026-08-01", { "back-squat": [] })]), null);
+  assert.equal(defaultLift(menu, []), null);
+  assert.equal(defaultLift(menu, [day("2026-08-01", { "back-squat": [] })]), null);
 });
 
 /*
@@ -315,7 +321,7 @@ test("a best names the set its number actually came from", () => {
     day("2026-08-01", { "back-squat": [set(225, 5)] }),
     day("2026-09-09", { "back-squat": [set(275, 3), set(245, 8)] }),
   ];
-  const best = liftBest(days, "back-squat")!;
+  const best = liftBest(menu, days, "back-squat")!;
   assert.equal(Math.round(best.value), 310);
   assert.deepEqual(best.set, set(245, 8), "not the 275 triple, which estimates 302");
 });
@@ -325,4 +331,97 @@ test("the stats say which set the estimate came from", () => {
   assert.deepEqual(s.e1rmSet, set(245, 8));
   assert.deepEqual(s.top, set(275, 3), "which is still the top set");
   assert.equal(liftStats([set(135, 20)]).e1rmSet, null, "no estimate, no set");
+});
+
+/* ---------------- the menu ---------------- */
+
+const lift = (over: Partial<ReturnType<typeof seedLifts>[number]>) => ({
+  key: "x",
+  name: "X",
+  group: "Lower body",
+  mode: "load" as const,
+  help: "",
+  position: 0,
+  archived: false,
+  ...over,
+});
+
+test("the menu offers live lifts in the coach's order, not alphabetically", () => {
+  const m = liftMenu([
+    lift({ key: "a", name: "Zebra press", position: 0 }),
+    lift({ key: "b", name: "Apple squat", position: 1 }),
+  ]);
+  assert.deepEqual(m.lifts.map((l) => l.key), ["a", "b"]);
+  assert.equal(m.rank("a") < m.rank("b"), true);
+});
+
+/*
+ * The reason the menu is built from EVERY lift rather than the live ones. An
+ * athlete who benched for a year should not find that year relabelled
+ * `bench-press` because the movement came off the menu.
+ */
+test("a retired lift is off the menu but still named", () => {
+  const m = liftMenu([
+    lift({ key: "bench-press", name: "Bench press", archived: true }),
+    lift({ key: "back-squat", name: "Back squat", position: 1 }),
+  ]);
+  assert.deepEqual(m.lifts.map((l) => l.key), ["back-squat"]);
+  assert.equal(m.name("bench-press"), "Bench press", "history still reads");
+  assert.equal(m.mode("bench-press"), "load");
+  assert.equal(m.rank("bench-press"), m.lifts.length, "and it sorts last");
+});
+
+test("a key that was never defined falls back to itself rather than blank", () => {
+  const m = liftMenu([]);
+  assert.equal(m.name("power-clean"), "power-clean");
+  assert.equal(m.mode("power-clean"), "load");
+  assert.equal(m.get("power-clean"), null);
+});
+
+test("groups come from the live menu, in order, without repeats", () => {
+  const m = liftMenu([
+    lift({ key: "a", group: "Lower body", position: 0 }),
+    lift({ key: "b", group: "Push", position: 1 }),
+    lift({ key: "c", group: "Lower body", position: 2 }),
+    lift({ key: "d", group: "Pull", position: 3, archived: true }),
+  ]);
+  assert.deepEqual(m.groups, ["Lower body", "Push"], "the retired group is gone too");
+});
+
+/* ---------------- keys for new lifts ---------------- */
+
+test("a new lift's key is a readable slug of its name", () => {
+  assert.equal(liftKeyFrom("Trap Bar Deadlift", []), "trap-bar-deadlift");
+  assert.equal(liftKeyFrom("  Bulgarian  split squat ", []), "bulgarian-split-squat");
+  assert.equal(liftKeyFrom("Bench Press (close grip)", []), "bench-press-close-grip");
+});
+
+/*
+ * Uniqueness has to count archived keys. Reusing a retired lift's key would
+ * graft its whole history onto whatever was just created.
+ */
+test("a key never collides, archived ones included", () => {
+  assert.equal(liftKeyFrom("Back squat", ["back-squat"]), "back-squat-2");
+  assert.equal(
+    liftKeyFrom("Back squat", ["back-squat", "back-squat-2"]),
+    "back-squat-3",
+  );
+});
+
+test("a name with nothing sluggable still gets a key", () => {
+  assert.equal(liftKeyFrom("???", []), "lift");
+  assert.equal(liftKeyFrom("???", ["lift"]), "lift-2");
+  assert.equal(liftKeyFrom("", []), "lift");
+});
+
+test("accents are folded rather than dropped into nothing", () => {
+  assert.equal(liftKeyFrom("Pallof press", []), "pallof-press");
+  assert.equal(liftKeyFrom("Zerchér squat", []), "zercher-squat");
+});
+
+test("a very long name is cut without leaving a trailing dash", () => {
+  const key = liftKeyFrom("a".repeat(80), []);
+  assert.ok(key.length <= 48);
+  assert.equal(/-$/.test(key), false);
+  assert.equal(/-$/.test(liftKeyFrom(`${"b".repeat(47)} tail`, [])), false);
 });

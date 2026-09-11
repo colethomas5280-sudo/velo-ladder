@@ -42,7 +42,13 @@ process.env.USE_PGLITE = "1";
 process.env.DATABASE_URL = "";
 const DB_DIR = mkdtempSync(join(tmpdir(), "velo-wire-"));
 process.env.PGLITE_DIR = DB_DIR;
-after(() => rmSync(DB_DIR, { recursive: true, force: true }));
+after(async () => {
+  // A live PGlite holds the event loop open; leaving it running is what the
+  // runner's --test-force-exit was hiding.
+  const { closeDb } = await import("@/lib/db");
+  await closeDb();
+  rmSync(DB_DIR, { recursive: true, force: true });
+});
 process.env.COACH_EMAILS = COACH_EMAIL;
 process.env.SETUP_KEY = "wire-test-key";
 

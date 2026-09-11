@@ -5,7 +5,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import type { StrengthOverviewRow } from "@/lib/types";
 import { STRENGTH_WINDOW } from "@/lib/strength";
 import { withSwr } from "./testSwr";
-import { daysAgo, TODAY } from "./testRender";
+import { daysAgo, LIFT_ROWS, TODAY } from "./testRender";
 import StrengthView from "./StrengthView";
 
 /* ------------------------------------------------------------------ *
@@ -30,7 +30,11 @@ const rowOf = (over: Partial<StrengthOverviewRow> = {}): StrengthOverviewRow => 
 const roster = (rows: StrengthOverviewRow[]) =>
   render(
     withSwr(
-      { "/api/me": { role: "coach", athleteId: null }, "/api/strength/overview": rows },
+      {
+        "/api/me": { role: "coach", athleteId: null },
+        "/api/strength/overview": rows,
+        "/api/lifts": LIFT_ROWS,
+      },
       <StrengthView />,
     ),
   );
@@ -91,6 +95,7 @@ test("an athlete sees their own lifting and never the roster", () => {
       {
         "/api/me": { role: "athlete", athleteId: "a1" },
         "/api/athletes/a1/lifts": [],
+        "/api/lifts": LIFT_ROWS,
       },
       <StrengthView />,
     ),

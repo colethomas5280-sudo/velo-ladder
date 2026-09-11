@@ -57,6 +57,23 @@ function getPglite() {
   return pglitePromise;
 }
 
+/**
+ * Shut the local database down.
+ *
+ * Only tests call this, and they have to: a PGlite instance is a live WASM
+ * database that holds the event loop open, so a test file that opened one
+ * never lets the process exit. The runner was papering over that with
+ * `--test-force-exit`, which killed it mid-run often enough to drop two whole
+ * files — and still report success.
+ */
+export async function closeDb(): Promise<void> {
+  const pending = pglitePromise;
+  pglitePromise = null;
+  if (!pending) return;
+  const db = await pending.catch(() => null);
+  await db?.close();
+}
+
 const pglitePool: PgPool = {
   async query(text, params) {
     const db = await getPglite();

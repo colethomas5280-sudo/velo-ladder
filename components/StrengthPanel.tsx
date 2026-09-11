@@ -3,22 +3,22 @@
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import type { LiftSession } from "@/lib/types";
+import type { Lift } from "@/lib/strength";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
   METRIC_LABEL,
   dayTotals,
+  defaultLift,
   fmtMetric,
   fmtSet,
   fmtVolume,
   liftBest,
   liftLast,
-  liftMode,
-  liftName,
+  liftMenu,
   liftSeries,
   liftStats,
   liftsDone,
   liftsEverDone,
-  defaultLift,
 } from "@/lib/strength";
 import { fmtDate, todayISO } from "@/lib/velo";
 import LiftChart from "./LiftChart";
@@ -49,6 +49,13 @@ export default function StrengthPanel({
     fetcher,
   );
   const days = useMemo(() => data ?? [], [data]);
+  /*
+   * The menu is the coach's now, so a logged day is unreadable without it —
+   * it holds keys and nothing else. Fetched alongside the log rather than
+   * passed down, because every page that shows lifting needs it.
+   */
+  const { data: liftRows } = useSWR<Lift[]>("/api/lifts", fetcher);
+  const menu = useMemo(() => liftMenu(liftRows ?? []), [liftRows]);
   const [editing, setEditing] = useState<LiftSession | "new" | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const show = (m: string) => {
@@ -58,15 +65,15 @@ export default function StrengthPanel({
 
   const today = todayISO();
   const todayDay = days.find((d) => d.date === today) ?? null;
-  const keys = useMemo(() => liftsEverDone(days), [days]);
+  const keys = useMemo(() => liftsEverDone(menu, days), [menu, days]);
   const [picked, setPicked] = useState<string | null>(null);
   // Their main movement, until they pick something else.
-  const fallback = useMemo(() => defaultLift(days), [days]);
+  const fallback = useMemo(() => defaultLift(menu, days), [menu, days]);
   const chartKey = picked && keys.includes(picked) ? picked : fallback;
-  const chartMode = chartKey ? liftMode(chartKey) : "load";
+  const chartMode = chartKey ? menu.mode(chartKey) : "load";
   const series = useMemo(
-    () => (chartKey ? liftSeries(days, chartKey) : []),
-    [days, chartKey],
+    () => (chartKey ? liftSeries(menu, days, chartKey) : []),
+    [menu, days, chartKey],
   );
 
   const recent = useMemo(() => [...days].reverse().slice(0, HISTORY_SHOWN), [days]);
@@ -115,9 +122,9 @@ export default function StrengthPanel({
           <div className="eyebrow">Bests</div>
           <ul className="st-bests">
             {keys.map((key) => {
-              const mode = liftMode(key);
-              const best = liftBest(days, key, mode);
-              const last = liftLast(days, key);
+              const mode = menu.mode(key);
+              const best = liftBest(menu, days, key, mode);
+              const last = liftLast(menu, days, key);
               const lastSet = last
                 ? mode === "reps"
                   ? last.stats.longest
@@ -130,7 +137,7 @@ export default function StrengthPanel({
                     aria-pressed={key === chartKey}
                     onClick={() => setPicked(key)}
                   >
-                    <span className="st-lift">{liftName(key)}</span>
+                    <span className="st-lift">{menu.name(key)}</span>
                     <span className="st-value">
                       {fmtMetric(best?.value ?? null, mode)}
                       <em>{METRIC_LABEL[mode]}</em>
@@ -150,7 +157,7 @@ export default function StrengthPanel({
 
       {chartKey && (
         <div className="st-chart">
-          <LiftChart series={series} mode={chartMode} label={liftName(chartKey)} />
+          <LiftChart series={series} mode={chartMode} label={menu.name(chartKey)} />
         </div>
       )}
 
@@ -159,18 +166,18 @@ export default function StrengthPanel({
           <div className="eyebrow">Recent sessions</div>
           <ul className="st-list">
             {recent.map((d) => {
-              const totals = dayTotals(d);
+              const totals = dayTotals(menu, d);
               return (
                 <li key={d.date}>
                   <div className="feed-main">
                     <b>{fmtDate(d.date)}</b>
                     <span className="feed-sub">
-                      {liftsDone(d)
+                      {liftsDone(menu, d)
                         .map((k) => {
-                          const mode = liftMode(k);
+                          const mode = menu.mode(k);
                           const s = liftStats(d.lifts[k]);
                           const top = mode === "reps" ? s.longest : s.top;
-                          return `${liftName(k)} ${top ? fmtSet(top, mode) : ""}`.trim();
+                          return `${menu.name(k)} ${top ? fmtSet(top, mode) : ""}`.trim();
                         })
                         .join(" · ") || (d.notes ? "note only" : "—")}
                     </span>
@@ -208,6 +215,7 @@ export default function StrengthPanel({
           existing={editing === "new" ? null : editing}
           date={editing === "new" ? today : editing.date}
           history={days}
+          menu={menu}
           onClose={() => setEditing(null)}
           onSaved={async (msg) => {
             await mutate();
