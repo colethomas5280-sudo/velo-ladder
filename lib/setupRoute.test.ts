@@ -244,3 +244,14 @@ test("refreshing a recipe does not make it look edited", async () => {
   `) as { untouched: boolean }[];
   assert.equal(row.untouched, true, "a second correction would never arrive");
 });
+
+/*
+ * Four separate times Cole has read an answer from a deployment that did not
+ * have the change he was checking for. Every other field in the response
+ * describes what the build BELIEVES; the commit says which build it was.
+ */
+test("the response names the deployment that answered it", async () => {
+  const body = (await run()) as unknown as { commit?: string; seedHash?: string };
+  assert.equal(body.commit, "local", "no VERCEL_GIT_COMMIT_SHA outside a build");
+  assert.match(body.seedHash!, /^[0-9a-f]{8}$/);
+});

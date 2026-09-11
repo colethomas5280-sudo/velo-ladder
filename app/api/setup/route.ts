@@ -214,6 +214,13 @@ export async function GET(request: Request) {
        * looked the same whether the fix had landed or not.
        */
       seedHash: seedFingerprint(),
+      /*
+       * The commit that answered. Vercel sets this at build time, so it is the
+       * one fact in here that cannot be stale relative to the code producing
+       * it — every other field describes what this build BELIEVES, and four
+       * times now Cole has been reading an older build's beliefs.
+       */
+      commit: (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7),
       ...state,
     });
   } catch (err) {
