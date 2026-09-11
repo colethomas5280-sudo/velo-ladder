@@ -3499,3 +3499,82 @@ table.roster-table {
 .lmm-retired {
   margin-top: 18px;
 }
+
+/* ---------- strength standards ---------- */
+.st-standards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sd {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--panel);
+}
+.sd.met {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+}
+.sd-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.sd-lift {
+  flex: 1 1 auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+.sd-ratio {
+  font-family: var(--font-teko), system-ui, sans-serif;
+  font-size: 30px;
+  line-height: 1;
+}
+.sd-target {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+/* The meter fills towards the target and stops there — past it the bar is
+   full rather than overflowing, which is what progressTo() caps. */
+.sd-meter {
+  height: 6px;
+  margin: 9px 0 7px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  overflow: hidden;
+}
+.sd-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.sd.met .sd-fill {
+  background: var(--good);
+}
+.sd-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sd-gap {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.sd.met .sd-gap {
+  color: var(--good);
+}
+.sd-src {
+  font-size: 11px;
+  color: var(--ink-faint);
+}

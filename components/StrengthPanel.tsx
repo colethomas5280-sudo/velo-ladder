@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import type { LiftSession } from "@/lib/types";
+import type { Athlete, LiftSession, RecoveryEntry } from "@/lib/types";
 import type { Lift } from "@/lib/strength";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
@@ -21,6 +21,13 @@ import {
   liftsEverDone,
   topSet,
 } from "@/lib/strength";
+import {
+  fmtRatio,
+  fmtTarget,
+  progressTo,
+  relativeStrength,
+  type Relative,
+} from "@/lib/relative";
 import { fmtDate, todayISO } from "@/lib/velo";
 import LiftChart from "./LiftChart";
 import LiftModal from "./LiftModal";
@@ -77,6 +84,24 @@ export default function StrengthPanel({
     [menu, days, chartKey],
   );
 
+  /*
+   * The denominator for the ratios. Bodyweight lives on the recovery check-in
+   * and is trended there rather than taken raw; the profile weight is the
+   * fallback for an athlete who has not been checking in.
+   */
+  const { data: checkins } = useSWR<RecoveryEntry[]>(
+    `/api/athletes/${athleteId}/recovery`,
+    fetcher,
+  );
+  const { data: athlete } = useSWR<Athlete>(`/api/athletes/${athleteId}`, fetcher);
+  const standards = useMemo(
+    () => relativeStrength(menu, days, checkins ?? [], athlete?.weightLb ?? null),
+    [menu, days, checkins, athlete],
+  );
+  const weighed =
+    (checkins ?? []).some((e) => typeof e.bodyWeight === "number" && e.bodyWeight > 0) ||
+    !!athlete?.weightLb;
+
   const recent = useMemo(() => [...days].reverse().slice(0, HISTORY_SHOWN), [days]);
 
   async function remove(d: LiftSession) {
@@ -116,6 +141,25 @@ export default function StrengthPanel({
           Nothing logged yet. Put in a session and this starts tracking your
           best lifts the way the tracker follows your velocity.
         </p>
+      )}
+
+      {days.length > 0 && (
+        <>
+          <div className="eyebrow">Strength standards</div>
+          {standards.length > 0 ? (
+            <ul className="st-standards">
+              {standards.map((r) => (
+                <StandardRow key={r.liftKey} r={r} name={menu.name(r.liftKey)} />
+              ))}
+            </ul>
+          ) : (
+            <p className="widget-empty">
+              {weighed
+                ? "Log one of the lifts that carries a standard and your ratio shows up here."
+                : "Put your weight on a recovery check-in and these turn into ratios — what you lift against what you weigh."}
+            </p>
+          )}
+        </>
       )}
 
       {keys.length > 0 && (
@@ -223,5 +267,46 @@ export default function StrengthPanel({
 
       {toast && <div className="toast">{toast}</div>}
     </section>
+  );
+}
+
+/**
+ * One standard: where they are, what they are chasing, and the gap in the
+ * only unit that means anything — pounds on the bar.
+ *
+ * "40 lb to go" is the line that does the work. A ratio on its own is a
+ * grade; a number of pounds is a training target.
+ */
+function StandardRow({ r, name }: { r: Relative; name: string }) {
+  return (
+    <li className={r.met ? "sd met" : "sd"}>
+      <div className="sd-head">
+        <span className="sd-lift">{name}</span>
+        <span className="sd-ratio">{fmtRatio(r.ratio)}</span>
+        <span className="sd-target">of {fmtTarget(r.target)} bodyweight</span>
+      </div>
+      <div className="sd-meter" role="presentation">
+        <span className="sd-fill" style={{ width: `${progressTo(r) * 100}%` }} />
+      </div>
+      <div className="sd-foot">
+        <span className="sd-gap">
+          {r.met ? "Cleared" : `${Math.ceil(r.toGo)} lb to go`}
+        </span>
+        {/*
+          * Always says where both numbers came from. A ratio is two
+          * measurements and an athlete should be able to check either —
+          * especially when the weight is one lone weigh-in.
+          */}
+        <span className="sd-src">
+          {Math.round(r.e1rm)} lb est. on {fmtDate(r.on)} at{" "}
+          {Math.round(r.weight.lb)} lb
+          {r.weight.from === "profile"
+            ? " (from your profile)"
+            : r.weight.n < 3
+              ? ` (${r.weight.n} weigh-in${r.weight.n === 1 ? "" : "s"})`
+              : ""}
+        </span>
+      </div>
+    </li>
   );
 }
