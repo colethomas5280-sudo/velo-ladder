@@ -6,7 +6,7 @@ import {
   BODYWEIGHT_ANCHORS,
   bodyweightStanding,
   fmtHeight,
-  roundLoad,
+  roundUp5,
   targetsAt,
   type BodyweightStanding,
 } from "@/lib/relative";
@@ -170,13 +170,13 @@ export default function StrengthStandards() {
                 <span className="ss-amount">
                   {t.unit === "reps"
                     ? `${t.amount} reps`
-                    : `${roundLoad(t.amount)} lb`}
+                    : `${roundUp5(t.amount)} lb`}
                 </span>
                 <span className="ss-basis">
                   {t.ratio != null
                     ? `${t.ratio}× bodyweight`
                     : "strict, from a dead hang"}
-                  {t.then && ` · then +${roundLoad(t.then.added)} lb ${t.then.note}`}
+                  {t.then && ` · then +${roundUp5(t.then.added)} lb ${t.then.note}`}
                 </span>
               </li>
             ))}

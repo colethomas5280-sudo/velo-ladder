@@ -10,7 +10,6 @@ import {
   bodyweightMarks,
   bodyweightStanding,
   fmtHeight,
-  roundLoad,
   roundUp5,
   targetsAt,
   levelReached,
@@ -623,10 +622,16 @@ test("the pull-up's next rung is the plate, not the plate plus the athlete", () 
   assert.equal(pu.then!.added, 90, "1.5x of 180 is 270 total, and he is 180 of it");
 });
 
-test("the pounds shown are loadable, not spurious to a decimal", () => {
-  assert.equal(roundLoad(403.7), 405);
-  assert.equal(roundLoad(267.5), 270);
-  assert.equal(roundLoad(0), 0);
+/*
+ * One rounding rule for everything on the page. A back squat target of 372
+ * used to show as 370 while the bodyweight marks rounded up — two rules, and
+ * the lower one quietly handed back two pounds of the standard Cole set.
+ */
+test("a lift target rounds up too, not to the nearest", () => {
+  assert.equal(roundUp5(403.7), 405);
+  assert.equal(roundUp5(372), 375, "2x of 186 — not 370");
+  assert.equal(roundUp5(267.5), 270);
+  assert.equal(roundUp5(0), 0);
 });
 
 test("a height reads in feet and inches", () => {
