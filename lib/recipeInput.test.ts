@@ -194,44 +194,41 @@ test("the macros add up to something near the stated calories", () => {
  * indistinguishable from a real one once it is in the database.
  */
 /*
- * A marked amount is one of exactly two shapes, and both are detections
- * rather than guesses:
- *
- *   the amount was the whole quantity and is gone -> "tsp cayenne"
- *   the fraction was inside the number            -> "1 cups heavy cream"
- *
- * The second is the one worth catching. "1 cups" is silently wrong where
- * "tsp cayenne" is visibly missing, and a plural cannot follow a bare 1.
+ * Cole asked for the "(amount unclear in the source)" notes to go, and most
+ * of them stopped being needed rather than being hidden: a broken conversion
+ * beside a gram weight is redundant, and one beside an ounce measure means
+ * the ounces were the answer all along.
  */
-test("a lost amount says so rather than carrying an invented number", () => {
-  const lost = COOKBOOK.flatMap((r) => r.ingredients).filter((i) =>
-    i.includes("unclear"),
-  );
-  assert.ok(lost.length > 0 && lost.length < 40, `${lost.length} unclear amounts`);
-  for (const i of lost)
-    assert.ok(
-      /^(tsp|Tbsp|cups?)\b/.test(i) || /(?<!\d)\b1 (cups|Tbsps|tsps)\b/.test(i),
-      i,
-    );
-});
-
-/* The marker is appended once. It went out twice on a card Cole opened. */
-test("no ingredient carries the marker twice", () => {
+test("no ingredient carries an annotation", () => {
   for (const r of COOKBOOK)
     for (const i of r.ingredients)
-      assert.ok(i.split("amount unclear").length <= 2, `${r.title}: ${i}`);
+      assert.equal(i.includes("unclear"), false, `${r.title}: ${i}`);
 });
 
 /*
- * A "1 cups" beside a gram weight is a redundant conversion, not an unknown
- * amount: the grams say what it is. Flagging those buried the ones that
- * actually matter.
+ * What is left reads as a bare unit — "tsp cayenne" — which is visibly
+ * incomplete rather than plausibly wrong. The bound is the point: if a change
+ * to the extractor starts dropping amounts wholesale, this is what says so.
  */
-test("a lost conversion beside a gram weight is dropped, not flagged", () => {
-  for (const r of COOKBOOK)
-    for (const i of r.ingredients)
-      if (/\b\d+\s?g\b/.test(i))
-        assert.equal(i.includes("unclear"), false, `${r.title}: ${i}`);
+test("only a handful of ingredients are left without an amount", () => {
+  const bare = COOKBOOK.flatMap((r) => r.ingredients).filter(
+    (i) => /^(tsp|Tbsp|cups?)\s/.test(i) || /(?<!\d)\b1 (cups|Tbsps|tsps)\b/.test(i),
+  );
+  assert.ok(bare.length < 30, `${bare.length} ingredients have no amount`);
+  assert.equal(new Set(bare).size <= 12, true, `${new Set(bare).size} distinct`);
+});
+
+/*
+ * The rule that must not over-reach. "2 cups (8oz)" is a perfectly good
+ * measure and an earlier pass of mine rewrote it to "8oz", throwing away the
+ * cup measure a cook would actually use.
+ */
+test("a good measure is never rewritten into its conversion", () => {
+  const all = COOKBOOK.flatMap((r) => r.ingredients);
+  assert.ok(
+    all.some((i) => /^\d+ cups? \(\d+\s?oz\)/.test(i)),
+    "every count-plus-conversion was flattened",
+  );
 });
 
 test("the cookbook is meals, and the shakes are still smoothies", () => {
