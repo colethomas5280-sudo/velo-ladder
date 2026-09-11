@@ -1172,6 +1172,7 @@ function toRecipe(r: Record<string, unknown>): Recipe {
     // Null, never 0. "Nobody has worked this out" and "zero calories" are
     // different facts, and an athlete sorting by calories needs them apart.
     blurb: String(r.blurb ?? ""),
+    servings: r.servings == null ? null : Number(r.servings),
     calories: r.calories == null ? null : Number(r.calories),
     proteinG: r.protein_g == null ? null : Number(r.protein_g),
     carbsG: r.carbs_g == null ? null : Number(r.carbs_g),
@@ -1197,6 +1198,7 @@ export interface RecipeInput {
   title: string;
   kind?: RecipeKind;
   blurb?: string;
+  servings?: number | null;
   calories?: number | null;
   proteinG?: number | null;
   carbsG?: number | null;
@@ -1209,10 +1211,10 @@ export interface RecipeInput {
 export async function createRecipe(input: RecipeInput): Promise<Recipe> {
   const id = crypto.randomUUID();
   const rows = (await sql`
-    INSERT INTO recipes (id, title, kind, blurb, calories, protein_g, carbs_g, fat_g,
-                         ingredients, steps, notes)
+    INSERT INTO recipes (id, title, kind, blurb, servings, calories, protein_g, carbs_g,
+                         fat_g, ingredients, steps, notes)
     VALUES (${id}, ${input.title.trim()}, ${input.kind ?? "smoothie"},
-            ${input.blurb ?? ""},
+            ${input.blurb ?? ""}, ${input.servings ?? null},
             ${input.calories ?? null}, ${input.proteinG ?? null},
             ${input.carbsG ?? null}, ${input.fatG ?? null},
             ${JSON.stringify(input.ingredients ?? [])}::jsonb,
@@ -1238,6 +1240,7 @@ export async function updateRecipe(
       title = ${patch.title?.trim() ?? cur.title},
       kind = ${patch.kind ?? cur.kind},
       blurb = ${patch.blurb ?? cur.blurb},
+      servings = ${patch.servings === undefined ? cur.servings : patch.servings},
       calories = ${patch.calories === undefined ? cur.calories : patch.calories},
       protein_g = ${patch.proteinG === undefined ? cur.proteinG : patch.proteinG},
       carbs_g = ${patch.carbsG === undefined ? cur.carbsG : patch.carbsG},

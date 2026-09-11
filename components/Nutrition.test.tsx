@@ -25,6 +25,7 @@ const recipe = (over: Partial<Recipe> = {}): Recipe => ({
   carbsG: null,
   fatG: null,
   blurb: "",
+  servings: 1,
   steps: ["Blend the liquids first."],
   notes: "",
   position: 0,

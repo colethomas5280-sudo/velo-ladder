@@ -1,5 +1,5 @@
 import { seedLifts } from "./strength";
-import { SEED_RECIPES } from "./recipes";
+import { ALL_SEED_RECIPES } from "./recipes";
 
 /**
  * Canonical database schema. Run once (and after any schema change) via
@@ -7,7 +7,7 @@ import { SEED_RECIPES } from "./recipes";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 22;
+export const SCHEMA_VERSION = 23;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -36,12 +36,12 @@ const LIFT_SEED_SQL = seedLifts()
  * recipe is on his database it is his to edit, and a deploy never overwrites
  * it. The ids are stable and readable for exactly that reason.
  */
-const RECIPE_SEED_SQL = SEED_RECIPES.map((r, i) => {
+const RECIPE_SEED_SQL = ALL_SEED_RECIPES.map((r, i) => {
   const n = (v: number | null) => (v == null ? "NULL" : String(v));
   return (
-    `INSERT INTO recipes (id, title, kind, blurb, calories, protein_g, carbs_g,` +
-    ` fat_g, ingredients, steps, notes, position) VALUES (` +
-    `${q(r.id)}, ${q(r.title)}, ${q(r.kind)}, ${q(r.blurb)}, ` +
+    `INSERT INTO recipes (id, title, kind, blurb, servings, calories, protein_g,` +
+    ` carbs_g, fat_g, ingredients, steps, notes, position) VALUES (` +
+    `${q(r.id)}, ${q(r.title)}, ${q(r.kind)}, ${q(r.blurb)}, ${n(r.servings)}, ` +
     `${n(r.calories)}, ${n(r.proteinG)}, ${n(r.carbsG)}, ${n(r.fatG)}, ` +
     `${q(JSON.stringify(r.ingredients))}::jsonb, ${q(JSON.stringify(r.steps))}::jsonb, ` +
     `${q(r.notes)}, ${i}) ON CONFLICT (id) DO NOTHING;`
@@ -346,6 +346,10 @@ ALTER TABLE recipes ADD COLUMN IF NOT EXISTS blurb text NOT NULL DEFAULT '';
 -- list like the ingredients, not a paragraph. An ordered list also renders
 -- as one, which a prose method never did.
 ALTER TABLE recipes ADD COLUMN IF NOT EXISTS steps jsonb NOT NULL DEFAULT '[]'::jsonb;
+-- v23: how many servings a batch makes. The cookbook recipes are written for
+-- meal prep and every one of them says so, and the calories are PER SERVING,
+-- which is not a safe thing to leave implicit next to a number like 700.
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS servings int;
 
 -- Carry any prose method into the first step before the column goes, so no
 -- recipe written against v20 loses its instructions. Production had none,
