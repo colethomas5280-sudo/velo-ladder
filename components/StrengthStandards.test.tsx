@@ -44,7 +44,7 @@ test("height and weight turn the ratios into pounds", () => {
   fill("6", "0", "180");
   const rows = [...document.querySelectorAll(".ss-targets li")].map((l) => l.textContent!);
   const dl = rows.find((r) => /deadlift/i.test(r))!;
-  // 2.25 x 180 = 405, rounded to something loadable.
+  // 2.25 x 180 = 405, already a loadable number.
   assert.match(dl, new RegExp(`${targetFor("deadlift")! * 180} lb`));
   assert.match(dl, /2\.25× bodyweight/);
 });
@@ -178,4 +178,19 @@ test("the marker tracks the athlete along that scale", () => {
   fill("6", "0", "205");
   const heavy = parseFloat(document.querySelector<HTMLElement>(".ss-marker")!.style.left);
   assert.ok(heavy > light);
+});
+
+/*
+ * One rounding rule across the page. The back squat's true 2x of 186 is 372;
+ * showing 370 while the bodyweight marks rounded up was two rules disagreeing,
+ * and the lower one handed back two pounds of Cole's standard.
+ */
+test("a lift target rounds up, the same way the bodyweight marks do", () => {
+  open();
+  fill("6", "1", "186");
+  const bs = [...document.querySelectorAll(".ss-targets li")]
+    .map((l) => l.textContent!)
+    .find((r) => /back squat/i.test(r))!;
+  assert.match(bs, /375 lb/);
+  assert.equal(/370/.test(bs), false);
 });

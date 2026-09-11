@@ -590,7 +590,19 @@ export function bodyweightMarks(
   }));
 }
 
-/** Up to the nearest 5. A target you can hold in your head. */
+/**
+ * Up to the nearest 5 — every target on the page, bodyweight and barbell
+ * alike, goes through this one function.
+ *
+ * Two reasons it is one function rather than two. Nobody loads a bar to
+ * 403.7, and 200 is a number an athlete carries around where 197.1 is one he
+ * looks up again. And up rather than to-nearest because these are marks to
+ * REACH: rounding a target down moves the target, which quietly hands back a
+ * couple of pounds of the standard Cole set.
+ *
+ * A measurement is never sent through here. The weight an athlete typed is
+ * his, and rounding it once produced "at 185 lb" for someone who entered 186.
+ */
 export function roundUp5(lb: number): number {
   return Math.ceil(lb / 5) * 5;
 }
@@ -713,7 +725,4 @@ export function fmtHeight(inches: number): string {
   return `${ft}'${inch}"`;
 }
 
-/** Targets are rounded to the nearest 5 lb — nobody loads a bar to 403.7. */
-export function roundLoad(lb: number): number {
-  return Math.round(lb / 5) * 5;
-}
+
