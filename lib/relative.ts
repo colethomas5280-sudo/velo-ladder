@@ -190,7 +190,14 @@ export const STRENGTH_STANDARDS: Standard[] = [
      * Cole's to move, like every other number here.
      */
     loadedBand: "elite",
-    note: "Strict, from a dead hang. Cole's number, not the chart's.",
+    /*
+     * 14 is Cole's number, not the chart's — its pull-up row is a weighted
+     * 1RM ratio and he wants the rep test. That provenance belongs HERE and
+     * not in `note`: notes are rendered to the athlete, and "Cole's number,
+     * not the chart's" is a sentence written for the person maintaining the
+     * config, which a sixteen-year-old reading his own page has no use for.
+     */
+    note: "Strict, from a dead hang.",
   },
 ];
 
