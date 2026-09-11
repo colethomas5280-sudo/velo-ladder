@@ -1,5 +1,11 @@
 import { execScript, assertDbConfigured, sql } from "@/lib/db";
-import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
+import {
+  SCHEMA_SQL,
+  SEED_SQL,
+  SCHEMA_VERSION,
+  schemaTables,
+  seedFingerprint,
+} from "@/lib/schema";
 import { missingSeedLifts, seedLifts } from "@/lib/strength";
 import { ALL_SEED_RECIPES, missingSeedRecipes } from "@/lib/recipes";
 import { json } from "@/lib/http";
@@ -202,6 +208,12 @@ export async function GET(request: Request) {
       // Bumped whenever the schema changes, so a stale deployment is obvious
       // from the response rather than looking like a fresh failure.
       schemaVersion: SCHEMA_VERSION,
+      /*
+       * And what this deploy seeds, which the version number does not cover.
+       * A corrected recipe changes no table and no version; twice the response
+       * looked the same whether the fix had landed or not.
+       */
+      seedHash: seedFingerprint(),
       ...state,
     });
   } catch (err) {

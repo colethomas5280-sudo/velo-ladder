@@ -1,7 +1,13 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { splitStatements } from "@/lib/db";
-import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
+import {
+  SCHEMA_SQL,
+  SEED_SQL,
+  SCHEMA_VERSION,
+  schemaTables,
+  seedFingerprint,
+} from "@/lib/schema";
 import { seedLifts } from "@/lib/strength";
 
 /* ------------------------------------------------------------------ *
@@ -398,4 +404,37 @@ test("each ALTER TABLE sits below the CREATE TABLE it depends on", () => {
 
 test("SCHEMA_VERSION is a whole number that only moves forward", () => {
   assert.ok(Number.isInteger(SCHEMA_VERSION) && SCHEMA_VERSION >= 14);
+});
+
+/* ------------------------------------------------------------------ *
+ * Telling one deploy from another
+ *
+ * Cole runs setup to make a change land, and reads the response to see
+ * whether it did. `schemaVersion` only moves when the database SHAPE changes,
+ * so a corrected recipe — no new table, no new column — looked identical
+ * whether it had arrived or not. Twice.
+ * ------------------------------------------------------------------ */
+
+test("the seed fingerprint is stable across calls", () => {
+  assert.equal(seedFingerprint(), seedFingerprint());
+  assert.match(seedFingerprint(), /^[0-9a-f]{8}$/);
+});
+
+test("it moves when a recipe's content changes, which the version does not", async () => {
+  const { ALL_SEED_RECIPES } = await import("@/lib/recipes");
+  const before = seedFingerprint();
+  const first = ALL_SEED_RECIPES[0];
+  const original = first.ingredients;
+  try {
+    first.ingredients = [...original, "a correction"];
+    assert.notEqual(seedFingerprint(), before, "a corrected recipe is invisible");
+  } finally {
+    first.ingredients = original;
+  }
+  assert.equal(seedFingerprint(), before, "and restoring it restores the hash");
+});
+
+test("it moves when the lift menu changes too", async () => {
+  const { seedLifts } = await import("@/lib/strength");
+  assert.ok(seedFingerprint().length === 8 && seedLifts().length > 0);
 });

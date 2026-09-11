@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 24). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 25). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
