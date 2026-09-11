@@ -5,7 +5,7 @@ import { render, screen, cleanup } from "@testing-library/react";
 import type { LiftSession } from "@/lib/types";
 import { e1rm } from "@/lib/strength";
 import { withSwr } from "./testSwr";
-import { daysAgo, TODAY } from "./testRender";
+import { daysAgo, LIFT_ROWS, TODAY } from "./testRender";
 import StrengthPanel from "./StrengthPanel";
 
 /* ------------------------------------------------------------------ *
@@ -30,7 +30,7 @@ const day = (date: string, lifts: LiftSession["lifts"], notes = ""): LiftSession
 const panel = (days: LiftSession[], canEdit = true) =>
   render(
     withSwr(
-      { "/api/athletes/a1/lifts": days },
+      { "/api/athletes/a1/lifts": days, "/api/lifts": LIFT_ROWS },
       <StrengthPanel athleteId="a1" canEdit={canEdit} />,
     ),
   );

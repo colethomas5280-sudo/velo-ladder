@@ -4,17 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import type { LiftSession } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
 import {
-  LIFTS,
-  LIFT_GROUPS,
   MAX_SETS,
   fmtMetric,
   fmtSet,
   liftBest,
   liftLast,
-  liftMode,
-  liftName,
   type DatedLifts,
   type Lift,
+  type Menu,
 } from "@/lib/strength";
 import { fmtDate, todayISO } from "@/lib/velo";
 
@@ -44,24 +41,21 @@ const blankSet = (): DraftSet => ({ w: "", r: "" });
 const cleanW = (s: string) => s.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
 const cleanR = (s: string) => s.replace(/[^0-9]/g, "");
 
-function draftFrom(day: LiftSession | null): Draft {
+function draftFrom(menu: Menu, day: LiftSession | null): Draft {
   const out: Draft = {};
   if (!day) return out;
   for (const [key, sets] of Object.entries(day.lifts))
     if (sets?.length)
       out[key] = sets.map((s) => ({
-        w: liftMode(key) === "reps" && s.w === 0 ? "" : String(s.w),
+        w: menu.mode(key) === "reps" && s.w === 0 ? "" : String(s.w),
         r: String(s.r),
       }));
   return out;
 }
 
-/** Config order, so the form reads the same way twice. */
-function orderedKeys(draft: Draft): string[] {
-  const rank = new Map(LIFTS.map((l, i) => [l.key, i]));
-  return Object.keys(draft).sort(
-    (a, b) => (rank.get(a) ?? LIFTS.length) - (rank.get(b) ?? LIFTS.length),
-  );
+/** Menu order, so the form reads the same way twice. */
+function orderedKeys(menu: Menu, draft: Draft): string[] {
+  return Object.keys(draft).sort((a, b) => menu.rank(a) - menu.rank(b));
 }
 
 export default function LiftModal({
@@ -69,6 +63,7 @@ export default function LiftModal({
   existing,
   date,
   history,
+  menu,
   onClose,
   onSaved,
 }: {
@@ -77,11 +72,13 @@ export default function LiftModal({
   date: string;
   /** Every day this athlete has logged — what "last time" and "best" read. */
   history: DatedLifts[];
+  /** The coach's current lift menu. */
+  menu: Menu;
   onClose: () => void;
   onSaved: (msg: string) => void;
 }) {
   const [when, setWhen] = useState(existing?.date ?? date ?? todayISO());
-  const [draft, setDraft] = useState<Draft>(() => draftFrom(existing));
+  const [draft, setDraft] = useState<Draft>(() => draftFrom(menu, existing));
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -106,8 +103,8 @@ export default function LiftModal({
     [history, when],
   );
 
-  const shown = orderedKeys(draft);
-  const available = LIFTS.filter((l) => !(l.key in draft));
+  const shown = orderedKeys(menu, draft);
+  const available = menu.lifts.filter((l) => !(l.key in draft));
 
   const addLift = (key: string) => {
     if (!key) return;
@@ -195,8 +192,9 @@ export default function LiftModal({
           {shown.map((key) => (
             <LiftBlock
               key={key}
-              lift={LIFTS.find((l) => l.key === key) ?? null}
+              lift={menu.get(key)}
               liftKey={key}
+              menu={menu}
               sets={draft[key]}
               past={past}
               onAdd={() => addSet(key)}
@@ -217,7 +215,7 @@ export default function LiftModal({
                 }}
               >
                 <option value="">Choose…</option>
-                {LIFT_GROUPS.map((g) => {
+                {menu.groups.map((g) => {
                   const inGroup = available.filter((l) => l.group === g);
                   if (!inGroup.length) return null;
                   return (
@@ -267,6 +265,7 @@ export default function LiftModal({
 function LiftBlock({
   lift,
   liftKey,
+  menu,
   sets,
   past,
   onAdd,
@@ -276,6 +275,7 @@ function LiftBlock({
 }: {
   lift: Lift | null;
   liftKey: string;
+  menu: Menu;
   sets: DraftSet[];
   past: DatedLifts[];
   onAdd: () => void;
@@ -283,9 +283,9 @@ function LiftBlock({
   onDropSet: (i: number) => void;
   onEdit: (i: number, field: "w" | "r", value: string) => void;
 }) {
-  const mode = lift?.mode ?? liftMode(liftKey);
-  const last = liftLast(past, liftKey);
-  const best = liftBest(past, liftKey, mode);
+  const mode = lift?.mode ?? menu.mode(liftKey);
+  const last = liftLast(menu, past, liftKey);
+  const best = liftBest(menu, past, liftKey, mode);
   const bw = mode === "reps";
   // The set worth beating: the longest on a bodyweight lift, the heaviest
   // otherwise — the same set the best and the chart are read from.
@@ -294,7 +294,7 @@ function LiftBlock({
   return (
     <div className="lm-lift">
       <div className="lm-lift-head">
-        <b>{lift?.name ?? liftName(liftKey)}</b>
+        <b>{lift?.name ?? menu.name(liftKey)}</b>
         <button
           className="btn sm ghost"
           onClick={onDrop}

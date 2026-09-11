@@ -1,7 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseLiftInput } from "@/lib/liftInput";
-import { MAX_REPS, MAX_SETS, MAX_WEIGHT } from "@/lib/strength";
+import {
+  MAX_REPS,
+  MAX_SETS,
+  MAX_WEIGHT,
+  liftMenu,
+  seedLifts,
+} from "@/lib/strength";
 
 /* ------------------------------------------------------------------ *
  * Validating a lifting day
@@ -13,7 +19,8 @@ import { MAX_REPS, MAX_SETS, MAX_WEIGHT } from "@/lib/strength";
  * ------------------------------------------------------------------ */
 
 const TODAY = "2026-09-10";
-const parse = (body: unknown) => parseLiftInput(body, TODAY);
+const MENU = liftMenu(seedLifts());
+const parse = (body: unknown) => parseLiftInput(body, TODAY, MENU);
 const day = (lifts: Record<string, unknown>, notes = "") => ({
   date: TODAY,
   lifts,
@@ -39,7 +46,8 @@ test("the date has to be a real day, not just the right shape", () => {
   assert.equal(parse(day({ "back-squat": [{ w: 225, r: 5 }] })).ok, true);
   for (const date of ["2026-02-30", "2026-13-01", "26-09-01", "not-a-date", ""])
     assert.equal(
-      parseLiftInput({ ...day({ "back-squat": [{ w: 225, r: 5 }] }), date }, TODAY).ok,
+      parseLiftInput({ ...day({ "back-squat": [{ w: 225, r: 5 }] }), date }, TODAY, MENU)
+        .ok,
       false,
       date,
     );
@@ -49,6 +57,7 @@ test("a day in the future is refused", () => {
   const r = parseLiftInput(
     { ...day({ "back-squat": [{ w: 225, r: 5 }] }), date: "2026-09-11" },
     TODAY,
+    MENU,
   );
   assert.equal(r.ok, false);
   assert.match(r.error!, /future/);
@@ -165,20 +174,27 @@ test("a long note is trimmed rather than refused", () => {
 test("a body that isn't an object is refused", () => {
   assert.equal(parse(null).ok, false);
   assert.equal(parse("hello").ok, false);
-  assert.equal(parseLiftInput({ date: TODAY, lifts: "nope" }, TODAY).ok, false);
+  assert.equal(parseLiftInput({ date: TODAY, lifts: "nope" }, TODAY, MENU).ok, false);
 });
 
-test("the menu can be narrowed, which is what retiring a lift does", () => {
-  const only = [
-    { key: "bench-press", name: "Bench press", group: "Push", mode: "load" as const },
-  ];
-  assert.equal(
-    parseLiftInput(day({ "back-squat": [{ w: 225, r: 5 }] }), TODAY, only).ok,
-    false,
-    "a lift off the menu closes its write path too",
+/*
+ * Retiring a lift has to close its write path in the same action that takes
+ * it off the form. Otherwise a stale tab — or anyone holding the endpoint —
+ * keeps filing sets under a movement the coach has removed.
+ */
+test("an archived lift is off the menu and refused on the way in", () => {
+  const rows = seedLifts().map((l) =>
+    l.key === "back-squat" ? { ...l, archived: true } : l,
   );
+  const narrowed = liftMenu(rows);
+  const r = parseLiftInput(day({ "back-squat": [{ w: 225, r: 5 }] }), TODAY, narrowed);
+  assert.equal(r.ok, false);
+  assert.match(r.error!, /back-squat/);
   assert.equal(
-    parseLiftInput(day({ "bench-press": [{ w: 185, r: 5 }] }), TODAY, only).ok,
+    parseLiftInput(day({ "bench-press": [{ w: 185, r: 5 }] }), TODAY, narrowed).ok,
     true,
+    "the rest of the menu is untouched",
   );
+  // But the archived lift is still NAMED, so its history still reads.
+  assert.equal(narrowed.name("back-squat"), "Back squat");
 });

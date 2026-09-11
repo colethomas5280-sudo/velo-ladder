@@ -23,29 +23,40 @@
 export type LiftMode = "load" | "reps";
 
 export interface Lift {
+  /**
+   * Stable forever. Generated from the name when the lift is created and
+   * never changed by a rename, because this is what every logged set is
+   * filed under — a key that moved would orphan an athlete's history.
+   */
   key: string;
   name: string;
   /** Section heading in the entry form. */
   group: string;
   mode: LiftMode;
-  /** Small print under the name — what counts as a working set here. */
-  help?: string;
+  /** Small print under the name — what counts as a working set here. "" for none. */
+  help: string;
+  /** Coach's ordering within the group. */
+  position: number;
+  /**
+   * Retired. Off the entry form, but still named wherever it appears in a
+   * history — soft-deleted for the same reason athletes and resources are.
+   */
+  archived: boolean;
 }
 
 /**
- * The lifts on the menu.
+ * What a brand-new database starts with.
  *
  * A starting list of the main barbell movements, NOT a transcription of any
- * particular program — Cole lifts his athletes off Driveline's, and the exact
- * menu is his to set. It is declarative for that reason: adding, renaming or
- * removing a lift is an edit here and nothing else, because nothing stores a
- * lift's name — only its key.
- *
- * Removing a key that has already been logged hides it from the form and
- * leaves the history intact; `liftByKey` returns null and the panel labels it
- * by its key rather than dropping the sets on the floor.
+ * particular program — Cole lifts his athletes off Driveline's, and the menu
+ * is his. It is the SEED and nothing more: the live menu lives in the `lifts`
+ * table, which he edits himself. Changing an entry here has no effect on a
+ * database that has already been set up, by design — otherwise a deploy would
+ * quietly overwrite his own edits.
  */
-export const LIFTS: Lift[] = [
+export const SEED_LIFTS: (Omit<Lift, "position" | "archived" | "help"> & {
+  help?: string;
+})[] = [
   // Lower body
   { key: "trap-bar-deadlift", name: "Trap bar deadlift", group: "Lower body", mode: "load" },
   { key: "back-squat", name: "Back squat", group: "Lower body", mode: "load" },
@@ -77,23 +88,99 @@ export const LIFTS: Lift[] = [
   { key: "db-row", name: "Dumbbell row", group: "Pull", mode: "load", help: "Per hand" },
 ];
 
-/** Group headings in config order, without repeats. */
-export const LIFT_GROUPS: string[] = [...new Set(LIFTS.map((l) => l.group))];
+/* ------------------------------------------------------------------ *
+ * The menu
+ *
+ * Every derived function takes one. The menu used to be this module's own
+ * constant, which stopped being true the moment Cole could edit it: the
+ * lifts live in the database now and the answer to "what is this key called"
+ * depends on what he has done to it.
+ *
+ * Built from EVERY lift, archived included. A retired lift still has to be
+ * named wherever it appears in a history — an athlete who benched for a year
+ * should not find that year relabelled `bench-press` because the movement
+ * came off the menu.
+ * ------------------------------------------------------------------ */
 
-const BY_KEY = new Map(LIFTS.map((l) => [l.key, l]));
-
-export function liftByKey(key: string): Lift | null {
-  return BY_KEY.get(key) ?? null;
+export interface Menu {
+  /** Live lifts, in the coach's order. What the entry form offers. */
+  lifts: Lift[];
+  /** Group headings in that order, without repeats. */
+  groups: string[];
+  /** A lift by key, archived included; null for a key never defined. */
+  get(key: string): Lift | null;
+  /** A lift's name, falling back to the key so nothing renders blank. */
+  name(key: string): string;
+  /** How a key is read. Anything unknown reads as a loaded lift. */
+  mode(key: string): LiftMode;
+  /** Sort position. Anything not on the live menu sorts last. */
+  rank(key: string): number;
 }
 
-/** A lift's name, falling back to its key so retired lifts still read. */
-export function liftName(key: string): string {
-  return BY_KEY.get(key)?.name ?? key;
+export function liftMenu(all: readonly Lift[]): Menu {
+  const byKey = new Map(all.map((l) => [l.key, l]));
+  const live = all
+    .filter((l) => !l.archived)
+    .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+  const order = new Map(live.map((l, i) => [l.key, i]));
+  return {
+    lifts: live,
+    groups: [...new Set(live.map((l) => l.group))],
+    get: (key) => byKey.get(key) ?? null,
+    name: (key) => byKey.get(key)?.name ?? key,
+    mode: (key) => byKey.get(key)?.mode ?? "load",
+    rank: (key) => order.get(key) ?? live.length,
+  };
 }
 
-/** The mode a stored key is read under. Retired keys read as loaded lifts. */
-export function liftMode(key: string): LiftMode {
-  return BY_KEY.get(key)?.mode ?? "load";
+/** A menu holding nothing — for a page rendering before its fetch lands. */
+export const EMPTY_MENU: Menu = liftMenu([]);
+
+/**
+ * `SEED_LIFTS` as real rows: position by declaration order, none archived.
+ *
+ * The single expansion of the seed. The schema builds its INSERTs from this
+ * and `lib/schema.test.ts` checks a freshly set-up database against it, so
+ * "what the code says a new database starts with" and "what a new database
+ * actually starts with" cannot come apart.
+ */
+export function seedLifts(): Lift[] {
+  return SEED_LIFTS.map((l, i) => ({
+    ...l,
+    // Always a string, never absent. An optional field that is sometimes
+    // missing and sometimes `undefined` compares unequal to itself across
+    // the wire, which is a needless way to make two identical menus differ.
+    help: l.help ?? "",
+    position: i,
+    archived: false,
+  }));
+}
+
+/**
+ * The key a new lift gets, from the name the coach typed.
+ *
+ * Readable rather than a UUID, because these end up as the keys of a JSONB
+ * column someone will one day read by hand — `{"back-squat": [...]}` says
+ * what it is and `{"f4c1...": [...]}` does not.
+ *
+ * Made unique against what already exists INCLUDING archived lifts: reusing
+ * a retired lift's key would silently graft its history onto the new one.
+ * A name with nothing sluggable in it still gets a key, because refusing to
+ * create "?" is a worse answer than filing it under `lift`.
+ */
+export function liftKeyFrom(name: string, taken: Iterable<string>): string {
+  const base =
+    name
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48)
+      .replace(/-+$/, "") || "lift";
+  const used = new Set(taken);
+  if (!used.has(base)) return base;
+  for (let n = 2; ; n++) if (!used.has(`${base}-${n}`)) return `${base}-${n}`;
 }
 
 /** One working set. `w` is pounds on the bar (or hung on); `r` is reps. */
@@ -121,6 +208,13 @@ export interface DatedLifts {
  * ------------------------------------------------------------------ */
 
 export const MAX_SETS = 12;
+
+/** Long enough for "Rear-foot elevated split squat", short enough to render. */
+export const MAX_LIFT_NAME = 60;
+
+export function isLiftMode(v: unknown): v is LiftMode {
+  return v === "load" || v === "reps";
+}
 export const MAX_WEIGHT = 1000;
 export const MAX_REPS = 50;
 
@@ -253,29 +347,19 @@ export const METRIC_UNIT: Record<LiftMode, string> = {
  * ------------------------------------------------------------------ */
 
 /** Lift keys with at least one set recorded, in config order. */
-export function liftsDone(day: DatedLifts): string[] {
+export function liftsDone(menu: Menu, day: DatedLifts): string[] {
   const done = Object.entries(day.lifts)
     .filter(([, sets]) => Array.isArray(sets) && sets.length > 0)
     .map(([key]) => key);
-  const order = new Map(LIFTS.map((l, i) => [l.key, i]));
   // A retired key has no place in the order; it sorts to the end, by name.
-  return done.sort(
-    (a, b) =>
-      (order.get(a) ?? LIFTS.length) - (order.get(b) ?? LIFTS.length) ||
-      a.localeCompare(b),
-  );
+  return done.sort((a, b) => menu.rank(a) - menu.rank(b) || a.localeCompare(b));
 }
 
 /** Every lift key this athlete has ever logged, in config order. */
-export function liftsEverDone(days: readonly DatedLifts[]): string[] {
+export function liftsEverDone(menu: Menu, days: readonly DatedLifts[]): string[] {
   const seen = new Set<string>();
-  for (const d of days) for (const k of liftsDone(d)) seen.add(k);
-  const order = new Map(LIFTS.map((l, i) => [l.key, i]));
-  return [...seen].sort(
-    (a, b) =>
-      (order.get(a) ?? LIFTS.length) - (order.get(b) ?? LIFTS.length) ||
-      a.localeCompare(b),
-  );
+  for (const d of days) for (const k of liftsDone(menu, d)) seen.add(k);
+  return [...seen].sort((a, b) => menu.rank(a) - menu.rank(b) || a.localeCompare(b));
 }
 
 export interface LiftPoint {
@@ -299,9 +383,10 @@ export interface LiftPoint {
  * a new one, and the point of the badge is that something moved.
  */
 export function liftSeries(
+  menu: Menu,
   days: readonly DatedLifts[],
   key: string,
-  mode: LiftMode = liftMode(key),
+  mode: LiftMode = menu.mode(key),
 ): LiftPoint[] {
   const ordered = [...days]
     .filter((d) => liftStats(d.lifts?.[key]).sets > 0)
@@ -333,10 +418,10 @@ export function liftSeries(
  * back squat — five sessions and two PRs — unshown behind a picker, under a
  * caption saying there was nothing to draw yet.
  */
-export function defaultLift(days: readonly DatedLifts[]): string | null {
+export function defaultLift(menu: Menu, days: readonly DatedLifts[]): string | null {
   let best: { key: string; n: number; last: string } | null = null;
-  for (const key of liftsEverDone(days)) {
-    const series = liftSeries(days, key);
+  for (const key of liftsEverDone(menu, days)) {
+    const series = liftSeries(menu, days, key);
     if (!series.length) continue;
     const cur = { key, n: series.length, last: series[series.length - 1].date };
     if (!best || cur.n > best.n || (cur.n === best.n && cur.last > best.last))
@@ -354,12 +439,13 @@ export interface LiftRecord {
 
 /** The best day for a lift, and when. Null when nothing supports a number. */
 export function liftBest(
+  menu: Menu,
   days: readonly DatedLifts[],
   key: string,
-  mode: LiftMode = liftMode(key),
+  mode: LiftMode = menu.mode(key),
 ): LiftRecord | null {
   let best: LiftRecord | null = null;
-  for (const p of liftSeries(days, key, mode)) {
+  for (const p of liftSeries(menu, days, key, mode)) {
     if (p.value == null) continue;
     if (!best || p.value > best.value)
       best = {
@@ -374,10 +460,11 @@ export function liftBest(
 
 /** The most recent day a lift was done. */
 export function liftLast(
+  menu: Menu,
   days: readonly DatedLifts[],
   key: string,
 ): { date: string; stats: LiftStats } | null {
-  const series = liftSeries(days, key);
+  const series = liftSeries(menu, days, key);
   const last = series[series.length - 1];
   return last ? { date: last.date, stats: last.stats } : null;
 }
@@ -394,12 +481,13 @@ export const STRENGTH_WINDOW = 28;
 
 /** Records set on or after `since`, newest first. */
 export function recentRecords(
+  menu: Menu,
   days: readonly DatedLifts[],
   since: string,
 ): { key: string; date: string; value: number }[] {
   const out: { key: string; date: string; value: number }[] = [];
-  for (const key of liftsEverDone(days))
-    for (const p of liftSeries(days, key))
+  for (const key of liftsEverDone(menu, days))
+    for (const p of liftSeries(menu, days, key))
       if (p.record && p.value != null && p.date >= since)
         out.push({ key, date: p.date, value: p.value });
   return out.sort((a, b) => b.date.localeCompare(a.date));
@@ -417,8 +505,8 @@ export interface DayTotals {
 }
 
 /** Everything across every lift on one day — the line a history row shows. */
-export function dayTotals(day: DatedLifts): DayTotals {
-  const keys = liftsDone(day);
+export function dayTotals(menu: Menu, day: DatedLifts): DayTotals {
+  const keys = liftsDone(menu, day);
   let sets = 0;
   let reps = 0;
   let volume = 0;

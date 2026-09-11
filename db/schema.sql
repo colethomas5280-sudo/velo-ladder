@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 18). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 19). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -257,3 +257,37 @@ CREATE TABLE IF NOT EXISTS lift_sessions (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS lift_athlete_date_uidx
   ON lift_sessions(athlete_id, date);
+
+-- v19: the lift menu became Cole's to edit rather than a constant in the
+-- code. Keyed by the slug, because that slug is what every logged set is
+-- filed under in lift_sessions.lifts — a surrogate id here would leave two
+-- ways to name the same lift and no guarantee they agreed.
+--
+-- Retiring a lift archives it. That is what makes the seed below safe to
+-- re-run: a lift Cole has removed stays in the table with archived = true,
+-- so ON CONFLICT DO NOTHING cannot resurrect it on the next deploy.
+CREATE TABLE IF NOT EXISTS lifts (
+  key        text PRIMARY KEY,
+  name       text NOT NULL,
+  lift_group text NOT NULL DEFAULT '',
+  mode       text NOT NULL DEFAULT 'load' CHECK (mode IN ('load','reps')),
+  help       text NOT NULL DEFAULT '',
+  position   int NOT NULL DEFAULT 0,
+  archived   boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lifts_order_idx ON lifts(position, name)
+  WHERE archived = false;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('trap-bar-deadlift', 'Trap bar deadlift', 'Lower body', 'load', '', 0) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('back-squat', 'Back squat', 'Lower body', 'load', '', 1) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('front-squat', 'Front squat', 'Lower body', 'load', '', 2) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('romanian-deadlift', 'Romanian deadlift', 'Lower body', 'load', '', 3) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('split-squat', 'Rear-foot elevated split squat', 'Lower body', 'load', 'Log one side — the load, not the total', 4) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('hip-thrust', 'Hip thrust', 'Lower body', 'load', '', 5) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('bench-press', 'Bench press', 'Push', 'load', '', 6) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('incline-db-press', 'Incline dumbbell press', 'Push', 'load', 'Per dumbbell', 7) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('overhead-press', 'Overhead press', 'Push', 'load', '', 8) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('chin-up', 'Chin-up', 'Pull', 'reps', 'Leave the weight blank for bodyweight, or enter what you hung on', 9) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('barbell-row', 'Barbell row', 'Pull', 'load', '', 10) ON CONFLICT (key) DO NOTHING;
+INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES ('db-row', 'Dumbbell row', 'Pull', 'load', 'Per hand', 11) ON CONFLICT (key) DO NOTHING;
