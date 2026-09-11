@@ -127,7 +127,14 @@ test("running it twice does not duplicate the library", async () => {
  */
 test("a recipe Cole edited is not overwritten by the next deploy", async () => {
   const { sql } = await import("@/lib/db");
-  await sql`UPDATE recipes SET title = 'Cole renamed this' WHERE id = 'seed-choc-pb'`;
+  /*
+   * Edited through the app, not with raw SQL. That distinction is the whole
+   * mechanism now: `updateRecipe` moves `updated_at` off `created_at`, and
+   * that is what marks a recipe as his. A hand-written UPDATE that leaves the
+   * timestamp alone looks untouched, and correctly gets refreshed.
+   */
+  const data = await import("@/lib/data");
+  await data.updateRecipe("seed-choc-pb", { title: "Cole renamed this" });
   await run();
   const [row] = (await sql`SELECT title FROM recipes WHERE id = 'seed-choc-pb'`) as {
     title: string;
@@ -173,4 +180,67 @@ test("a recipe of Cole's own with no meal time is not counted against him", asyn
   const body = await run();
   assert.equal(body.recipes.unsorted, 0);
   assert.equal(body.warning, undefined);
+});
+
+/* ------------------------------------------------------------------ *
+ * Corrections have to actually reach him
+ *
+ * `ON CONFLICT DO NOTHING` protected Cole's edits and also meant a FIXED
+ * recipe never landed: his rows already existed, so two rounds of extraction
+ * corrections went out and changed nothing he could see. The whole point of
+ * fixing an extraction bug is that the fix arrives.
+ *
+ * These test the upgrade path, which is the one that matters — a fresh
+ * database takes the corrected text through the INSERT and proves nothing.
+ * ------------------------------------------------------------------ */
+
+test("a corrected recipe reaches a database that already had the old one", async () => {
+  const { execScript, sql } = await import("@/lib/db");
+  const { SCHEMA_SQL } = await import("@/lib/schema");
+  await execScript(`
+    UPDATE recipes SET ingredients = '["stale text"]'::jsonb WHERE id = 'seed-choc-mousse';
+    UPDATE recipes SET created_at = updated_at WHERE id = 'seed-choc-mousse';
+  `);
+  await execScript(SCHEMA_SQL);
+
+  const [row] = (await sql`
+    SELECT ingredients FROM recipes WHERE id = 'seed-choc-mousse'
+  `) as { ingredients: string[] }[];
+  assert.equal(row.ingredients.includes("stale text"), false, "the fix never landed");
+  assert.ok(row.ingredients.length > 3);
+});
+
+/*
+ * And the other half, which is what DO NOTHING was protecting. Once he edits
+ * a recipe it is his: `updated_at` moves off `created_at` and stays there.
+ */
+test("a recipe Cole has edited is never refreshed out from under him", async () => {
+  const { execScript, sql } = await import("@/lib/db");
+  const { SCHEMA_SQL } = await import("@/lib/schema");
+  await execScript(`
+    UPDATE recipes
+       SET title = 'Cole renamed this',
+           ingredients = '["his own list"]'::jsonb,
+           updated_at = created_at + interval '1 second'
+     WHERE id = 'seed-rice-krispie';
+  `);
+  await execScript(SCHEMA_SQL);
+
+  const [row] = (await sql`
+    SELECT title, ingredients FROM recipes WHERE id = 'seed-rice-krispie'
+  `) as { title: string; ingredients: string[] }[];
+  assert.equal(row.title, "Cole renamed this");
+  assert.deepEqual(row.ingredients, ["his own list"]);
+});
+
+/* An untouched recipe must stay refreshable, so the refresh cannot stamp
+ * updated_at. Otherwise a correction lands once and never again. */
+test("refreshing a recipe does not make it look edited", async () => {
+  const { execScript, sql } = await import("@/lib/db");
+  const { SCHEMA_SQL } = await import("@/lib/schema");
+  await execScript(SCHEMA_SQL);
+  const [row] = (await sql`
+    SELECT (updated_at = created_at) AS untouched FROM recipes WHERE id = 'seed-berry-fresh'
+  `) as { untouched: boolean }[];
+  assert.equal(row.untouched, true, "a second correction would never arrive");
 });

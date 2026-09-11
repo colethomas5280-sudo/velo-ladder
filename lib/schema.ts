@@ -30,11 +30,17 @@ const LIFT_SEED_SQL = seedLifts()
   .join("\n");
 
 /**
- * Cole's six recipes, as INSERTs.
+ * The seeded recipes, as upserts.
  *
- * Same contract as the lift menu: ON CONFLICT (id) DO NOTHING, so once a
- * recipe is on his database it is his to edit, and a deploy never overwrites
- * it. The ids are stable and readable for exactly that reason.
+ * DO NOTHING was wrong, and quietly: a corrected recipe never reached Cole,
+ * because his rows already existed. The whole point of fixing an extraction
+ * bug is that the fix lands.
+ *
+ * So it refreshes — but ONLY a recipe he has never touched, which the row
+ * says itself: `updated_at = created_at` holds until the first PATCH, and the
+ * refresh deliberately does not stamp it, so an untouched recipe stays
+ * refreshable forever. The moment he edits one it is his, and every later
+ * deploy leaves it exactly as he left it.
  */
 /**
  * Teach the recipes already on Cole's database their meal times.
@@ -61,7 +67,14 @@ const RECIPE_SEED_SQL = ALL_SEED_RECIPES.map((r, i) => {
     `${q(JSON.stringify(r.meals))}::jsonb, ${n(r.servings)}, ` +
     `${n(r.calories)}, ${n(r.proteinG)}, ${n(r.carbsG)}, ${n(r.fatG)}, ` +
     `${q(JSON.stringify(r.ingredients))}::jsonb, ${q(JSON.stringify(r.steps))}::jsonb, ` +
-    `${q(r.notes)}, ${i}) ON CONFLICT (id) DO NOTHING;`
+    `${q(r.notes)}, ${i}) ON CONFLICT (id) DO UPDATE SET` +
+    ` title = EXCLUDED.title, kind = EXCLUDED.kind, blurb = EXCLUDED.blurb,` +
+    ` meals = EXCLUDED.meals, servings = EXCLUDED.servings,` +
+    ` calories = EXCLUDED.calories, protein_g = EXCLUDED.protein_g,` +
+    ` carbs_g = EXCLUDED.carbs_g, fat_g = EXCLUDED.fat_g,` +
+    ` ingredients = EXCLUDED.ingredients, steps = EXCLUDED.steps,` +
+    ` notes = EXCLUDED.notes` +
+    ` WHERE recipes.updated_at = recipes.created_at;`
   );
 }).join("\n");
 
