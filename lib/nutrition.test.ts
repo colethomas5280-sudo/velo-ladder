@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   CALORIES_PER_LB,
+  MAX_BODYWEIGHT_LB,
+  MIN_BODYWEIGHT_LB,
   PROTEIN_G_PER_LB,
   fmtShare,
   intakeFor,
@@ -95,5 +97,41 @@ test("Cole's shakes land where a big shake should against a day", () => {
     if (r.calories == null) continue;
     const share = shareOfDay(r.calories, day);
     assert.ok(share > 0.15 && share < 0.45, `${r.title}: ${Math.round(share * 100)}%`);
+  }
+});
+
+/* ---------------- a bodyweight has to be plausible ---------------- */
+
+/*
+ * Cole: "when I try to enter a number the first number is added and then the
+ * box is closed."
+ *
+ * `intakeFor(1)` returned a target of ZERO calories, which is nonsense and
+ * was still truthy enough to convince the page it had a weight. It then swapped
+ * the input for the answer, mid-keystroke.
+ */
+test("an implausible bodyweight is not a bodyweight", () => {
+  for (const w of [1, 7, 49, 501, 0, -5, NaN])
+    assert.equal(intakeFor(w), null, `${w} lb`);
+});
+
+test("the bounds are the profile's own, not a second opinion", async () => {
+  const { PROFILE_FIELDS } = await import("@/lib/profile");
+  const field = PROFILE_FIELDS.find((f) => f.key === "weightLb")!;
+  assert.equal(MIN_BODYWEIGHT_LB, field.min);
+  assert.equal(MAX_BODYWEIGHT_LB, field.max);
+});
+
+test("the edges themselves are accepted", () => {
+  assert.ok(intakeFor(MIN_BODYWEIGHT_LB));
+  assert.ok(intakeFor(MAX_BODYWEIGHT_LB));
+});
+
+/* Never zero. A target of 0 calories was the tell that the guard was wrong. */
+test("any accepted weight produces a target worth eating", () => {
+  for (const w of [MIN_BODYWEIGHT_LB, 120, 186, 240, MAX_BODYWEIGHT_LB]) {
+    const i = intakeFor(w)!;
+    assert.ok(i.calories >= 900, `${w} lb -> ${i.calories} kcal`);
+    assert.ok(i.proteinG > 0);
   }
 });
