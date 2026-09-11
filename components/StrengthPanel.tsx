@@ -22,7 +22,8 @@ import {
   topSet,
 } from "@/lib/strength";
 import {
-  fmtRatio,
+  fmtToGo,
+  fmtValue,
   fmtTarget,
   progressTo,
   relativeStrength,
@@ -282,29 +283,38 @@ function StandardRow({ r, name }: { r: Relative; name: string }) {
     <li className={r.met ? "sd met" : "sd"}>
       <div className="sd-head">
         <span className="sd-lift">{name}</span>
-        <span className="sd-ratio">{fmtRatio(r.ratio)}</span>
-        <span className="sd-target">of {fmtTarget(r.target)} bodyweight</span>
+        <span className="sd-ratio">{fmtValue(r)}</span>
+        <span className="sd-target">{fmtTarget(r)}</span>
       </div>
       <div className="sd-meter" role="presentation">
         <span className="sd-fill" style={{ width: `${progressTo(r) * 100}%` }} />
       </div>
       <div className="sd-foot">
-        <span className="sd-gap">
-          {r.met ? "Cleared" : `${Math.ceil(r.toGo)} lb to go`}
-        </span>
+        <span className="sd-gap">{r.met ? "Cleared" : fmtToGo(r)}</span>
         {/*
-          * Always says where both numbers came from. A ratio is two
+          * Always says where the number came from. A ratio is two
           * measurements and an athlete should be able to check either —
           * especially when the weight is one lone weigh-in.
+          *
+          * A rep standard shows the bodyweight too when there is one, because
+          * ten pull-ups at 200 lb is not the same feat as ten at 150 — but it
+          * is context, not arithmetic, so its absence hides nothing.
           */}
         <span className="sd-src">
-          {Math.round(r.e1rm)} lb est. on {fmtDate(r.on)} at{" "}
-          {Math.round(r.weight.lb)} lb
-          {r.weight.from === "profile"
-            ? " (from your profile)"
-            : r.weight.n < 3
-              ? ` (${r.weight.n} weigh-in${r.weight.n === 1 ? "" : "s"})`
-              : ""}
+          {r.kind === "reps"
+            ? `${r.achieved} on ${fmtDate(r.on)}`
+            : `${Math.round(r.achieved)} lb est. on ${fmtDate(r.on)}`}
+          {r.weight && (
+            <>
+              {" at "}
+              {Math.round(r.weight.lb)} lb
+              {r.weight.from === "profile"
+                ? " (from your profile)"
+                : r.weight.n < 3
+                  ? ` (${r.weight.n} weigh-in${r.weight.n === 1 ? "" : "s"})`
+                  : ""}
+            </>
+          )}
         </span>
       </div>
     </li>

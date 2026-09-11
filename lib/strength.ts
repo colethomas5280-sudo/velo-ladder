@@ -59,8 +59,11 @@ export interface Lift {
  * cut of this list was wrong.
  *
  * It is the SEED and nothing more. The live menu is the `lifts` table, which
- * Cole edits himself; changing an entry here has no effect on a database
- * already set up, by design, or a deploy would overwrite his own edits.
+ * Cole edits himself. Every INSERT is ON CONFLICT (key) DO NOTHING and the
+ * seed runs on every /api/setup, so the two halves of that behave differently
+ * on purpose: adding a NEW key here reaches his live menu on the next setup,
+ * while editing an existing one never does — or a deploy would quietly
+ * overwrite his own renames.
  *
  * The PROGRAMMING — which of these to do, in what order, for how many sets —
  * lives in Velo Beam. This app holds the lift and the log, not the plan.
@@ -158,6 +161,28 @@ const SEED_LIFTS: ExerciseDef[] = [
     name: "Band assisted Nordic glute ham",
     group: "Lower body",
     mode: "reps",
+  },
+  /*
+   * The last three are NOT off the Driveline sheet. Cole named Back Squat, DB
+   * Bench Press and Max Pull-ups among the five he watches, and none was in
+   * the cycle he sent — the sheet's "Bench" is a separate barbell lift, which
+   * is why this does not reuse that key. Appended rather than slotted in, so
+   * nothing above them shifts position.
+   */
+  { key: "back-squat", name: "Back squat", group: "Lower body", mode: "load" },
+  {
+    key: "db-bench-press",
+    name: "DB bench press",
+    group: "Push",
+    mode: "load",
+    help: "Per dumbbell, like the rest of the dumbbell work",
+  },
+  {
+    key: "pull-up",
+    name: "Max pull-ups",
+    group: "Pull",
+    mode: "reps",
+    help: "Strict, from a dead hang — log the reps, and any weight you hung on",
   },
   {
     key: "single-leg-pallof-press",
