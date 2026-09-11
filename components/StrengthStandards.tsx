@@ -236,7 +236,7 @@ function Bodyweight({ s }: { s: BodyweightStanding }) {
             key={m.anchor.label}
             className={s.reached === m.anchor ? "ss-anchor ss-anchor-at" : "ss-anchor"}
           >
-            <span className="ss-anchor-lb">{Math.round(m.lb)} lb</span>
+            <span className="ss-anchor-lb">{m.lb} lb</span>
             <span className="ss-anchor-name">{m.anchor.label}</span>
             <span className="ss-basis">{m.anchor.note}</span>
           </li>

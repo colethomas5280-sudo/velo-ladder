@@ -80,10 +80,10 @@ test("bodyweight is shown as named anchors, not as a pass or fail", () => {
   open();
   fill("6", "0", "180");
   const body = document.querySelector(".ss-body")!.textContent!;
-  // 72in x 2.5 / 2.7 / 2.8
+  // 72in x 2.5 / 2.7 / 2.8, each rounded up to the nearest 5.
   assert.match(body, /180 lb/);
-  assert.match(body, /194 lb/);
-  assert.match(body, /202 lb/);
+  assert.match(body, /195 lb/);
+  assert.match(body, /205 lb/);
   assert.match(body, /high-school draftee/i, "each anchor says what it is");
   assert.match(body, /average MLB player/i);
 });

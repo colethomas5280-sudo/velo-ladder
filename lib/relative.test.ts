@@ -11,6 +11,7 @@ import {
   bodyweightStanding,
   fmtHeight,
   roundLoad,
+  roundUp5,
   targetsAt,
   levelReached,
   markFor,
@@ -508,10 +509,42 @@ test("the loaded ratio reads loaded sets only, even when a rep set estimates hig
  * the average MLB player and 2.5x the average high-school draftee.
  */
 test("the anchors are pounds per inch, so they scale with height", () => {
-  const short = bodyweightMarks(68).map((m) => Math.round(m.lb));
-  const tall = bodyweightMarks(76).map((m) => Math.round(m.lb));
-  assert.deepEqual(short, [170, 184, 190]);
-  assert.deepEqual(tall, [190, 205, 213]);
+  assert.deepEqual(bodyweightMarks(68).map((m) => m.lb), [170, 185, 195]);
+  assert.deepEqual(bodyweightMarks(76).map((m) => m.lb), [190, 210, 215]);
+});
+
+/*
+ * Rounded UP, not to nearest: these are minimums, and rounding a floor down
+ * moves the floor. 68 x 2.7 is 183.6, which becomes 185 rather than 185's
+ * neighbour below.
+ */
+test("a mark rounds up to the nearest 5, never down", () => {
+  assert.equal(roundUp5(183.6), 185);
+  assert.equal(roundUp5(190.4), 195);
+  assert.equal(roundUp5(180), 180, "already round, left alone");
+  assert.equal(roundUp5(180.1), 185);
+});
+
+/*
+ * Two anchors landing on the same rounded pound would make "the highest one
+ * reached" ambiguous and let `next` skip a rung. 0.1 lb/in separates the top
+ * two, so this only holds because athletes are taller than 50 inches — worth
+ * asserting across the range rather than assuming.
+ */
+test("the rounded marks stay distinct across every height an athlete has", () => {
+  for (let h = 58; h <= 84; h++) {
+    const lbs = bodyweightMarks(h).map((m) => m.lb);
+    for (let i = 1; i < lbs.length; i++)
+      assert.ok(lbs[i] > lbs[i - 1], `at ${h}in: ${lbs.join(" / ")}`);
+  }
+});
+
+/* The gap has to agree with the number beside it, or the athlete does the
+ * arithmetic and finds it wrong. */
+test("what is left to go is measured against the rounded mark, not the raw one", () => {
+  const b = bodyweightStanding(73, 186)!;
+  assert.equal(b.next!.lb, 200, "73 x 2.7 is 197.1, shown as 200");
+  assert.equal(Math.round(b.next!.toGo), 14, "186 + 14 = 200");
 });
 
 test("every anchor says what it is, not just what it is worth", () => {
