@@ -3765,3 +3765,41 @@ table.roster-table {
 .st-subs .sd-lift {
   font-size: 12px;
 }
+
+/* ---------- what the recovery score means ---------- */
+.rg-top {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.rg-band {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  flex: 1 1 240px;
+}
+.rg-p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+.rg-p:last-child {
+  margin-bottom: 0;
+}
+.rg-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+.rg-list li {
+  margin-bottom: 9px;
+}
+.rg-list li:last-child {
+  margin-bottom: 0;
+}
