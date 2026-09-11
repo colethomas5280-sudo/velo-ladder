@@ -19,6 +19,7 @@ import {
   liftsDone,
   metricSet,
   liftsEverDone,
+  missingSeedLifts,
   recentRecords,
   topSet,
   type DatedLifts,
@@ -475,4 +476,33 @@ test("with nothing loaded, both fall back to the longest set", () => {
     assert.deepEqual(metricSet(s, mode), set(0, 12), mode);
     assert.deepEqual(topSet(s, mode), set(0, 12), mode);
   }
+});
+
+/* ---------------- has the seed landed ---------------- */
+
+/*
+ * The check behind /api/setup's report. Cole reads that response after every
+ * deploy, and until this existed it could not distinguish a run that added
+ * three lifts from one that added none — the menu grows by INSERT ... ON
+ * CONFLICT DO NOTHING, which is silent either way.
+ */
+test("a menu holding every seeded key is missing nothing", () => {
+  assert.deepEqual(missingSeedLifts(seedLifts().map((l) => l.key)), []);
+});
+
+test("a key that never inserted is named", () => {
+  const short = seedLifts()
+    .map((l) => l.key)
+    .filter((k) => k !== "back-squat" && k !== "pull-up");
+  assert.deepEqual(missingSeedLifts(short), ["back-squat", "pull-up"]);
+});
+
+test("an empty menu names the whole seed rather than shrugging", () => {
+  assert.equal(missingSeedLifts([]).length, seedLifts().length);
+});
+
+/* Lifts Cole adds himself are not part of the seed and are never reported. */
+test("a lift of Cole's own is not a missing seed lift", () => {
+  const withExtra = [...seedLifts().map((l) => l.key), "cole-invented-this"];
+  assert.deepEqual(missingSeedLifts(withExtra), []);
 });
