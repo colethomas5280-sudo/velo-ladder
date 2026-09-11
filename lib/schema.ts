@@ -1,4 +1,4 @@
-import { programLifts } from "./program";
+import { seedLifts } from "./strength";
 
 /**
  * Canonical database schema. Run once (and after any schema change) via
@@ -19,7 +19,7 @@ const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
  * is `ON CONFLICT DO NOTHING`: on Cole's database, which already has a menu
  * he has edited, this whole block is a no-op.
  */
-const LIFT_SEED_SQL = programLifts()
+const LIFT_SEED_SQL = seedLifts()
   .map(
     (l) =>
       `INSERT INTO lifts (key, name, lift_group, mode, help, position) VALUES (` +

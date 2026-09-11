@@ -51,6 +51,140 @@ export interface Lift {
 }
 
 /* ------------------------------------------------------------------ *
+ * What a brand-new database starts with
+ *
+ * Every exercise named in the Driveline sheet Cole's athletes lift off —
+ * Intermediate Off-Season (Throwing Skill-Dominant), Cycle 1. Taken from his
+ * program rather than invented beside it, which is the whole reason the first
+ * cut of this list was wrong.
+ *
+ * It is the SEED and nothing more. The live menu is the `lifts` table, which
+ * Cole edits himself; changing an entry here has no effect on a database
+ * already set up, by design, or a deploy would overwrite his own edits.
+ *
+ * The PROGRAMMING — which of these to do, in what order, for how many sets —
+ * lives in Velo Beam. This app holds the lift and the log, not the plan.
+ * ------------------------------------------------------------------ */
+
+interface ExerciseDef {
+  key: string;
+  name: string;
+  group: string;
+  mode: LiftMode;
+  help?: string;
+}
+
+const SEED_LIFTS: ExerciseDef[] = [
+  // Day 1
+  { key: "front-squat", name: "Front squat", group: "Lower body", mode: "load" },
+  {
+    key: "prone-1-arm-trap-raise",
+    name: "Prone 1-arm trap raise",
+    group: "Shoulder care",
+    mode: "load",
+    help: "Per side — the load in one hand, not the total",
+  },
+  {
+    key: "reverse-lunge",
+    name: "Reverse lunge",
+    group: "Lower body",
+    mode: "load",
+    help: "Per side — the load you carried, not the total",
+  },
+  {
+    key: "three-point-db-row",
+    name: "Three point DB row",
+    group: "Pull",
+    mode: "load",
+    help: "Per hand",
+  },
+  { key: "push-up", name: "Push-up", group: "Push", mode: "reps" },
+  {
+    key: "banded-side-lying-clam",
+    name: "Banded side lying clam",
+    group: "Core & hips",
+    mode: "reps",
+    help: "Per side",
+  },
+  { key: "high-plank", name: "High plank", group: "Core & hips", mode: "time" },
+
+  // Day 2
+  { key: "bench", name: "Bench", group: "Push", mode: "load" },
+  {
+    key: "half-kneeling-hip-flexor-mob",
+    name: "Half kneeling hip flexor mob",
+    group: "Mobility",
+    mode: "reps",
+    help: "Per side",
+  },
+  {
+    key: "half-kneeling-landmine-press",
+    name: "Half kneeling landmine press",
+    group: "Push",
+    mode: "load",
+    help: "Per side",
+  },
+  { key: "rdl", name: "RDL", group: "Lower body", mode: "load" },
+  {
+    key: "db-goblet-lateral-lunge",
+    name: "DB goblet lateral lunge",
+    group: "Lower body",
+    mode: "load",
+    help: "Per side",
+  },
+  {
+    key: "half-kneeling-cable-high-row",
+    name: "Half kneeling cable high row",
+    group: "Pull",
+    mode: "load",
+    help: "Per side",
+  },
+  { key: "dead-bug", name: "Dead bug", group: "Core & hips", mode: "reps", help: "Per side" },
+
+  // Day 3
+  { key: "deadlift", name: "Deadlift", group: "Lower body", mode: "load" },
+  {
+    key: "cable-external-rotation",
+    name: "Cable external rotation",
+    group: "Shoulder care",
+    mode: "load",
+    help: "Per side",
+  },
+  { key: "barbell-hip-thrust", name: "Barbell hip thrust", group: "Lower body", mode: "load" },
+  { key: "bench-t-spine-mob", name: "Bench T-spine mob", group: "Mobility", mode: "reps" },
+  { key: "yoga-push-up", name: "Yoga push-up", group: "Push", mode: "reps" },
+  {
+    key: "band-assisted-nordic-glute-ham",
+    name: "Band assisted Nordic glute ham",
+    group: "Lower body",
+    mode: "reps",
+  },
+  {
+    key: "single-leg-pallof-press",
+    name: "Single leg Pallof press",
+    group: "Core & hips",
+    mode: "reps",
+    help: "Per side",
+  },
+];
+
+/** The seed as real rows: position by declaration order, none archived. */
+export function seedLifts(): Lift[] {
+  return SEED_LIFTS.map((e, i) => ({
+    key: e.key,
+    name: e.name,
+    group: e.group,
+    mode: e.mode,
+    // Always a string, never absent. An optional field that is sometimes
+    // missing and sometimes `undefined` compares unequal to itself across
+    // the wire, which is a needless way to make two identical menus differ.
+    help: e.help ?? "",
+    position: i,
+    archived: false,
+  }));
+}
+
+/* ------------------------------------------------------------------ *
  * The menu
  *
  * Every derived function takes one. The menu used to be this module's own

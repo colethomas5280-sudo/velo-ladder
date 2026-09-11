@@ -6,8 +6,8 @@ import {
   MAX_SETS,
   MAX_WEIGHT,
   liftMenu,
+  seedLifts,
 } from "@/lib/strength";
-import { programLifts } from "@/lib/program";
 
 /* ------------------------------------------------------------------ *
  * Validating a lifting day
@@ -19,7 +19,7 @@ import { programLifts } from "@/lib/program";
  * ------------------------------------------------------------------ */
 
 const TODAY = "2026-09-10";
-const MENU = liftMenu(programLifts());
+const MENU = liftMenu(seedLifts());
 const parse = (body: unknown) => parseLiftInput(body, TODAY, MENU);
 const day = (lifts: Record<string, unknown>, notes = "") => ({
   date: TODAY,
@@ -183,7 +183,7 @@ test("a body that isn't an object is refused", () => {
  * keeps filing sets under a movement the coach has removed.
  */
 test("an archived lift is off the menu and refused on the way in", () => {
-  const rows = programLifts().map((l) =>
+  const rows = seedLifts().map((l) =>
     l.key === "front-squat" ? { ...l, archived: true } : l,
   );
   const narrowed = liftMenu(rows);

@@ -2,7 +2,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { splitStatements } from "@/lib/db";
 import { SCHEMA_SQL, SEED_SQL, SCHEMA_VERSION, schemaTables } from "@/lib/schema";
-import { programLifts } from "@/lib/program";
+import { seedLifts } from "@/lib/strength";
 
 /* ------------------------------------------------------------------ *
  * The gap these tests close
@@ -217,7 +217,7 @@ test("the tables the setup check looks for are the tables the schema creates", a
  * starts with" from drifting — including the `lift_group` column name, which
  * differs from the field it carries because `group` is reserved in SQL.
  */
-test("a fresh database starts with exactly the program's exercises", async () => {
+test("a fresh database starts with exactly the seeded lift menu", async () => {
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
   const rows = (
@@ -235,7 +235,7 @@ test("a fresh database starts with exactly the program's exercises", async () =>
       position: Number(r.position),
       archived: Boolean(r.archived),
     })),
-    programLifts(),
+    seedLifts(),
   );
 });
 
