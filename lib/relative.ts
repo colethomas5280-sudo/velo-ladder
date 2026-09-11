@@ -26,13 +26,30 @@ import {
  * dividing by today's weight would quietly demote a lift they actually made.
  * ------------------------------------------------------------------ */
 
-export interface Standard {
-  liftKey: string;
-  /** Target as a multiple of bodyweight. */
-  multiple: number;
-  /** Why this number, in the athlete's language. */
-  note?: string;
-}
+/**
+ * A mark to train towards.
+ *
+ * Two kinds, because two of the five lifts Cole watches are not measured in
+ * pounds. A back squat is a multiple of bodyweight; max pull-ups is a rep
+ * count — an athlete IS the load, so "2× bodyweight of pull-up" is not a
+ * sentence. The discriminant is explicit rather than inferred from the lift's
+ * mode so the config says out loud what `target: 10` means.
+ */
+export type Standard =
+  | {
+      liftKey: string;
+      kind: "ratio";
+      /** Multiple of bodyweight. */
+      target: number;
+      note?: string;
+    }
+  | {
+      liftKey: string;
+      kind: "reps";
+      /** Reps in one set. */
+      target: number;
+      note?: string;
+    };
 
 /**
  * PROPOSED, NOT COLE'S. These are the commonly cited relative-strength marks
@@ -42,21 +59,41 @@ export interface Standard {
  * One target for everyone, by his call: a ratio is a ratio, and splitting it
  * by level would mean deciding that a sixteen-year-old should want less.
  *
- * Deliberately only three. A standard on every accessory would turn a target
- * into a scoreboard, and nobody has a published mark for a banded clam.
+ * These are the five lifts Cole says he watches, and no others. The barbell
+ * bench on his sheet is deliberately absent — he named the DB press, and a
+ * standard on every accessory would turn a target into a scoreboard.
  */
 export const STRENGTH_STANDARDS: Standard[] = [
   {
     liftKey: "deadlift",
-    multiple: 2,
-    note: "The big one. Twice your bodyweight off the floor.",
+    kind: "ratio",
+    target: 2,
+    note: "Twice your bodyweight off the floor.",
+  },
+  {
+    liftKey: "back-squat",
+    kind: "ratio",
+    target: 1.75,
+    note: "The heavier of the two squats, so the heavier mark.",
   },
   {
     liftKey: "front-squat",
-    multiple: 1.5,
-    note: "Front squat sits below a back squat — this is the equivalent mark.",
+    kind: "ratio",
+    target: 1.5,
+    note: "A front squat runs about 85% of a back squat — same effort, lower number.",
   },
-  { liftKey: "bench", multiple: 1.25, note: "Upper body, against your own size." },
+  {
+    liftKey: "db-bench-press",
+    kind: "ratio",
+    target: 0.5,
+    note: "Per dumbbell, not the pair — 90s at 180 lb bodyweight.",
+  },
+  {
+    liftKey: "pull-up",
+    kind: "reps",
+    target: 10,
+    note: "Strict, from a dead hang. Ten is the mark.",
+  },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -128,20 +165,30 @@ export function bodyWeightOn(
 
 export interface Relative {
   liftKey: string;
-  /** Best estimated max, and the day it came from. */
-  e1rm: number;
+  kind: Standard["kind"];
+  /** What they actually did: an estimated max in lb, or reps in a set. */
+  achieved: number;
+  /** The day it came from. */
   on: string;
-  weight: BodyWeight;
-  /** e1rm ÷ bodyweight. */
-  ratio: number;
+  /**
+   * Bodyweight around that day. Required for a ratio — there is no ratio
+   * without it — and merely CONTEXT for a rep standard, which is why it is
+   * nullable: twelve pull-ups at 200 lb is a different feat from twelve at
+   * 150, but an athlete who has never weighed in still has a pull-up count.
+   */
+  weight: BodyWeight | null;
+  /** The number against the target: a multiple of bodyweight, or reps. */
+  value: number;
   target: number;
   met: boolean;
   /**
-   * Pounds still to add to the bar to hit the target at that bodyweight.
+   * What is left: pounds to add to the bar, or reps to add to the set.
    * Zero once it is met — never negative, because "−18 lb to go" reads as a
    * deficit to the person who just cleared the bar.
    */
   toGo: number;
+  /** The unit `toGo` is counted in, so the page can never mislabel it. */
+  unit: "lb" | "reps";
   note?: string;
 }
 
@@ -163,44 +210,82 @@ export function relativeStrength(
   const out: Relative[] = [];
 
   for (const s of standards) {
-    // Only a loaded lift has a max to take a ratio of.
-    if (menu.mode(s.liftKey) !== "load") continue;
+    const mode = menu.mode(s.liftKey);
+    /*
+     * The standard and the lift have to agree about what is being measured.
+     * A ratio needs a loaded lift to take a max of; a rep standard needs a
+     * lift actually counted in reps. A mismatch is a config mistake, and
+     * silently showing something would hide it.
+     */
+    if (s.kind === "ratio" && mode !== "load") continue;
+    if (s.kind === "reps" && mode !== "reps") continue;
+
     const best = liftBest(menu, days, s.liftKey);
     if (!best) continue;
 
     const weight = bodyWeightOn(entries, best.date, profileWeight);
-    if (!weight) continue;
 
-    const ratio = best.value / weight.lb;
-    const toGo = Math.max(0, s.multiple * weight.lb - best.value);
+    if (s.kind === "reps") {
+      out.push({
+        liftKey: s.liftKey,
+        kind: "reps",
+        achieved: best.value,
+        on: best.date,
+        weight,
+        value: best.value,
+        target: s.target,
+        met: best.value >= s.target,
+        toGo: Math.max(0, s.target - best.value),
+        unit: "reps",
+        note: s.note,
+      });
+      continue;
+    }
+
+    // A ratio with no denominator is not a ratio.
+    if (!weight) continue;
+    const value = best.value / weight.lb;
     out.push({
       liftKey: s.liftKey,
-      e1rm: best.value,
+      kind: "ratio",
+      achieved: best.value,
       on: best.date,
       weight,
-      ratio,
-      target: s.multiple,
-      met: ratio >= s.multiple,
-      toGo,
+      value,
+      target: s.target,
+      met: value >= s.target,
+      toGo: Math.max(0, s.target * weight.lb - best.value),
+      unit: "lb",
       note: s.note,
     });
   }
 
   // Closest to the target first — the one worth a push this block.
-  return out.sort((a, b) => b.ratio / b.target - a.ratio / a.target);
+  return out.sort((a, b) => b.value / b.target - a.value / a.target);
 }
 
-/** "1.72×" — two decimals is false precision on a number built from an estimate. */
-export function fmtRatio(ratio: number): string {
-  return `${ratio.toFixed(2)}×`;
+/** "1.72×" for a ratio, "8" for reps — the number as its own kind reads. */
+export function fmtValue(r: Relative): string {
+  return r.kind === "reps" ? String(r.value) : `${r.value.toFixed(2)}×`;
 }
 
-/** "2×" / "1.25×" — a target reads exactly as it was written down. */
-export function fmtTarget(multiple: number): string {
-  return `${multiple}×`;
+/** "of 2× bodyweight" / "of 10 reps" — what is being chased. */
+export function fmtTarget(r: Relative): string {
+  return r.kind === "reps"
+    ? `of ${r.target} reps`
+    : `of ${r.target}× bodyweight`;
+}
+
+/**
+ * What is left, in the unit it is counted in. Reps round UP the same way
+ * pounds do: half a rep short is still short.
+ */
+export function fmtToGo(r: Relative): string {
+  const n = Math.ceil(r.toGo);
+  return r.unit === "reps" ? `${n} rep${n === 1 ? "" : "s"} to go` : `${n} lb to go`;
 }
 
 /** How far along the bar towards the target, capped at 1 for the meter. */
 export function progressTo(r: Relative): number {
-  return Math.max(0, Math.min(1, r.ratio / r.target));
+  return Math.max(0, Math.min(1, r.value / r.target));
 }
