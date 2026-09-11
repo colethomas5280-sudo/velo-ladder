@@ -174,7 +174,7 @@ export default function StrengthStandards() {
                 </span>
                 <span className="ss-basis">
                   {t.ratio != null
-                    ? `${t.ratio}× bodyweight`
+                    ? `${t.ratio}× bodyweight${t.forReps ? ` for ${t.forReps} reps a side` : ""}`
                     : "strict, neutral grip, from a dead hang"}
                   {t.then && ` · then +${roundUp5(t.then.added)} lb ${t.then.note}`}
                 </span>

@@ -274,9 +274,10 @@ test("a rep standard on a loaded lift is skipped, and the reverse too", () => {
 test("every standard names a menu lift whose mode matches its kind", () => {
   for (const s of STRENGTH_STANDARDS) {
     assert.ok(MENU.get(s.liftKey), `${s.liftKey} is not on the menu`);
+    const wants = s.kind === "ratio" || s.kind === "load-for-reps" ? "load" : "reps";
     assert.equal(
       MENU.mode(s.liftKey),
-      s.kind === "ratio" ? "load" : "reps",
+      wants,
       `${s.liftKey} is a ${MENU.mode(s.liftKey)} lift with a ${s.kind} standard`,
     );
     const target = s.kind === "reps-then-load" ? s.reps : s.target;
@@ -291,7 +292,16 @@ test("every standard names a menu lift whose mode matches its kind", () => {
 test("the standards are exactly the lifts Cole watches", () => {
   assert.deepEqual(
     [...STRENGTH_STANDARDS.map((s) => s.liftKey)].sort(),
-    ["back-squat", "barbell-row", "bench", "db-bench-press", "deadlift", "front-squat", "pull-up"],
+    [
+      "back-squat",
+      "barbell-row",
+      "bench",
+      "db-bench-press",
+      "deadlift",
+      "front-squat",
+      "pull-up",
+      "reverse-lunge",
+    ],
   );
   assert.deepEqual(
     STRENGTH_STANDARDS.filter((s) => s.tier === "sub").map((s) => s.liftKey),
@@ -721,4 +731,91 @@ test("landing exactly on the loaded total clears it", () => {
   )[0];
   assert.equal(under.met, false);
   assert.equal(under.toGo, 1);
+});
+
+/* ---------------- the unilateral gold star ---------------- */
+
+/*
+ * Cole: "add Reverse Lunge as our unilateral strength gold star. The goal is
+ * to perform 10 reps per side with BW on the bar."
+ *
+ * Neither a ratio nor a rep count on its own. The reps are half the mark, and
+ * measuring it as an estimated max would hand it to an athlete who never did
+ * ten of anything.
+ */
+const lunge: Standard[] = [
+  { liftKey: "reverse-lunge", kind: "load-for-reps", reps: 10, target: 1 },
+];
+const lungeDay = (date: string, sets: LiftSet[]): DatedLifts => ({
+  date,
+  lifts: { "reverse-lunge": sets },
+});
+
+test("bodyweight on the bar for the full reps clears it", () => {
+  const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(180, 10)])], steady(180), null, lunge);
+  assert.equal(r.value, 1);
+  assert.equal(r.met, true);
+  assert.equal(r.toGo, 0);
+  assert.equal(r.targetReps, 10);
+  assert.equal(r.didReps, 10);
+});
+
+/*
+ * The reason this is its own kind. 245 for a triple estimates to 270, which
+ * would clear a max-based target set by ten reps at 180 — without the athlete
+ * ever doing ten.
+ */
+test("a heavy short set does not count, however much it estimates to", () => {
+  const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(245, 3)])], steady(180), null, lunge);
+  assert.equal(r, undefined, "no qualifying set, so no row at all");
+});
+
+test("the heaviest qualifying set is the one read", () => {
+  const days = [
+    lungeDay("2026-09-01", [set(135, 12), set(225, 4)]),
+    lungeDay("2026-09-05", [set(155, 10), set(275, 2)]),
+  ];
+  const [r] = relativeStrength(MENU, days, steady(180), null, lunge);
+  assert.equal(r.achieved, 155, "the 275 double is not a qualifying set");
+  assert.equal(r.on, "2026-09-05");
+});
+
+test("more reps than asked for still counts, and says how many", () => {
+  const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(180, 14)])], steady(180), null, lunge);
+  assert.equal(r.met, true);
+  assert.equal(r.didReps, 14, "what he did");
+  assert.equal(r.targetReps, 10, "what was asked");
+});
+
+test("short of bodyweight, what is left is pounds on the bar", () => {
+  const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(155, 10)])], steady(180), null, lunge);
+  assert.equal(r.met, false);
+  assert.equal(r.toGo, 25);
+  assert.equal(fmtTarget(r), "of 1× bodyweight for 10 reps");
+});
+
+test("each day is read against its own bodyweight, like every other ratio", () => {
+  const days = [lungeDay("2026-03-05", [set(165, 10)]), lungeDay("2026-09-05", [set(175, 10)])];
+  const entries = [
+    weighIn("2026-03-01", 160), weighIn("2026-03-05", 160), weighIn("2026-03-09", 160),
+    weighIn("2026-09-01", 200), weighIn("2026-09-05", 200), weighIn("2026-09-09", 200),
+  ];
+  const [r] = relativeStrength(MENU, days, entries, null, lunge);
+  // 165/160 = 1.03 in March beats 175/200 = 0.88 now.
+  assert.equal(r.on, "2026-03-05");
+  assert.equal(r.met, true);
+});
+
+test("an unloaded set is not a bodyweight lunge standard", () => {
+  const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(0, 20)])], steady(180), null, lunge);
+  assert.equal(r, undefined, "no bar, nothing to measure against bodyweight");
+});
+
+test("the gold star is a main marker with no chart band behind it", () => {
+  const s = STRENGTH_STANDARDS.find((x) => x.liftKey === "reverse-lunge")!;
+  assert.equal(s.kind, "load-for-reps");
+  assert.equal(s.tier, undefined, "main by default");
+  assert.equal(STRENGTH_CHART["reverse-lunge"], undefined);
+  const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(180, 10)])], steady(180), null);
+  assert.equal(r.level, null, "no row on the chart, so no band to claim");
 });
