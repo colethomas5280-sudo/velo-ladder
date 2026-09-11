@@ -7,7 +7,7 @@ import { ALL_SEED_RECIPES } from "./recipes";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 24;
+export const SCHEMA_VERSION = 25;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -492,4 +492,34 @@ export function schemaFile(): string {
     `-- Applied by GET /api/setup?key=SETUP_KEY\n` +
     SCHEMA_SQL
   );
+}
+
+/**
+ * A short fingerprint of everything this deploy SEEDS.
+ *
+ * `schemaVersion` answers "is the database shape current". It does not answer
+ * "is the content current", and that is the question Cole actually has: he
+ * runs setup to make a correction land, and twice now the response looked
+ * identical whether it had or not, because a fixed recipe changes no table
+ * and no version number.
+ *
+ * Derived from the seed itself rather than typed, so it cannot be forgotten
+ * the way a version bump can — which is exactly how the last one got past me.
+ * FNV-1a, because this needs to be stable and legible, not secure.
+ */
+export function seedFingerprint(): string {
+  const body = JSON.stringify([
+    seedLifts().map((l) => [l.key, l.name, l.group, l.mode, l.help]),
+    ALL_SEED_RECIPES.map((r) => [
+      r.id, r.title, r.kind, r.blurb, r.meals, r.servings,
+      r.calories, r.proteinG, r.carbsG, r.fatG,
+      r.ingredients, r.steps, r.notes,
+    ]),
+  ]);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < body.length; i++) {
+    h ^= body.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, "0");
 }
