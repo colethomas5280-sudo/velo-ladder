@@ -2,7 +2,7 @@ import "./testDom";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup } from "@testing-library/react";
-import type { LiftSession } from "@/lib/types";
+import type { LiftSession, RecoveryEntry } from "@/lib/types";
 import { e1rm } from "@/lib/strength";
 import { withSwr } from "./testSwr";
 import { daysAgo, LIFT_ROWS, TODAY } from "./testRender";
@@ -27,10 +27,23 @@ const day = (date: string, lifts: LiftSession["lifts"], notes = ""): LiftSession
   level: null,
 });
 
-const panel = (days: LiftSession[], canEdit = true) =>
+/** A steady weigh-in history — the denominator the ratios need. */
+const weighing = (lb: number): RecoveryEntry[] =>
+  [1, 3, 5].map((d) => ({ date: daysAgo(d), bodyWeight: lb }) as RecoveryEntry);
+
+const panel = (
+  days: LiftSession[],
+  canEdit = true,
+  opts: { weighIns?: RecoveryEntry[]; profileWeight?: number | null } = {},
+) =>
   render(
     withSwr(
-      { "/api/athletes/a1/lifts": days, "/api/lifts": LIFT_ROWS },
+      {
+        "/api/athletes/a1/lifts": days,
+        "/api/lifts": LIFT_ROWS,
+        "/api/athletes/a1/recovery": opts.weighIns ?? [],
+        "/api/athletes/a1": { id: "a1", name: "Kid", weightLb: opts.profileWeight ?? null },
+      },
       <StrengthPanel athleteId="a1" canEdit={canEdit} />,
     ),
   );
@@ -162,4 +175,78 @@ test("a session the chart can't plot is still counted as a session done", () => 
     /2 of 3 sessions plotted/,
     "not '2 sessions' — he squatted three times",
   );
+});
+
+
+/* ------------------------------------------------------------------ *
+ * Strength standards
+ *
+ * The reason Cole wanted this built: a number to chase, not a diary. The
+ * tests hold it to being honest about both halves of the ratio.
+ * ------------------------------------------------------------------ */
+
+test("a ratio shows against its target, with the gap in pounds on the bar", () => {
+  panel([day(daysAgo(3), { deadlift: [{ w: 320, r: 1 }] })], true, {
+    weighIns: weighing(180),
+  });
+  const row = document.querySelector(".sd")!.textContent!;
+  assert.match(row, /1\.78×/);
+  assert.match(row, /of 2× bodyweight/i);
+  // 2 × 180 = 360, so 40 lb short. That line is the training target.
+  assert.match(row, /40 lb to go/);
+});
+
+test("clearing the standard says so rather than showing a negative gap", () => {
+  panel([day(daysAgo(3), { deadlift: [{ w: 400, r: 1 }] })], true, {
+    weighIns: weighing(180),
+  });
+  const row = document.querySelector(".sd")!;
+  assert.match(row.textContent!, /Cleared/);
+  assert.equal(row.className.includes("met"), true);
+  assert.equal(/to go/.test(row.textContent!), false);
+});
+
+/*
+ * A ratio is two measurements. An athlete should be able to check either,
+ * and especially so when the weight behind it is one lone weigh-in.
+ */
+test("the row says where both numbers came from", () => {
+  panel([day(daysAgo(3), { deadlift: [{ w: 320, r: 1 }] })], true, {
+    weighIns: [{ date: daysAgo(3), bodyWeight: 180 } as RecoveryEntry],
+  });
+  const row = document.querySelector(".sd")!.textContent!;
+  assert.match(row, /320 lb est\./);
+  assert.match(row, /at 180 lb/);
+  assert.match(row, /1 weigh-in/, "one reading is thin and the row admits it");
+});
+
+test("with no check-ins it falls back to the profile weight and marks it", () => {
+  panel([day(daysAgo(3), { deadlift: [{ w: 360, r: 1 }] })], true, {
+    profileWeight: 180,
+  });
+  assert.match(document.querySelector(".sd")!.textContent!, /from your profile/i);
+});
+
+/*
+ * The case an athlete will actually hit first: lifting logged, never weighed.
+ * A blank section would read as "you have no standards"; it has to say what
+ * to do about it.
+ */
+test("no bodyweight anywhere explains itself instead of showing nothing", () => {
+  panel([day(daysAgo(3), { deadlift: [{ w: 320, r: 1 }] })]);
+  assert.equal(document.querySelector(".sd"), null);
+  assert.ok(screen.getByText(/put your weight on a recovery check-in/i));
+});
+
+test("a lift with no standard behind it prompts for one that has", () => {
+  panel([day(daysAgo(3), { "barbell-hip-thrust": [{ w: 315, r: 5 }] })], true, {
+    weighIns: weighing(180),
+  });
+  assert.equal(document.querySelector(".sd"), null);
+  assert.ok(screen.getByText(/carries a standard/i));
+});
+
+test("nothing logged at all shows no standards section", () => {
+  panel([], true, { weighIns: weighing(180) });
+  assert.equal(screen.queryByText(/strength standards/i), null);
 });
