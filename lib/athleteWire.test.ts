@@ -139,7 +139,7 @@ async function seed(): Promise<Seeded> {
     calories: 1200,
     proteinG: 60,
     ingredients: ["2 cups whole milk", "1 cup oats"],
-    method: "Blend.",
+    steps: ["Blend."],
   });
   // One nobody has counted, to prove the difference survives the database.
   await data.createRecipe({ title: "Wire uncounted recipe" });

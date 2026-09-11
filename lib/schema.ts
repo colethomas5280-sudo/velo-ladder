@@ -6,7 +6,7 @@ import { seedLifts } from "./strength";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 20;
+export const SCHEMA_VERSION = 21;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -312,6 +312,41 @@ CREATE TABLE IF NOT EXISTS recipes (
 -- Biggest first is the order an athlete trying to gain actually wants.
 CREATE INDEX IF NOT EXISTS recipes_order_idx
   ON recipes(calories DESC NULLS LAST, position, lower(title)) WHERE archived = false;
+
+-- v21: what Cole's actual recipes turned out to carry, once he sent six.
+--
+-- Full macros, not just protein: three of the six are written as
+-- "1,110 calories | 73g protein | 115g carbs | 40g fat".
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS carbs_g int;
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS fat_g int;
+-- The one-line "why pick this one", which belongs on the row rather than
+-- inside it: "the lightest and lowest-fat of these, good after training".
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS blurb text NOT NULL DEFAULT '';
+-- Steps are numbered and discrete in every recipe he wrote, so they are a
+-- list like the ingredients, not a paragraph. An ordered list also renders
+-- as one, which a prose method never did.
+ALTER TABLE recipes ADD COLUMN IF NOT EXISTS steps jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+-- Carry any prose method into the first step before the column goes, so no
+-- recipe written against v20 loses its instructions. Production had none,
+-- but "probably empty" is not a reason to drop a column holding text.
+--
+-- Wrapped in a guard because the UPDATE reads a column this block then drops:
+-- run flat, the second pass fails on a column that no longer exists. Cole runs
+-- setup after every deploy, so "works once" is not a migration.
+DO $recipes$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'recipes' AND column_name = 'method'
+  ) THEN
+    UPDATE recipes SET steps = jsonb_build_array(method)
+      WHERE method IS NOT NULL AND method <> '' AND steps = '[]'::jsonb;
+    ALTER TABLE recipes DROP COLUMN method;
+  END IF;
+END
+$recipes$;
 
 -- v19: the lift menu became Cole's to edit rather than a constant in the
 -- code. Keyed by the slug, because that slug is what every logged set is

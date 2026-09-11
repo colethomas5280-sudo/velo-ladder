@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Recipe, RecipeKind } from "@/lib/types";
 import { RECIPE_KINDS } from "@/lib/types";
-import { MAX_INGREDIENTS } from "@/lib/recipeInput";
+import { MAX_INGREDIENTS, MAX_STEPS } from "@/lib/recipeInput";
 import { api, ApiError } from "@/lib/fetcher";
 
 /** Coach-only. Athletes read recipes; only Cole writes them. */
@@ -13,10 +13,13 @@ const digits = (s: string) => s.replace(/[^0-9]/g, "").slice(0, 5);
 interface Draft {
   title: string;
   kind: RecipeKind;
+  blurb: string;
   calories: string;
   proteinG: string;
+  carbsG: string;
+  fatG: string;
   ingredients: string[];
-  method: string;
+  steps: string[];
   notes: string;
 }
 
@@ -24,11 +27,14 @@ function draftFrom(r: Recipe | null): Draft {
   return {
     title: r?.title ?? "",
     kind: r?.kind ?? "smoothie",
+    blurb: r?.blurb ?? "",
     calories: r?.calories != null ? String(r.calories) : "",
     proteinG: r?.proteinG != null ? String(r.proteinG) : "",
+    carbsG: r?.carbsG != null ? String(r.carbsG) : "",
+    fatG: r?.fatG != null ? String(r.fatG) : "",
     // One empty row to type into, so a new recipe is not a blank wall.
     ingredients: r?.ingredients.length ? [...r.ingredients] : [""],
-    method: r?.method ?? "",
+    steps: r?.steps.length ? [...r.steps] : [""],
     notes: r?.notes ?? "",
   };
 }
@@ -64,10 +70,13 @@ export default function RecipeEditor({
     const body = {
       title: d.title.trim(),
       kind: d.kind,
+      blurb: d.blurb,
       calories: num(d.calories),
       proteinG: num(d.proteinG),
+      carbsG: num(d.carbsG),
+      fatG: num(d.fatG),
       ingredients: d.ingredients,
-      method: d.method,
+      steps: d.steps,
       notes: d.notes,
     };
     try {
@@ -104,6 +113,15 @@ export default function RecipeEditor({
               value={d.title}
               placeholder="Peanut butter gainer"
               onChange={(e) => setD((p) => ({ ...p, title: e.target.value }))}
+            />
+          </label>
+
+          <label className="field">
+            <span>One-liner</span>
+            <input
+              value={d.blurb}
+              placeholder="Tastes like a peanut butter cup milkshake."
+              onChange={(e) => setD((p) => ({ ...p, blurb: e.target.value }))}
             />
           </label>
 
@@ -145,6 +163,26 @@ export default function RecipeEditor({
                 onChange={(e) =>
                   setD((p) => ({ ...p, proteinG: digits(e.target.value) }))
                 }
+              />
+            </label>
+            <label className="field">
+              <span>Carbs (g)</span>
+              <input
+                className="tin"
+                inputMode="numeric"
+                placeholder="115"
+                value={d.carbsG}
+                onChange={(e) => setD((p) => ({ ...p, carbsG: digits(e.target.value) }))}
+              />
+            </label>
+            <label className="field">
+              <span>Fat (g)</span>
+              <input
+                className="tin"
+                inputMode="numeric"
+                placeholder="40"
+                value={d.fatG}
+                onChange={(e) => setD((p) => ({ ...p, fatG: digits(e.target.value) }))}
               />
             </label>
           </div>
@@ -194,14 +232,44 @@ export default function RecipeEditor({
             )}
           </div>
 
-          <label className="field">
-            <span>Method</span>
-            <textarea
-              placeholder={"Blend the liquids first, then the rest.\n\n- bullets work\n**bold** works"}
-              value={d.method}
-              onChange={(e) => setD((p) => ({ ...p, method: e.target.value }))}
-            />
-          </label>
+          <div className="field">
+            <span>Steps</span>
+            <div className="nu-ing-edit">
+              {d.steps.map((step, i) => (
+                <div className="nu-ing-row" key={i}>
+                  <span className="lm-n">{i + 1}</span>
+                  <input
+                    value={step}
+                    aria-label={`Step ${i + 1}`}
+                    placeholder="Blend the liquids first, then the rest."
+                    onChange={(e) =>
+                      setD((p) => ({
+                        ...p,
+                        steps: p.steps.map((x, n) => (n === i ? e.target.value : x)),
+                      }))
+                    }
+                  />
+                  <button
+                    className="btn sm ghost"
+                    aria-label={`Remove step ${i + 1}`}
+                    onClick={() =>
+                      setD((p) => ({ ...p, steps: p.steps.filter((_, n) => n !== i) }))
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            {d.steps.length < MAX_STEPS && (
+              <button
+                className="btn sm"
+                onClick={() => setD((p) => ({ ...p, steps: [...p.steps, ""] }))}
+              >
+                + Step
+              </button>
+            )}
+          </div>
 
           <label className="field">
             <span>Notes (optional)</span>

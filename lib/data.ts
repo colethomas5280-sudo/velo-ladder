@@ -1171,10 +1171,13 @@ function toRecipe(r: Record<string, unknown>): Recipe {
     kind: (r.kind as RecipeKind) ?? "smoothie",
     // Null, never 0. "Nobody has worked this out" and "zero calories" are
     // different facts, and an athlete sorting by calories needs them apart.
+    blurb: String(r.blurb ?? ""),
     calories: r.calories == null ? null : Number(r.calories),
     proteinG: r.protein_g == null ? null : Number(r.protein_g),
+    carbsG: r.carbs_g == null ? null : Number(r.carbs_g),
+    fatG: r.fat_g == null ? null : Number(r.fat_g),
     ingredients: (r.ingredients ?? []) as string[],
-    method: String(r.method ?? ""),
+    steps: (r.steps ?? []) as string[],
     notes: String(r.notes ?? ""),
     position: Number(r.position ?? 0),
     archived: Boolean(r.archived),
@@ -1193,21 +1196,28 @@ export async function listRecipes(): Promise<Recipe[]> {
 export interface RecipeInput {
   title: string;
   kind?: RecipeKind;
+  blurb?: string;
   calories?: number | null;
   proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   ingredients?: string[];
-  method?: string;
+  steps?: string[];
   notes?: string;
 }
 
 export async function createRecipe(input: RecipeInput): Promise<Recipe> {
   const id = crypto.randomUUID();
   const rows = (await sql`
-    INSERT INTO recipes (id, title, kind, calories, protein_g, ingredients, method, notes)
+    INSERT INTO recipes (id, title, kind, blurb, calories, protein_g, carbs_g, fat_g,
+                         ingredients, steps, notes)
     VALUES (${id}, ${input.title.trim()}, ${input.kind ?? "smoothie"},
+            ${input.blurb ?? ""},
             ${input.calories ?? null}, ${input.proteinG ?? null},
+            ${input.carbsG ?? null}, ${input.fatG ?? null},
             ${JSON.stringify(input.ingredients ?? [])}::jsonb,
-            ${input.method ?? ""}, ${input.notes ?? ""})
+            ${JSON.stringify(input.steps ?? [])}::jsonb,
+            ${input.notes ?? ""})
     RETURNING *
   `) as Record<string, unknown>[];
   return toRecipe(rows[0]);
@@ -1227,10 +1237,13 @@ export async function updateRecipe(
     UPDATE recipes SET
       title = ${patch.title?.trim() ?? cur.title},
       kind = ${patch.kind ?? cur.kind},
+      blurb = ${patch.blurb ?? cur.blurb},
       calories = ${patch.calories === undefined ? cur.calories : patch.calories},
       protein_g = ${patch.proteinG === undefined ? cur.proteinG : patch.proteinG},
+      carbs_g = ${patch.carbsG === undefined ? cur.carbsG : patch.carbsG},
+      fat_g = ${patch.fatG === undefined ? cur.fatG : patch.fatG},
       ingredients = ${JSON.stringify(patch.ingredients ?? cur.ingredients)}::jsonb,
-      method = ${patch.method ?? cur.method},
+      steps = ${JSON.stringify(patch.steps ?? cur.steps)}::jsonb,
       notes = ${patch.notes ?? cur.notes},
       position = ${patch.position ?? cur.position},
       archived = ${patch.archived ?? cur.archived},

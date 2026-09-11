@@ -12,16 +12,22 @@ import { RECIPE_KINDS, type RecipeKind } from "./types";
 /** Enough headroom for a real gainer shake, low enough to catch a stray zero. */
 export const MAX_CALORIES = 5000;
 export const MAX_PROTEIN_G = 400;
+export const MAX_CARBS_G = 600;
+export const MAX_FAT_G = 300;
 export const MAX_INGREDIENTS = 40;
+export const MAX_STEPS = 20;
 
 /** Every field a coach can set. */
 export interface RecipeFields {
   title: string;
   kind: RecipeKind;
+  blurb: string;
   calories: number | null;
   proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
   ingredients: string[];
-  method: string;
+  steps: string[];
   notes: string;
 }
 
@@ -73,28 +79,38 @@ function read(b: Record<string, unknown>): Parsed<RecipePatch> {
     if (typeof n === "string") return { ok: false, error: n };
     out.calories = n;
   }
-  if (b.proteinG !== undefined) {
-    const n = whole(b.proteinG, MAX_PROTEIN_G, "Protein");
+  for (const [key, max, label] of [
+    ["proteinG", MAX_PROTEIN_G, "Protein"],
+    ["carbsG", MAX_CARBS_G, "Carbs"],
+    ["fatG", MAX_FAT_G, "Fat"],
+  ] as const) {
+    if (b[key] === undefined) continue;
+    const n = whole(b[key], max, label);
     if (typeof n === "string") return { ok: false, error: n };
-    out.proteinG = n;
+    out[key] = n;
   }
 
-  if (b.ingredients !== undefined) {
-    if (!Array.isArray(b.ingredients))
-      return { ok: false, error: "ingredients must be a list" };
-    if (b.ingredients.length > MAX_INGREDIENTS)
+  for (const [key, max] of [
+    ["ingredients", MAX_INGREDIENTS],
+    ["steps", MAX_STEPS],
+  ] as const) {
+    if (b[key] === undefined) continue;
+    if (!Array.isArray(b[key]))
+      return { ok: false, error: `${key} must be a list` };
+    const list = b[key] as unknown[];
+    if (list.length > max)
       return {
         ok: false,
-        error: `${b.ingredients.length} ingredients is more than the ${MAX_INGREDIENTS} we store`,
+        error: `${list.length} ${key} is more than the ${max} we store`,
       };
     // Blank rows belong to the form, not the coach: dropped, never an error.
-    out.ingredients = b.ingredients
+    out[key] = list
       .map((i) => (typeof i === "string" ? i.trim() : ""))
       .filter(Boolean);
   }
 
-  if (b.method !== undefined)
-    out.method = typeof b.method === "string" ? b.method.slice(0, 4000) : "";
+  if (b.blurb !== undefined)
+    out.blurb = typeof b.blurb === "string" ? b.blurb.trim().slice(0, 300) : "";
   if (b.notes !== undefined)
     out.notes = typeof b.notes === "string" ? b.notes.slice(0, 2000) : "";
 
@@ -116,10 +132,13 @@ export function parseNewRecipe(body: unknown): Parsed<RecipeFields> {
     value: {
       title: v.title,
       kind: v.kind ?? "smoothie",
+      blurb: v.blurb ?? "",
       calories: v.calories ?? null,
       proteinG: v.proteinG ?? null,
+      carbsG: v.carbsG ?? null,
+      fatG: v.fatG ?? null,
       ingredients: v.ingredients ?? [],
-      method: v.method ?? "",
+      steps: v.steps ?? [],
       notes: v.notes ?? "",
     },
   };

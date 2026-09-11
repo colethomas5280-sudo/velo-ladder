@@ -6,7 +6,6 @@ import type { Recipe, RecipeKind } from "@/lib/types";
 import { RECIPE_KINDS } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import useSWR from "swr";
-import RichText from "./RichText";
 import RecipeEditor from "./RecipeEditor";
 
 /* ------------------------------------------------------------------ *
@@ -162,9 +161,15 @@ export default function Nutrition() {
                   <span className="nu-meta">
                     {KIND_LABEL[r.kind]}
                     {r.proteinG != null && ` · ${r.proteinG}g protein`}
-                    {r.ingredients.length > 0 &&
-                      ` · ${r.ingredients.length} ingredients`}
+                    {r.carbsG != null && ` · ${r.carbsG}g carbs`}
+                    {r.fatG != null && ` · ${r.fatG}g fat`}
                   </span>
+                  {/*
+                    * The blurb is the reason to pick one over another, so it
+                    * sits on the row. Making an athlete open five to find the
+                    * light one after training is the page wasting his time.
+                    */}
+                  {r.blurb && <span className="nu-blurb">{r.blurb}</span>}
                 </span>
                 <span className="nu-toggle" aria-hidden="true">{open.has(r.id) ? "−" : "+"}</span>
               </button>
@@ -178,7 +183,13 @@ export default function Nutrition() {
                       ))}
                     </ul>
                   )}
-                  {r.method && <RichText text={r.method} />}
+                  {r.steps.length > 0 && (
+                    <ol className="nu-steps">
+                      {r.steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  )}
                   {r.notes && <p className="cz-note">{r.notes}</p>}
                   {isCoach && (
                     <div className="rec-actions">

@@ -236,11 +236,16 @@ export interface Recipe {
   id: string;
   title: string;
   kind: RecipeKind;
+  /** One line of "why pick this one", shown on the row without opening it. */
+  blurb: string;
   /** null when nobody has worked it out yet, never 0 as a stand-in */
   calories: number | null;
   proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
   ingredients: string[];
-  method: string;
+  /** Numbered and in order, the way every recipe Cole writes is. */
+  steps: string[];
   notes: string;
   position: number;
   archived: boolean;
