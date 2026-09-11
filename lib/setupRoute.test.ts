@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seedLifts } from "@/lib/strength";
+import { SEED_RECIPES } from "@/lib/recipes";
 
 /* ------------------------------------------------------------------ *
  * What /api/setup can actually tell Cole
@@ -34,6 +35,7 @@ type Body = {
   schemaVersion: number;
   missing: string[];
   lifts: { live: number; archived: number; missingSeed: string[] };
+  recipes: { live: number; archived: number; missingSeed: string[] };
 };
 
 let route: typeof import("../app/api/setup/route");
@@ -99,5 +101,48 @@ test("a lift Cole retired is archived, not reported as missing", async () => {
     body.lifts.missingSeed.includes("high-plank"),
     false,
     "retiring a lift is not a broken migration",
+  );
+});
+
+/*
+ * Recipes are seeded for the same reason lifts are: Cole's six already exist
+ * as text, and asking him to retype them into a browser form is work the
+ * machine should do. He ran a deploy expecting them and got an empty page,
+ * which is what prompted this.
+ */
+test("a clean run reports Cole's recipes, and nothing missing", async () => {
+  const body = await run();
+  assert.deepEqual(body.recipes.missingSeed, []);
+  assert.equal(body.recipes.live, SEED_RECIPES.length);
+});
+
+test("running it twice does not duplicate the library", async () => {
+  const body = await run();
+  assert.equal(body.recipes.live, SEED_RECIPES.length);
+});
+
+/*
+ * Once a recipe is on his database it is HIS. A deploy that reinstated one he
+ * removed, or overwrote an edit, would be the app arguing with the coach.
+ */
+test("a recipe Cole edited is not overwritten by the next deploy", async () => {
+  const { sql } = await import("@/lib/db");
+  await sql`UPDATE recipes SET title = 'Cole renamed this' WHERE id = 'seed-choc-pb'`;
+  await run();
+  const [row] = (await sql`SELECT title FROM recipes WHERE id = 'seed-choc-pb'`) as {
+    title: string;
+  }[];
+  assert.equal(row.title, "Cole renamed this");
+});
+
+test("a recipe Cole removed stays removed", async () => {
+  const { sql } = await import("@/lib/db");
+  await sql`UPDATE recipes SET archived = true WHERE id = 'seed-tropical-gainer'`;
+  const body = await run();
+  assert.equal(body.recipes.archived >= 1, true);
+  assert.equal(
+    body.recipes.missingSeed.includes("seed-tropical-gainer"),
+    false,
+    "archived is not missing",
   );
 });
