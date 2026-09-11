@@ -193,12 +193,45 @@ test("the macros add up to something near the stated calories", () => {
  * What the PDF lost is MARKED, never guessed. An invented quarter-teaspoon is
  * indistinguishable from a real one once it is in the database.
  */
+/*
+ * A marked amount is one of exactly two shapes, and both are detections
+ * rather than guesses:
+ *
+ *   the amount was the whole quantity and is gone -> "tsp cayenne"
+ *   the fraction was inside the number            -> "1 cups heavy cream"
+ *
+ * The second is the one worth catching. "1 cups" is silently wrong where
+ * "tsp cayenne" is visibly missing, and a plural cannot follow a bare 1.
+ */
 test("a lost amount says so rather than carrying an invented number", () => {
   const lost = COOKBOOK.flatMap((r) => r.ingredients).filter((i) =>
     i.includes("unclear"),
   );
   assert.ok(lost.length > 0 && lost.length < 40, `${lost.length} unclear amounts`);
-  for (const i of lost) assert.match(i, /^(tsp|Tbsp|cups?)\b/, i);
+  for (const i of lost)
+    assert.ok(
+      /^(tsp|Tbsp|cups?)\b/.test(i) || /(?<!\d)\b1 (cups|Tbsps|tsps)\b/.test(i),
+      i,
+    );
+});
+
+/* The marker is appended once. It went out twice on a card Cole opened. */
+test("no ingredient carries the marker twice", () => {
+  for (const r of COOKBOOK)
+    for (const i of r.ingredients)
+      assert.ok(i.split("amount unclear").length <= 2, `${r.title}: ${i}`);
+});
+
+/*
+ * A "1 cups" beside a gram weight is a redundant conversion, not an unknown
+ * amount: the grams say what it is. Flagging those buried the ones that
+ * actually matter.
+ */
+test("a lost conversion beside a gram weight is dropped, not flagged", () => {
+  for (const r of COOKBOOK)
+    for (const i of r.ingredients)
+      if (/\b\d+\s?g\b/.test(i))
+        assert.equal(i.includes("unclear"), false, `${r.title}: ${i}`);
 });
 
 test("the cookbook is meals, and the shakes are still smoothies", () => {
