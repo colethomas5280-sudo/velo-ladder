@@ -1,5 +1,5 @@
 import type { Athlete, TrainingSession } from "@/lib/types";
-import { fiveOzPR, fmt, fmtDate, sessionsOfType } from "@/lib/velo";
+import { EMPTY, fiveOzPR, fmt, fmtDate, sessionsOfType } from "@/lib/velo";
 
 export default function Masthead({
   athlete,
@@ -30,7 +30,7 @@ export default function Masthead({
             <b>{pCount}</b> pull-down
           </span>
           <span>
-            last session <b>{latest ? fmtDate(latest.date) : "–"}</b>
+            last session <b>{latest ? fmtDate(latest.date) : EMPTY}</b>
           </span>
           {athlete.hand && (
             <span>

@@ -12,6 +12,7 @@ import {
   type ScreenTest,
   type SubTest,
 } from "@/lib/screen";
+import { EMPTY } from "@/lib/velo";
 
 /* ------------------------------------------------------------------ *
  * The whole sheet, on one page
@@ -37,7 +38,7 @@ function verdict(test: ScreenTest, sub: SubTest, finding: Finding) {
   );
   if (opens.length)
     return { cls: "gate", text: `opens “${opens.map((o) => o.label).join("”, “")}”` };
-  return { cls: "none", text: sub.diagnostic ? "context only" : "—" };
+  return { cls: "none", text: sub.diagnostic ? "context only" : EMPTY };
 }
 
 export default function ScreenReference() {

@@ -1,3 +1,4 @@
+import { EMPTY } from "./velo";
 /* ------------------------------------------------------------------ *
  * Strength
  *
@@ -690,7 +691,7 @@ export function trim(w: number): string {
 
 /** The charted number as it reads: "248 lb" or "8 reps". */
 export function fmtMetric(value: number | null, mode: LiftMode): string {
-  if (value == null) return "–";
+  if (value == null) return EMPTY;
   if (mode === "time") return `${value}s`;
   return mode === "reps"
     ? `${value} rep${value === 1 ? "" : "s"}`

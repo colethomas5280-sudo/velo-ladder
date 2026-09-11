@@ -6,7 +6,7 @@ import useSWR from "swr";
 import type { AthleteOverview, Hand } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import { LEVELS } from "@/lib/leaderboard";
-import { fmtDate } from "@/lib/velo";
+import { EMPTY, fmtDate } from "@/lib/velo";
 import GroupSession from "./GroupSession";
 import InviteAthleteModal from "./InviteAthleteModal";
 
@@ -294,7 +294,7 @@ export default function AthletesTable() {
                   <td className="mono">{a.mound}</td>
                   <td className="mono">{a.pulldown}</td>
                   <td className="mono">
-                    {a.lastDate ? fmtDate(a.lastDate) : "–"}
+                    {a.lastDate ? fmtDate(a.lastDate) : EMPTY}
                   </td>
                   <td style={{ textAlign: "right" }}>
                     <button

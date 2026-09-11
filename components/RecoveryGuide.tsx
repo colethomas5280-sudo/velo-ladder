@@ -11,6 +11,7 @@ import {
   type RatedItem,
 } from "@/lib/recovery";
 import { CNS_DEFAULT_PCT } from "@/lib/setback";
+import { EMPTY } from "@/lib/velo";
 
 /* ------------------------------------------------------------------ *
  * What the recovery score is
@@ -67,7 +68,7 @@ export default function RecoveryGuide() {
       <section className="card pad">
         <div className="rg-top">
           <div className={`ci-score big ${band ?? ""}`}>
-            <span className="n">{score ?? "–"}</span>
+            <span className="n">{score ?? EMPTY}</span>
             <span className="l">Score</span>
           </div>
           <div className="rg-band">
