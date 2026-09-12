@@ -28,6 +28,20 @@ export const CALORIES_PER_LB = 20;
 /** Daily protein in grams per pound. One to one, which is the point. */
 export const PROTEIN_G_PER_LB = 1;
 
+/**
+ * The rungs the calorie filter offers.
+ *
+ * Set against the library, not picked round: the cookbook clusters 525-785 a
+ * serving and the shakes sit at 1000+, so bands chosen for how calories
+ * "should" read hid the entire cookbook behind the one button an underweight
+ * athlete is most likely to press. Cole's call after seeing the counts.
+ *
+ * Ascending, 0 meaning no filter. A band that matches nothing, or that
+ * matches exactly what the band below it matches, is a button that answers
+ * no question of its own - which is what the test next to this guards.
+ */
+export const CALORIE_FLOORS = [0, 500, 750, 1000] as const;
+
 export interface DailyIntake {
   weightLb: number;
   calories: number;

@@ -9,6 +9,7 @@ import useSWR from "swr";
 import RecipeEditor from "./RecipeEditor";
 import { BODY_KEY, readBody, writeBody } from "./bodyStore";
 import {
+  CALORIE_FLOORS,
   CALORIES_PER_LB,
   PROTEIN_G_PER_LB,
   fmtShare,
@@ -31,9 +32,6 @@ import { readLocal, subscribeLocal } from "@/lib/localStore";
  * ------------------------------------------------------------------ */
 
 type Me = { role: "coach" | "athlete" | "none" };
-
-/** The rungs an athlete actually asks in. */
-const FLOORS = [0, 600, 800, 1000] as const;
 
 const KIND_LABEL: Record<RecipeKind, string> = {
   smoothie: "Smoothie",
@@ -179,7 +177,7 @@ export default function Nutrition() {
       <section className="card pad">
         <div className="nu-filters">
           <div className="chips" role="group" aria-label="Minimum calories">
-            {FLOORS.map((f) => (
+            {CALORIE_FLOORS.map((f) => (
               <button
                 key={f}
                 className="chip"
