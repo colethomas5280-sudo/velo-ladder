@@ -278,3 +278,35 @@ test("the shakes are breakfast or lunch, and the cookbook mains are not breakfas
   for (const r of mains)
     assert.deepEqual(r.meals, ["lunch", "dinner"], r.title);
 });
+
+/*
+ * Amounts Cole supplied for quantities the PDF lost. Asserted here because
+ * the extractor keys them on the text that survived, so an entry silently
+ * stops applying the moment the extraction changes — a correction that
+ * matches nothing is worse than no correction, because it looks done.
+ */
+test("the amounts Cole gave are in the recipes", () => {
+  /*
+   * Exact strings, not a substring search. Looking for "garlic powder"
+   * matched "Salt, garlic powder, and pepper, to taste" first and reported a
+   * failure that was entirely the test's own.
+   */
+  const has = (title: string, exact: string) => {
+    const r = COOKBOOK.find((x) => x.title.includes(title));
+    assert.ok(r, `no recipe titled like ${title}`);
+    assert.ok(r!.ingredients.includes(exact), `${r!.title} is missing "${exact}"`);
+  };
+  has("Breakfast Hash", "1/2 tsp crushed red pepper flakes");
+  has("Bolognese", "1/4 tsp nutmeg");
+  has("Jalapeño Popper", "3/4 tsp onion powder");
+  has("Jalapeño Popper", "3/4 tsp garlic powder");
+});
+
+test("every rice bowl got the same broth measure", () => {
+  const broths = COOKBOOK.flatMap((r) => r.ingredients).filter((i) =>
+    i.includes("chicken bone broth"),
+  );
+  assert.ok(broths.length >= 8, `${broths.length} broth lines`);
+  for (const b of broths)
+    assert.equal(/(?<!\d)\b1 cups\b/.test(b), false, `${b} still lost its fraction`);
+});
