@@ -144,7 +144,14 @@ export const STRENGTH_CHART: Record<string, Record<StrengthLevel, number>> = {
   deadlift: { beginner: 1, novice: 1.25, intermediate: 2, advanced: 2.5, elite: 3 },
   "front-squat": { beginner: 0.6, novice: 0.85, intermediate: 1.25, advanced: 1.75, elite: 2 },
   "barbell-hip-thrust": { beginner: 0.75, novice: 1.25, intermediate: 1.75, advanced: 2.25, elite: 2.75 },
-  "barbell-row": { beginner: 0.5, novice: 0.75, intermediate: 1, advanced: 1.4, elite: 1.75 },
+  /*
+   * The row's band is the bench band, deliberately identical at every level.
+   * Cole's call: he wants an athlete pulling what he presses, so the two are
+   * one number rather than two that happen to sit close. Changing bench and
+   * leaving this behind would quietly reintroduce a gap he asked to close,
+   * which is what the test pairing them is for.
+   */
+  "barbell-row": { beginner: 0.5, novice: 0.75, intermediate: 1.25, advanced: 1.75, elite: 2 },
   /*
    * The chart's pull-up row is deliberately absent. It is a ratio, and Cole's
    * loaded pull-up target is an ABSOLUTE 250 lb — past which, in his words,
@@ -896,5 +903,3 @@ export function fmtHeight(inches: number): string {
   const inch = Math.round(inches - ft * 12);
   return `${ft}'${inch}"`;
 }
-
-

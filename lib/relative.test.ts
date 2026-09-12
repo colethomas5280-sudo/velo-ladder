@@ -362,7 +362,7 @@ test("a ratio target is the midpoint of the band Cole is aiming between", () => 
   assert.equal(targetFor("back-squat"), (1.75 + 2.25) / 2);
   assert.equal(targetFor("bench"), (1.25 + 1.75) / 2);
   assert.equal(targetFor("front-squat"), (1.25 + 1.75) / 2);
-  assert.equal(targetFor("barbell-row"), (1 + 1.4) / 2);
+  assert.equal(targetFor("barbell-row"), (1.25 + 1.75) / 2);
   assert.equal(targetFor("push-up"), null, "a lift with no chart row has no target");
 
   for (const s of STRENGTH_STANDARDS)
@@ -818,4 +818,15 @@ test("the gold star is a main marker with no chart band behind it", () => {
   assert.equal(STRENGTH_CHART["reverse-lunge"], undefined);
   const [r] = relativeStrength(MENU, [lungeDay("2026-09-05", [set(180, 10)])], steady(180), null);
   assert.equal(r.level, null, "no row on the chart, so no band to claim");
+});
+
+/*
+ * Cole asked for the bench and row numbers to be equal - an athlete should
+ * pull what he presses. That is a RELATIONSHIP, not two numbers that happen
+ * to match today, so it is asserted as one. Raising bench alone is the easy
+ * way to break it, and the easy way to never notice.
+ */
+test("the row is held level with the bench at every level", () => {
+  assert.deepEqual(STRENGTH_CHART["barbell-row"], STRENGTH_CHART["bench"]);
+  assert.equal(targetFor("barbell-row"), targetFor("bench"));
 });
