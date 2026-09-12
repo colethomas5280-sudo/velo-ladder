@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  CALORIE_FLOORS,
   CALORIES_PER_LB,
   MAX_BODYWEIGHT_LB,
   MIN_BODYWEIGHT_LB,
@@ -9,7 +10,7 @@ import {
   intakeFor,
   shareOfDay,
 } from "@/lib/nutrition";
-import { SEED_RECIPES } from "@/lib/recipes";
+import { ALL_SEED_RECIPES, SEED_RECIPES } from "@/lib/recipes";
 
 /* ------------------------------------------------------------------ *
  * Eating to gain
@@ -133,5 +134,49 @@ test("any accepted weight produces a target worth eating", () => {
     const i = intakeFor(w)!;
     assert.ok(i.calories >= 900, `${w} lb -> ${i.calories} kcal`);
     assert.ok(i.proteinG > 0);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * The calorie bands
+ *
+ * Cole found this the hard way: the bands read as sensible round numbers but
+ * were never checked against the recipes behind them, so "1000+" - the button
+ * an athlete trying to gain weight reaches for first - returned six of
+ * fifty-one and hid the whole cookbook. Bands are a claim about the library,
+ * so they get tested against the library.
+ * ------------------------------------------------------------------ */
+
+const bandCount = (floor: number) =>
+  ALL_SEED_RECIPES.filter((r) => r.calories != null && r.calories >= floor).length;
+
+test("the bands ascend, starting from no filter at all", () => {
+  assert.equal(CALORIE_FLOORS[0], 0);
+  for (let i = 1; i < CALORIE_FLOORS.length; i++) {
+    assert.ok(
+      CALORIE_FLOORS[i] > CALORIE_FLOORS[i - 1],
+      `band ${i} (${CALORIE_FLOORS[i]}) does not sit above the one before it`,
+    );
+  }
+});
+
+test("every band finds recipes", () => {
+  for (const floor of CALORIE_FLOORS) {
+    assert.ok(
+      bandCount(floor) > 0,
+      `the ${floor}+ band matches nothing in the seeded library`,
+    );
+  }
+});
+
+test("no band answers the same question as the one below it", () => {
+  for (let i = 1; i < CALORIE_FLOORS.length; i++) {
+    const above = bandCount(CALORIE_FLOORS[i]);
+    const below = bandCount(CALORIE_FLOORS[i - 1]);
+    assert.ok(
+      above < below,
+      `${CALORIE_FLOORS[i]}+ and ${CALORIE_FLOORS[i - 1]}+ both match ` +
+        `${above} recipes, so one of the two buttons is doing nothing`,
+    );
   }
 });
