@@ -206,16 +206,16 @@ test("no ingredient carries an annotation", () => {
 });
 
 /*
- * What is left reads as a bare unit — "tsp cayenne" — which is visibly
- * incomplete rather than plausibly wrong. The bound is the point: if a change
- * to the extractor starts dropping amounts wholesale, this is what says so.
+ * Cole supplied all nine missing amounts from the original, so every
+ * ingredient now carries one. This is the test that says so if a change to
+ * the extractor ever starts dropping them again — the failure mode is
+ * silent, because a bare "tsp cayenne" still reads like an ingredient.
  */
-test("only a handful of ingredients are left without an amount", () => {
+test("no ingredient is missing its amount", () => {
   const bare = COOKBOOK.flatMap((r) => r.ingredients).filter(
     (i) => /^(tsp|Tbsp|cups?)\s/.test(i) || /(?<!\d)\b1 (cups|Tbsps|tsps)\b/.test(i),
   );
-  assert.ok(bare.length < 30, `${bare.length} ingredients have no amount`);
-  assert.equal(new Set(bare).size <= 12, true, `${new Set(bare).size} distinct`);
+  assert.deepEqual(bare, []);
 });
 
 /*
@@ -300,6 +300,10 @@ test("the amounts Cole gave are in the recipes", () => {
   has("Bolognese", "1/4 tsp nutmeg");
   has("Jalapeño Popper", "3/4 tsp onion powder");
   has("Jalapeño Popper", "3/4 tsp garlic powder");
+  has("Chimichurri", "1/2 tsp black pepper");
+  has("Slow Cooker Chili", "1/4 tsp cinnamon");
+  has("Queso Chicken Mac", "1/4 tsp cayenne");
+  has("Spicy Chicken Alfredo", "1/4 tsp cayenne pepper");
 });
 
 test("every rice bowl got the same broth measure", () => {
