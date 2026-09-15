@@ -119,18 +119,22 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="widget-empty">{children}</p>;
 }
 
+const LEADERBOARD_ROWS = 5;
+
 function Leaderboard({ data }: { data: DashboardData }) {
   const { date, rows } = data.leaderboard;
+  const top = Array.from(
+    { length: LEADERBOARD_ROWS },
+    (_, i) => rows[i] ?? null,
+  );
   return (
     <WidgetShell
       title="Best velos"
       sub={date ? fmtDate(date) : "no sessions yet"}
     >
-      {rows.length === 0 ? (
-        <Empty>Nothing logged yet.</Empty>
-      ) : (
-        <ol className="lb">
-          {rows.slice(0, 8).map((r, i) => (
+      <ol className="lb">
+        {top.map((r, i) =>
+          r ? (
             <li key={r.athleteId}>
               <span className="lb-rank">{i + 1}</span>
               <Link href={`/athletes/${r.athleteId}`} className="name-link">
@@ -141,9 +145,14 @@ function Leaderboard({ data }: { data: DashboardData }) {
               </span>
               <span className="lb-velo">{fmt(r.velo)}</span>
             </li>
-          ))}
-        </ol>
-      )}
+          ) : (
+            <li key={`blank-${i}`}>
+              <span className="lb-rank">{i + 1}</span>
+              <span className="lb-none">No Records</span>
+            </li>
+          ),
+        )}
+      </ol>
     </WidgetShell>
   );
 }
