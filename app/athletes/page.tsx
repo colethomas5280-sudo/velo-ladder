@@ -9,7 +9,7 @@ export default async function AthletesPage() {
   const session = await auth();
   if (!session?.user?.email) redirect("/login");
   return (
-    <div className="wrap">
+    <div className="wrap wrap-wide">
       <AppHeader email={session.user.email} />
       <RosterView />
     </div>

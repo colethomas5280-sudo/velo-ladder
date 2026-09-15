@@ -125,6 +125,9 @@ a {
   margin: 0 auto;
   padding: 0 16px 72px;
 }
+.wrap.wrap-wide {
+  max-width: 1400px;
+}
 .appbar {
   position: sticky;
   top: 0;
@@ -1021,18 +1024,26 @@ table.roster-table {
 .roster-table td.cell-access {
   text-align: left;
 }
-.roster-table .roster-select {
+.roster-table .roster-field {
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 8px;
   padding: 9px 10px;
   font-size: 13px;
   color: var(--ink);
-  min-width: 0;
 }
-.roster-table .roster-select.hand {
+.roster-table select.roster-field {
+  min-width: 0;
+  width: 140px;
+}
+.roster-table select.roster-field.hand {
   width: 64px;
-  min-width: 64px;
+}
+.roster-table select.roster-field.access-select {
+  width: 160px;
+}
+.roster-table input.roster-field[type="date"] {
+  width: 150px;
 }
 .select-bar {
   position: fixed;
@@ -1263,13 +1274,6 @@ table.roster-table {
   font-size: 13px;
   font-weight: 500;
   line-height: 1.45;
-}
-
-.access-cell {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  white-space: nowrap;
 }
 
 .sec-actions {

@@ -192,7 +192,7 @@ export default function AthletesTable() {
                   </td>
                   <td>
                     <select
-                      className="roster-select hand"
+                      className="roster-field hand"
                       value={a.hand}
                       onChange={(e) =>
                         patch(a.id, { hand: e.target.value as Hand })
@@ -205,7 +205,7 @@ export default function AthletesTable() {
                   </td>
                   <td>
                     <select
-                      className="roster-select"
+                      className="roster-field"
                       aria-label={`${a.name} level`}
                       value={a.level ?? ""}
                       onChange={(e) =>
@@ -222,7 +222,7 @@ export default function AthletesTable() {
                   </td>
                   <td>
                     <input
-                      className="tin"
+                      className="roster-field"
                       type="date"
                       aria-label={`${a.name} date of birth`}
                       value={a.birthDate ?? ""}
@@ -256,39 +256,40 @@ export default function AthletesTable() {
                         </button>
                       </span>
                     ) : (
-                      <span className="access-cell">
-                        <button
-                          className={`btn sm${a.hasPassword ? " ghost" : " primary"}`}
-                          disabled={inviting === a.id}
-                          onClick={() => invite(a)}
-                          title={
-                            a.inviteEmail
-                              ? "Copy a single-use link that lets them set their own password"
-                              : "Add a login email first"
+                      <select
+                        className="roster-field access-select"
+                        value=""
+                        disabled={inviting === a.id}
+                        aria-label={`${a.name} access actions`}
+                        onChange={(e) => {
+                          const action = e.target.value;
+                          if (action === "invite") invite(a);
+                          else if (action === "password") {
+                            setResetFor(a.id);
+                            setResetPw("");
                           }
-                        >
+                        }}
+                      >
+                        <option value="" disabled>
                           {inviting === a.id
                             ? "…"
                             : a.hasPassword
-                              ? "New invite"
+                              ? "● active"
                               : a.hasInvite
-                                ? "Copy invite again"
-                                : "Copy invite link"}
-                        </button>
-                        <button
-                          className="btn sm ghost"
-                          onClick={() => {
-                            setResetFor(a.id);
-                            setResetPw("");
-                          }}
-                        >
+                                ? "invite sent"
+                                : "set password"}
+                        </option>
+                        <option value="invite">
                           {a.hasPassword
-                            ? "● active"
+                            ? "New invite"
                             : a.hasInvite
-                              ? "invite sent"
-                              : "set password"}
-                        </button>
-                      </span>
+                              ? "Copy invite again"
+                              : "Copy invite link"}
+                        </option>
+                        <option value="password">
+                          {a.hasPassword ? "Reset password" : "Set password"}
+                        </option>
+                      </select>
                     )}
                   </td>
                   <td className="mono">
