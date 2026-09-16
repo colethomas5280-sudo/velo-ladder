@@ -69,7 +69,7 @@ export default function Masthead({
           </span>
           {athlete.hand && (
             <span>
-              <b>{athlete.hand}</b>HP
+              <b>{athlete.hand}HP</b>
             </span>
           )}
         </div>
