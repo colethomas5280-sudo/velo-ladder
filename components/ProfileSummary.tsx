@@ -3,11 +3,10 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
-import { fmtDate, fmt, todayISO, EMPTY } from "@/lib/velo";
+import { fmtDate, fmt, todayISO } from "@/lib/velo";
 import { ageOn } from "@/lib/leaderboard";
 import {
   PROFILE_FIELDS,
-  PROFILE_SECTIONS,
   isBlankValue,
   missingProfileFields,
   editableKeys,
@@ -18,15 +17,15 @@ type Row = Record<string, unknown>;
 
 /**
  * The profile at rest: a scannable panel rather than a wall of inputs.
- * Editing happens inline, in the same card, rather than a modal — Edit
- * swaps the read-only grid for the field-by-field form below it.
+ * Edit swaps each value for its input in place — same grid, same card,
+ * same field order as at rest, so the card never changes shape going in
+ * or out of edit.
  *
  * Editing opens by itself for an athlete while anything required is
  * still blank.
  *
  * The grid is deliberately the short factual fields only. The two free-text
- * ones read as paragraphs, not label/value pairs, so they sit underneath and
- * only when they have something in them.
+ * ones read as paragraphs, not label/value pairs, so they sit underneath.
  */
 const LONG_TEXT = new Set(["injuryNotes", "coachNotes"]);
 
@@ -72,8 +71,13 @@ export default function ProfileSummary({
   const grid = PROFILE_FIELDS.filter(
     (f) => f.key in data && !LONG_TEXT.has(f.key),
   );
+  // At rest: only the ones with something in them. Editing: every long-text
+  // field the role can see, blank or not, so there's somewhere to type.
   const blocks = PROFILE_FIELDS.filter(
-    (f) => f.key in data && LONG_TEXT.has(f.key) && !isBlankValue(data[f.key]),
+    (f) =>
+      f.key in data &&
+      LONG_TEXT.has(f.key) &&
+      (open || !isBlankValue(data[f.key])),
   );
 
   const display = (f: ProfileField): string => {
@@ -102,6 +106,8 @@ export default function ProfileSummary({
   const editable = (f: ProfileField) => allowed.has(f.key);
   const value = (f: ProfileField) =>
     edits[f.key] ?? (data[f.key] == null ? "" : String(data[f.key]));
+  const setValue = (f: ProfileField, v: string) =>
+    setEdits((p) => ({ ...p, [f.key]: v }));
 
   // What is still blank if he saved right now — drives the button's copy.
   const wouldRemain = missingProfileFields({
@@ -165,129 +171,108 @@ export default function ProfileSummary({
         </span>
       </div>
 
-      {!open ? (
-        <>
-          <dl className="pf-grid">
-            {grid.map((f) => {
-              const text = display(f);
-              return (
-                <div className="pf-cell" key={f.key}>
-                  <dt>{f.label}</dt>
-                  <dd>
-                    {text || <span className="pf-blank">not set</span>}
-                    {/* Age is derived, never stored — one less thing to go stale. */}
-                    {f.key === "birthDate" && age != null && (
-                      <span className="pf-derived">age {age}</span>
-                    )}
-                    {f.key === "weightLb" && text && data.weightAt != null && (
-                      <span className="pf-derived">
-                        {data.weightSource === "checkin"
-                          ? `from check-in, ${fmtDate(String(data.weightAt))}`
-                          : `entered ${fmtDate(String(data.weightAt))}`}
-                      </span>
-                    )}
-                    {!text && needs.has(f.key) && (
-                      <span className="pf-needed">needed</span>
-                    )}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
+      {open && !isCoach && (
+        <p className="cz-note">
+          Your coach needs these once. You can close this and come back to it.
+          It&apos;ll be here next time until it&apos;s done.
+        </p>
+      )}
 
-          {blocks.map((f) => (
-            <div className="pf-block" key={f.key}>
-              <div className="eyebrow">{f.label}</div>
-              <p>{String(data[f.key])}</p>
+      <dl className="pf-grid">
+        {grid.map((f) => {
+          const text = display(f);
+          const canEdit = open && editable(f);
+          return (
+            <div className="pf-cell" key={f.key}>
+              <dt>{f.label}</dt>
+              <dd>
+                {!canEdit ? (
+                  text || <span className="pf-blank">not set</span>
+                ) : f.kind === "select" ? (
+                  <select
+                    aria-label={f.label}
+                    value={value(f)}
+                    onChange={(e) => setValue(f, e.target.value)}
+                  >
+                    <option value="">Choose…</option>
+                    {f.options?.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    aria-label={f.label}
+                    type={f.kind === "date" ? "date" : "text"}
+                    inputMode={f.kind === "number" ? "numeric" : undefined}
+                    value={value(f)}
+                    onChange={(e) => setValue(f, e.target.value)}
+                  />
+                )}
+                {canEdit && f.unit && <span className="pf-unit">{f.unit}</span>}
+                {canEdit && f.help && (
+                  <span className="pf-derived">{f.help}</span>
+                )}
+                {/* Age is derived, never stored — one less thing to go stale. */}
+                {f.key === "birthDate" && age != null && (
+                  <span className="pf-derived">age {age}</span>
+                )}
+                {f.key === "weightLb" && text && data.weightAt != null && (
+                  <span className="pf-derived">
+                    {data.weightSource === "checkin"
+                      ? `from check-in, ${fmtDate(String(data.weightAt))}`
+                      : `entered ${fmtDate(String(data.weightAt))}`}
+                  </span>
+                )}
+                {!text && needs.has(f.key) && (
+                  <span className="pf-needed">needed</span>
+                )}
+                {open && !editable(f) && (
+                  <span className="pf-derived">
+                    {f.athleteSetOnce
+                      ? "ask your coach to change this"
+                      : "your coach sets this"}
+                  </span>
+                )}
+              </dd>
             </div>
-          ))}
-        </>
-      ) : (
-        <div className="pf-edit">
-          {!isCoach && (
-            <p className="cz-note">
-              Your coach needs these once. You can close this and come back to
-              it. It&apos;ll be here next time until it&apos;s done.
-            </p>
-          )}
+          );
+        })}
+      </dl>
 
-          {PROFILE_SECTIONS.map((section) => {
-            const fields = PROFILE_FIELDS.filter(
-              (f) => f.section === section.id && f.key in data,
-            );
-            if (!fields.length) return null;
+      {blocks.map((f) => {
+        const canEdit = open && editable(f);
+        return (
+          <div className="pf-block" key={f.key}>
+            <div className="eyebrow">{f.label}</div>
+            {canEdit && f.help && <span className="pf-derived">{f.help}</span>}
+            {canEdit ? (
+              <textarea
+                aria-label={f.label}
+                value={value(f)}
+                onChange={(e) => setValue(f, e.target.value)}
+              />
+            ) : (
+              <p>
+                {String(data[f.key] ?? "") || (
+                  <span className="pf-blank">not set</span>
+                )}
+              </p>
+            )}
+          </div>
+        );
+      })}
 
-            return (
-              <div className="pf-section" key={section.id}>
-                <div className="eyebrow">{section.title}</div>
-
-                {fields.map((f) => (
-                  <div className="ci-row pf-row" key={f.key}>
-                    <div className="ci-label">
-                      <b>{f.label}</b>
-                      {f.help && <span className="wl-help">{f.help}</span>}
-                    </div>
-
-                    {!editable(f) ? (
-                      <div className="pf-locked">
-                        {value(f) || EMPTY}
-                        <span>
-                          {f.athleteSetOnce
-                            ? "ask your coach to change this"
-                            : "your coach sets this"}
-                        </span>
-                      </div>
-                    ) : f.kind === "select" ? (
-                      <select
-                        aria-label={f.label}
-                        value={value(f)}
-                        onChange={(e) =>
-                          setEdits((p) => ({ ...p, [f.key]: e.target.value }))
-                        }
-                      >
-                        <option value="">Choose…</option>
-                        {f.options?.map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
-                        ))}
-                      </select>
-                    ) : f.kind === "textarea" ? (
-                      <textarea
-                        aria-label={f.label}
-                        value={value(f)}
-                        onChange={(e) =>
-                          setEdits((p) => ({ ...p, [f.key]: e.target.value }))
-                        }
-                      />
-                    ) : (
-                      <input
-                        aria-label={f.label}
-                        type={f.kind === "date" ? "date" : "text"}
-                        inputMode={f.kind === "number" ? "numeric" : undefined}
-                        value={value(f)}
-                        onChange={(e) =>
-                          setEdits((p) => ({ ...p, [f.key]: e.target.value }))
-                        }
-                      />
-                    )}
-
-                    {f.unit && editable(f) && (
-                      <span className="pf-unit">{f.unit}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-
+      {open && (
+        <>
           {err && (
             <p className="form-error" role="alert">
               {err}
             </p>
           )}
 
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="pf-actions">
             <button className="btn primary" disabled={busy} onClick={save}>
               {busy ? "Saving…" : isCoach ? "Save" : "Complete"}
             </button>
@@ -298,7 +283,7 @@ export default function ProfileSummary({
               <span className="cz-note">{wouldRemain} still to fill in</span>
             )}
           </div>
-        </div>
+        </>
       )}
     </section>
   );

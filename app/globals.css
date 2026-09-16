@@ -2189,14 +2189,7 @@ table.roster-table {
   padding-top: 10px;
 }
 
-.pf-edit {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  margin-top: 10px;
-}
-
-/* ---- the profile at rest: a scannable panel, not a form ---- */
+/* ---- the profile at rest, and edited in place — same grid either way ---- */
 .pf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -2226,6 +2219,17 @@ table.roster-table {
   gap: 8px;
   flex-wrap: wrap;
 }
+.pf-cell dd input,
+.pf-cell dd select {
+  flex: 1 1 130px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
 .pf-blank { color: var(--ink-faint); font-style: italic; }
 /* Derived, never stored — age from a birthday, provenance from a check-in. */
 .pf-derived { font-size: 12px; color: var(--ink-faint); }
@@ -2246,20 +2250,11 @@ table.roster-table {
   line-height: 1.6;
   white-space: pre-wrap;
 }
-/* The questionnaire's own rows keep the old label-left form layout. */
-.pf-section {
-  border-top: 1px solid var(--line-soft);
-  padding-top: 14px;
-  margin-top: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-.pf-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pf-row .ci-label { width: 170px; flex: 0 0 auto; }
-.pf-row textarea {
-  flex: 1 1 220px;
-  min-width: 0;
+.pf-block textarea {
+  width: 100%;
+  margin-top: 5px;
+  min-height: 74px;
+  resize: vertical;
   border: 1px solid var(--line);
   background: var(--panel);
   border-radius: 8px;
@@ -2268,15 +2263,13 @@ table.roster-table {
   color: var(--ink);
   font-family: inherit;
 }
-.pf-row textarea { min-height: 74px; resize: vertical; }
-.pf-locked {
-  flex: 1 1 220px;
-  font-size: 13.5px;
-  color: var(--ink-dim);
-  padding: 8px 0;
-}
-.pf-locked span { color: var(--ink-faint); font-size: 12px; margin-left: 8px; }
 .pf-unit { font-size: 12.5px; color: var(--ink-faint); }
+.pf-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .pf-missing {
   font-family: var(--font-mono), monospace;
   font-size: 10px;
