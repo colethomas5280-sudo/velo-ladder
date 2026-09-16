@@ -41,10 +41,15 @@ export default function Dashboard() {
         <>
           {shown("snapshot") && <Snapshot data={data} />}
 
+          {(shown("leaderboard") || shown("prs") || shown("setbacks")) && (
+            <div className="dash-top">
+              {shown("leaderboard") && <Leaderboard data={data} />}
+              {shown("prs") && <RecentPrs data={data} />}
+              {shown("setbacks") && <Setbacks data={data} />}
+            </div>
+          )}
+
           <div className="dash-grid">
-            {shown("leaderboard") && <Leaderboard data={data} />}
-            {shown("prs") && <RecentPrs data={data} />}
-            {shown("setbacks") && <Setbacks data={data} />}
             {shown("attention") && <NeedsAttention data={data} />}
             {shown("activity") && <Activity data={data} />}
             {shown("resources") && <ResourcesWidget data={data} />}
@@ -119,12 +124,18 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="widget-empty">{children}</p>;
 }
 
-const LEADERBOARD_ROWS = 5;
+/*
+ * Shared by the three top-row cards (Best velos, Recent PRs, Setback
+ * flags) so none of them can grow taller than the others — Best velos
+ * always renders exactly this many slots, and the other two are capped
+ * to match rather than stretching the row to fit an open-ended list.
+ */
+const TOP_ROW_LIMIT = 5;
 
 function Leaderboard({ data }: { data: DashboardData }) {
   const { date, rows } = data.leaderboard;
   const top = Array.from(
-    { length: LEADERBOARD_ROWS },
+    { length: TOP_ROW_LIMIT },
     (_, i) => rows[i] ?? null,
   );
   return (
@@ -164,7 +175,7 @@ function RecentPrs({ data }: { data: DashboardData }) {
         <Empty>No new personal records this week.</Empty>
       ) : (
         <ul className="feed">
-          {data.recentPrs.map((p, i) => (
+          {data.recentPrs.slice(0, TOP_ROW_LIMIT).map((p, i) => (
             <li key={`${p.athleteId}-${p.tracker}-${p.oz}-${i}`}>
               <div className="feed-main">
                 <Link href={`/athletes/${p.athleteId}`} className="name-link">
@@ -292,7 +303,7 @@ function Setbacks({ data }: { data: DashboardData }) {
         <Empty>Nothing flagged. Everyone&rsquo;s clear to work.</Empty>
       ) : (
         <ul className="feed">
-          {data.setbacks.map((s) => (
+          {data.setbacks.slice(0, TOP_ROW_LIMIT).map((s) => (
             <li key={s.id}>
               <div className="feed-main">
                 <Link href={`/athletes/${s.athleteId}`} className="name-link">

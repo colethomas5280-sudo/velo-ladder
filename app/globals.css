@@ -1309,6 +1309,21 @@ table.roster-table {
 .snapshot .ro {
   min-width: 0;
 }
+/*
+ * Best velos, Recent PRs and Setback flags, kept in their own row so they
+ * always sit together — the 6-widget `.dash-grid` below can settle into 2
+ * columns at some widths, which would split this trio across two rows and
+ * defeat the height-matching it depends on. Grid's default stretch already
+ * equalises the three within this row; capping each list to
+ * `TOP_ROW_LIMIT` (Dashboard.tsx) is what keeps that shared height equal
+ * to Best velos' own 5 rows instead of growing to fit a longer list.
+ */
+.dash-top {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
 .dash-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
