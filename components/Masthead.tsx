@@ -77,7 +77,7 @@ export default function Masthead({
       </div>
       <div className="mast-readouts">
         {onLogRecovery && (
-          <button className="btn sm ghost" onClick={onLogRecovery}>
+          <button className="btn sm primary" onClick={onLogRecovery}>
             + Log Recovery
           </button>
         )}
