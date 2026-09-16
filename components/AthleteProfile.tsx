@@ -33,6 +33,7 @@ import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
+import RecoveryModal from "./RecoveryModal";
 import ScreenLink from "./ScreenLink";
 import StrengthLink from "./StrengthLink";
 import { AthleteRetestPrompt } from "./RetestPrompt";
@@ -79,6 +80,8 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     fetcher,
   );
   const recovery = useMemo(() => recoveryData ?? [], [recoveryData]);
+  const todayRecoveryEntry =
+    recovery.find((e) => e.date === todayISO()) ?? null;
 
   const [tracker, setTracker] = useTracker();
   const cfg = TRACKERS[tracker];
@@ -103,6 +106,9 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const [chartGroup, setChartGroup] =
     useState<Partial<Record<TrackerId, string>>>({});
   const [section, setSection] = useState<SectionId>("progress");
+  const [recoveryModal, setRecoveryModal] = useState<
+    RecoveryEntry | "new" | null
+  >(null);
   const [saving, setSaving] = useState(false);
   /** Shown inside the pop-up and kept there until the next attempt — a save
    *  failure must never be a toast the athlete can miss behind the modal. */
@@ -269,6 +275,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
       <Masthead
         athlete={athlete}
         sessions={allSessions}
+        onLogRecovery={() => setRecoveryModal(todayRecoveryEntry ?? "new")}
         action={
           <button
             className="track-link"
@@ -403,6 +410,20 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
             error={saveError}
           />
         </SessionModal>
+      )}
+
+      {recoveryModal && (
+        <RecoveryModal
+          athleteId={athleteId}
+          existing={recoveryModal === "new" ? null : recoveryModal}
+          date={recoveryModal === "new" ? todayISO() : recoveryModal.date}
+          onClose={() => setRecoveryModal(null)}
+          onSaved={async (msg) => {
+            await mutateRecovery();
+            setRecoveryModal(null);
+            showToast(msg);
+          }}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

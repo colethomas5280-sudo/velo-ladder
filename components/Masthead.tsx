@@ -6,11 +6,14 @@ export default function Masthead({
   athlete,
   sessions,
   action,
+  onLogRecovery,
 }: {
   athlete: Athlete;
   sessions: TrainingSession[];
   /** Optional control rendered directly under the name (e.g. "Track a new session"). */
   action?: React.ReactNode;
+  /** Shown above the PR tiles when the viewer may log recovery for this athlete. */
+  onLogRecovery?: () => void;
 }) {
   const mCount = sessionsOfType(sessions, "mound").length;
   const pCount = sessionsOfType(sessions, "pulldown").length;
@@ -72,14 +75,21 @@ export default function Masthead({
         </div>
         {action}
       </div>
-      <div className="readouts">
-        <div className="ro">
-          <div className="n">{fmt(mPR)}</div>
-          <div className="l">Mound 5oz PR</div>
-        </div>
-        <div className="ro">
-          <div className="n">{fmt(pPR)}</div>
-          <div className="l">Pull-Down 5oz PR</div>
+      <div className="mast-readouts">
+        {onLogRecovery && (
+          <button className="btn sm ghost" onClick={onLogRecovery}>
+            + Log Recovery
+          </button>
+        )}
+        <div className="readouts">
+          <div className="ro">
+            <div className="n">{fmt(mPR)}</div>
+            <div className="l">Mound 5oz PR</div>
+          </div>
+          <div className="ro">
+            <div className="n">{fmt(pPR)}</div>
+            <div className="l">Pull-Down 5oz PR</div>
+          </div>
         </div>
       </div>
     </div>

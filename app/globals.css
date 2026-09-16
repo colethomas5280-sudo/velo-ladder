@@ -312,6 +312,12 @@ select {
   color: var(--ink);
   font-weight: 600;
 }
+.mast-readouts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
 .readouts {
   display: flex;
   gap: 10px;
@@ -2183,7 +2189,12 @@ table.roster-table {
   padding-top: 10px;
 }
 
-.pf { max-width: 760px; }
+.pf-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
 
 /* ---- the profile at rest: a scannable panel, not a form ---- */
 .pf-grid {
