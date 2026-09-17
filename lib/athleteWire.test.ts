@@ -32,6 +32,8 @@ const OTHER_EMAIL = "other@wire.test";
 const COACH_NOTE = "SENTINEL-coach-note-6b1f4a";
 const OTHER_NOTE = "SENTINEL-other-athlete-note-91cc7d";
 const SCREEN_NOTE = "SENTINEL-screen-note-2ae503";
+/* The delivery assessment split off the screen row in v27; same rule, own note. */
+const DELIVERY_NOTE = "SENTINEL-delivery-note-7f21ab";
 /* An athlete's own lifting note — theirs to read, unlike the screen's. */
 const LIFT_NOTE = "SENTINEL-lift-note-4c8e21";
 /* Another athlete's. Nobody but them and the coach should ever see it. */
@@ -118,6 +120,11 @@ async function seed(): Promise<Seeded> {
       flaws: {},
       deliveryAssessed: false,
     },
+    COACH_EMAIL,
+  );
+  await data.upsertDeliveryScreen(
+    athlete.id,
+    { date: "2026-09-01", flaws: {}, notes: DELIVERY_NOTE },
     COACH_EMAIL,
   );
   /*
@@ -355,6 +362,11 @@ test("no coach-only note reaches the athlete on any route", () => {
       false,
       `${r.file} (${r.status}) served the athlete the coach's screen note`,
     );
+    assert.equal(
+      r.body.includes(DELIVERY_NOTE),
+      false,
+      `${r.file} (${r.status}) served the athlete the coach's delivery assessment note`,
+    );
   }
 });
 
@@ -416,5 +428,9 @@ test("the coach does still get the notes — the filter isn't just deleting ever
   assert.ok(
     asCoach.some((r) => r.body.includes(SCREEN_NOTE)),
     "no route served the coach the screen note either",
+  );
+  assert.ok(
+    asCoach.some((r) => r.body.includes(DELIVERY_NOTE)),
+    "no route served the coach the delivery assessment note either",
   );
 });
