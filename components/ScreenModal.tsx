@@ -376,9 +376,11 @@ export default function ScreenModal({
                     </div>
                     {isOpen && (
                       <div className="ms-test-body">
-                        <span className="ms-help">
-                          {flaw.description} {flaw.howToSpot}
-                        </span>
+                        <p className="ms-help">{flaw.description}</p>
+                        <div className="ms-flaw-spot">
+                          <div className="eyebrow">How to spot it</div>
+                          <p className="ms-help">{flaw.howToSpot}</p>
+                        </div>
                       </div>
                     )}
                   </section>

@@ -191,6 +191,33 @@ test("the twelve are offered in Cole's order, behind the assessed checkbox", () 
     );
 });
 
+/*
+ * Welded once already, in a different component (recipe cards), and called
+ * out for it twice. The description and the how-to-spot procedure are
+ * different kinds of copy and must render as distinct blocks, never
+ * concatenated into one string a coach has to read all the way through to
+ * find where the procedure starts.
+ */
+test("a flaw's description and how-to-spot render as separate blocks, not one string", () => {
+  form();
+  const flaw = BIG_12[0];
+  const card = document
+    .querySelector(`input[name="flaw:${flaw.key}"]`)!
+    .closest(".ms-flaw-card")!;
+  fireEvent.click(card.querySelector(".ms-test-toggle")!);
+
+  const body = card.querySelector(".ms-test-body")!;
+  const blocks = [...body.querySelectorAll(".ms-help")];
+  assert.equal(blocks.length, 2, "description and how-to-spot must be separate elements");
+  assert.equal(blocks[0].textContent, flaw.description);
+  assert.equal(blocks[1].textContent, flaw.howToSpot);
+  assert.ok(
+    !body.textContent!.includes(`${flaw.description} ${flaw.howToSpot}`),
+    "must not be welded into one run-on string",
+  );
+  assert.match(body.textContent!, /how to spot it/i);
+});
+
 test("ticking a flaw marks the delivery as assessed", async () => {
   /*
    * The server refuses a record where these disagree. The UI must not be

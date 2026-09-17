@@ -2576,6 +2576,19 @@ table.roster-table {
   flex: 1 1 auto;
   width: auto;
 }
+/*
+ * The description and the how-to-spot procedure are two different kinds of
+ * copy — what the flaw is, and how to grade it — welded into one paragraph
+ * once already and called out for it. Kept as separate blocks, with the
+ * procedure carrying its own small label in the same style as the modal's
+ * other eyebrows, so a coach who opens the card to grade it can jump
+ * straight past the description.
+ */
+.ms-flaw-spot {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
 @media (max-width: 560px) {
   .ms-answers.sided {
     flex-direction: column;
