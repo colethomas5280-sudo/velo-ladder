@@ -22,7 +22,6 @@ export function rowOf(over: Partial<ScreenOverviewRow> = {}): ScreenOverviewRow 
     lastFull: TODAY,
     summary: screenSummary(screenOf()),
     spotSince: null,
-    delivery: null,
     spotTests: 0,
     called: null,
     phase: null,

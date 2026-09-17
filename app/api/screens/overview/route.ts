@@ -8,7 +8,6 @@ import {
   standingScreen,
   type Hand,
 } from "@/lib/screen";
-import { deliveryStatus } from "@/lib/big12Explain";
 import type { ScreenOverviewRow } from "@/lib/types";
 import { json, unauthorized, forbidden, guard } from "@/lib/http";
 
@@ -51,11 +50,9 @@ export async function GET() {
           spotTests: 0,
           called,
           phase: a.phase,
-          delivery: null,
         };
 
       const summary = screenSummary(standing.results, undefined, hand);
-      const latest = a.screens[a.screens.length - 1];
 
       return {
         athleteId: a.athleteId,
@@ -67,13 +64,6 @@ export async function GET() {
         spotTests: summary.failing.length,
         called,
         phase: a.phase,
-        /*
-         * The LAST screen's own marks, not the standing composite. Test
-         * results carry forward because a limitation found in June is still
-         * true today; a flaw does not, because it is what Cole saw in one
-         * delivery on one day.
-         */
-        delivery: deliveryStatus(latest.flaws, latest.deliveryAssessed),
       };
     });
     return json(out);

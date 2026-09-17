@@ -1,4 +1,3 @@
-import type { DeliveryStatus } from "./big12Explain";
 import type { ScreenSummary } from "./screen";
 import type { Lifts } from "./strength";
 
@@ -143,13 +142,32 @@ export interface ScreenOverviewRow {
   called: { since: string; reason: string } | null;
   /** Training block — in-season pauses the full-screen clock. */
   phase: string | null;
-  /**
-   * The delivery assessment on the MOST RECENT screen, or null when there is
-   * no screen at all. Not carried forward the way test results are: a mark is
-   * what the coach saw on that date, and "he swayed in June" is not a claim
-   * about today.
-   */
-  delivery: DeliveryStatus | null;
+}
+
+export interface DeliveryScreen {
+  id: string;
+  athleteId: string;
+  date: string;
+  /** Big 12 marks. A key present and true means Cole saw that flaw. */
+  flaws: Record<string, boolean>;
+  notes: string;
+}
+
+/**
+ * One athlete's line on the Pitching Inhibitors roster.
+ *
+ * Mirrors `ScreenOverviewRow`'s dates-not-due-ness: the elapsed days are
+ * worked out in the browser against the viewer's own today.
+ */
+export interface DeliveryOverviewRow {
+  athleteId: string;
+  name: string;
+  /** The most recent assessment, or null when there has never been one. */
+  last: string | null;
+  /** Marks on that most recent assessment. */
+  count: number;
+  /** Training block — in-season pauses the clock, same as the screen. */
+  phase: string | null;
 }
 
 export interface RecoveryEntry {

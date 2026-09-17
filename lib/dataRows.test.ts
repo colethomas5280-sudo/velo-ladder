@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isoDate, toScreen } from "@/lib/data";
+import { isoDate, toScreen, toDeliveryScreen, reduceDeliveryOverview } from "@/lib/data";
 
 /* ------------------------------------------------------------------ *
  * Row mappers
@@ -71,4 +71,34 @@ test("an assessed screen with nothing marked is not the same as an unassessed on
   const never = toScreen({ id: "s2", athlete_id: "a1", date: "2026-01-02" });
   assert.notEqual(clean.deliveryAssessed, never.deliveryAssessed);
   assert.deepEqual(clean.flaws, never.flaws);
+});
+
+test("a delivery row reads back with its marks and notes", () => {
+  const d = toDeliveryScreen({
+    id: "d1", athlete_id: "a1", date: "2026-01-01",
+    flaws: { sway: true }, notes: "filmed from the side",
+  });
+  assert.deepEqual(d.flaws, { sway: true });
+  assert.equal(d.notes, "filmed from the side");
+  assert.equal(d.athleteId, "a1");
+});
+
+test("a delivery row with no marks is still an assessment", () => {
+  const d = toDeliveryScreen({ id: "d1", athlete_id: "a1", date: "2026-01-01" });
+  assert.deepEqual(d.flaws, {});
+  assert.equal(d.notes, "");
+});
+
+test("an athlete never assessed reads last: null, count: 0 from the join", () => {
+  /*
+   * The LEFT JOIN hands back one row per athlete even when they have no
+   * delivery_screens row at all — date and flaws both null on that row. The
+   * `flaws` value here is one no real query would ever pair with a null
+   * date, chosen deliberately: `count` must come from the guarded block, not
+   * from `flaws` alone, and this is the only way to tell those apart.
+   */
+  const rows = reduceDeliveryOverview([
+    { athlete_id: "a1", name: "Kid", phase: null, date: null, flaws: { sway: true } },
+  ]);
+  assert.deepEqual(rows, [{ athleteId: "a1", name: "Kid", last: null, count: 0, phase: null }]);
 });
