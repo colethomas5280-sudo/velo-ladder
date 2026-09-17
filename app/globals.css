@@ -2540,6 +2540,42 @@ table.roster-table {
   font-size: 13.5px;
   font-weight: 600;
 }
+/*
+ * Its own class rather than `.ms-test` — the physical tests above count
+ * `.ms-test` elements in a test asserting nothing else is on the page yet,
+ * and the Big 12 would otherwise inflate that count. Borders mirror `.ms-test`
+ * so the two collapsible lists read as one visual language.
+ */
+.ms-flaw-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.ms-flaw-card.open {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+/*
+ * Each flaw's checkbox sits beside the disclosure toggle rather than inside
+ * it — a checkbox nested in a <button> is invalid markup and would fire both
+ * the mark and the open/close on one click. The toggle itself reuses
+ * `.ms-test-toggle` from the physical tests above, so description and
+ * how-to-spot copy (paragraphs, not one-liners) stay collapsed until a coach
+ * asks for them instead of pushing notes and save off the bottom of the modal.
+ */
+.ms-flaw-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ms-flaw-toggle-row input {
+  flex: 0 0 auto;
+  margin-left: 12px;
+}
+.ms-flaw-toggle-row .ms-test-toggle {
+  flex: 1 1 auto;
+  width: auto;
+}
 @media (max-width: 560px) {
   .ms-answers.sided {
     flex-direction: column;

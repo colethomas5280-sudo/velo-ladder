@@ -216,6 +216,33 @@ test("ticking a flaw marks the delivery as assessed", async () => {
   }
 });
 
+/*
+ * The fix for the wipe hole: unticking "assessed" while a flaw is marked
+ * used to silently clear every ticked flaw. That destroyed a coach's work on
+ * one mis-click, with no confirm and no undo. The UI must refuse instead —
+ * disable the box and explain why, the same way delete already protects
+ * against a stray click rather than acting on it.
+ */
+test("the assessed checkbox cannot be unticked while a flaw is marked", () => {
+  form();
+  fireEvent.click(
+    document.querySelector<HTMLInputElement>('input[name="flaw:sway"]')!,
+  );
+  const assessed = document.querySelector<HTMLInputElement>(
+    'input[name="deliveryAssessed"]',
+  )!;
+  assert.equal(assessed.checked, true);
+  assert.equal(assessed.disabled, true, "must refuse, not wipe, while a flaw is marked");
+
+  fireEvent.click(assessed);
+  assert.equal(assessed.checked, true, "a disabled checkbox must not toggle off");
+  assert.equal(
+    document.querySelector<HTMLInputElement>('input[name="flaw:sway"]')!.checked,
+    true,
+    "the flaw survives the attempted uncheck",
+  );
+});
+
 test("an athlete never sees the recording controls", () => {
   form({ isCoach: false });
   assert.equal(document.querySelector('input[name="flaw:sway"]'), null);

@@ -146,6 +146,10 @@ export default function ScreenModal({
   );
 
   const clash = !existing && takenDates.includes(date);
+  // Flaws only ever hold `true` entries (see toggleFlaw), so any key present
+  // means the coach marked something — and "delivery assessed" can't be
+  // turned off out from under them without wiping that work.
+  const anyFlawTicked = Object.keys(flaws).length > 0;
 
   const setField = (key: string, value: string) =>
     setResults((prev) => {
@@ -178,13 +182,6 @@ export default function ScreenModal({
       return next;
     });
     if (nowOn) setDeliveryAssessed(true);
-  };
-
-  // Unassessing by hand has to take any marked flaws with it, for the same
-  // reason: a clean checkbox can't sit next to flaws nobody unmarked.
-  const setAssessed = (value: boolean) => {
-    setDeliveryAssessed(value);
-    if (!value) setFlaws({});
   };
 
   async function save() {
@@ -336,28 +333,57 @@ export default function ScreenModal({
                   type="checkbox"
                   name="deliveryAssessed"
                   checked={deliveryAssessed}
-                  onChange={(e) => setAssessed(e.target.checked)}
+                  disabled={anyFlawTicked}
+                  onChange={(e) => {
+                    // Belt and suspenders alongside `disabled`: this can
+                    // never turn itself off while a flaw is still marked.
+                    if (anyFlawTicked) return;
+                    setDeliveryAssessed(e.target.checked);
+                  }}
                 />
                 <span>
                   <b>I assessed the delivery</b>
+                  {anyFlawTicked && (
+                    <span className="ms-help">
+                      Untick the flaws below first if he turned out clean after
+                      all.
+                    </span>
+                  )}
                 </span>
               </label>
-              {BIG_12.map((flaw) => (
-                <label className="ms-flaw" key={flaw.key}>
-                  <input
-                    type="checkbox"
-                    name={`flaw:${flaw.key}`}
-                    checked={!!flaws[flaw.key]}
-                    onChange={() => toggleFlaw(flaw.key)}
-                  />
-                  <span>
-                    <b>{flaw.label}</b>
-                    <span className="ms-help">
-                      {flaw.description} {flaw.howToSpot}
-                    </span>
-                  </span>
-                </label>
-              ))}
+              {BIG_12.map((flaw) => {
+                const key = `flaw:${flaw.key}`;
+                const isOpen = open.has(key);
+                return (
+                  <section className={`ms-flaw-card${isOpen ? " open" : ""}`} key={flaw.key}>
+                    <div className="ms-flaw-toggle-row">
+                      <input
+                        type="checkbox"
+                        name={key}
+                        aria-label={flaw.label}
+                        checked={!!flaws[flaw.key]}
+                        onChange={() => toggleFlaw(flaw.key)}
+                      />
+                      <button
+                        type="button"
+                        className="ms-test-toggle"
+                        aria-expanded={isOpen}
+                        onClick={() => toggle(key)}
+                      >
+                        <span className="ms-test-name">{flaw.label}</span>
+                        <span className="caret">{isOpen ? "▾" : "▸"}</span>
+                      </button>
+                    </div>
+                    {isOpen && (
+                      <div className="ms-test-body">
+                        <span className="ms-help">
+                          {flaw.description} {flaw.howToSpot}
+                        </span>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           )}
 
