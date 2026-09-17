@@ -1,7 +1,7 @@
 import "./testDom";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { MovementScreen } from "@/lib/types";
 import { withSwr } from "./testSwr";
 import { daysAgo, screenOf, TODAY } from "./testRender";
@@ -200,4 +200,63 @@ test("an athlete sees his own flaws, and never a coach note", () => {
     { isCoach: false },
   );
   assert.match(document.body.textContent!, /Sway/);
+});
+
+test("a painful finding reaches the report as an alert, not a plain explanation", () => {
+  panel(
+    [
+      bigScr({
+        deliveryAssessed: true,
+        flaws: { sway: true },
+        results: { "pelvic-rotation.rotation": "painful" },
+      }),
+    ],
+    { hand: "R" },
+  );
+  assert.ok(
+    document.querySelector(".ms-dot.alert"),
+    "a painful finding must render with the alert marker this app uses for pain everywhere else",
+  );
+});
+
+test("a flaw explained by another marked flaw says which one", () => {
+  panel(
+    [
+      bigScr({
+        deliveryAssessed: true,
+        flaws: { "flying-open": true, "short-stride": true },
+        results: {},
+      }),
+    ],
+    { hand: "R" },
+  );
+  assert.match(document.body.textContent!, /Also marked on this screen/i);
+  assert.match(document.body.textContent!, /Short Stride/);
+});
+
+test("the causes behind the lead one are hidden until asked for", () => {
+  panel(
+    [
+      bigScr({
+        deliveryAssessed: true,
+        flaws: { sway: true },
+        results: {
+          "hip-45.45-degree-angle:R": "less",
+          "pelvic-rotation.rotation": "limited-bilateral",
+        },
+      }),
+    ],
+    { hand: "R" },
+  );
+  assert.doesNotMatch(
+    document.body.textContent!,
+    /Spine disassociation/,
+    "the non-lead cause stays behind the toggle at first",
+  );
+  fireEvent.click(screen.getByText(/1 more possible cause/i));
+  assert.match(
+    document.body.textContent!,
+    /Spine disassociation/,
+    "and appears once the toggle is opened",
+  );
 });

@@ -2832,6 +2832,18 @@ table.roster-table {
 .sc-cause-label:first-child {
   margin-top: 0;
 }
+/*
+ * A finding, not a placeholder: "nothing on this screen explains this" is
+ * a real statement about the athlete (the flaw is a habit, not his body),
+ * so it carries the same weight as an explanation rather than reading as
+ * an empty state like .widget-empty does.
+ */
+.sc-unexplained {
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
 
 /* ---------- tests tab ---------- */
 .tests-head {

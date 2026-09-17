@@ -697,7 +697,7 @@ function FlawExplanation({ report }: { report: FlawReport }) {
         )}
 
         {report.unexplained && (
-          <p className="widget-empty">
+          <p className="sc-unexplained">
             Nothing on this screen explains this.
           </p>
         )}
