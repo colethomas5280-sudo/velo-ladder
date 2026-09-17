@@ -328,7 +328,7 @@ export default function ScreenModal({
 
           {isCoach && (
             <div className="ms-group">
-              <div className="eyebrow">Big 12 delivery check</div>
+              <div className="eyebrow">Pitching Inhibitors</div>
               <label className="ms-flaw ms-flaw-head">
                 <input
                   type="checkbox"

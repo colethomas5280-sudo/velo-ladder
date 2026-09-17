@@ -1,4 +1,5 @@
-import { BIG_12, flawByKey, type Cause, type CauseSide, type Flaw } from "./big12";
+import { BIG_12,
+  FLAW_KEYS, flawByKey, type Cause, type CauseSide, type Flaw } from "./big12";
 import {
   NOT_TESTED,
   PAINFUL,
@@ -228,4 +229,29 @@ export function explainScreen(
   return BIG_12.filter((f) => marked.has(f.key))
     .map((f) => explainFlaw(f.key, results, hand, marked))
     .filter((r): r is FlawReport => r !== null);
+}
+
+/** The roster's one-line read of a screen's delivery assessment. */
+export interface DeliveryStatus {
+  kind: "not-assessed" | "clean" | "marked";
+  count: number;
+}
+
+/**
+ * The three states, for anywhere that shows a screen without its detail.
+ *
+ * Derived HERE rather than recomputed per view, so the roster and the report
+ * cannot end up disagreeing about the same athlete on the same day. The
+ * count is filtered through FLAW_KEYS: a key that is not one of the twelve
+ * was never a flaw Cole ticked, and must not inflate the number he reads.
+ */
+export function deliveryStatus(
+  flaws: Record<string, boolean>,
+  deliveryAssessed: boolean,
+): DeliveryStatus {
+  if (!deliveryAssessed) return { kind: "not-assessed", count: 0 };
+  const count = Object.keys(flaws).filter(
+    (k) => flaws[k] === true && FLAW_KEYS.has(k),
+  ).length;
+  return { kind: count > 0 ? "marked" : "clean", count };
 }

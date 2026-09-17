@@ -127,3 +127,44 @@ test("an athlete sees their own tests and never the roster", () => {
   assert.ok(screen.getByText(/my tests/i));
   assert.equal(screen.queryByText(/full screen every/i), null, "no roster caption");
 });
+
+/* ------------------------------------------------------------------ *
+ * Pitching Inhibitors on the roster
+ *
+ * Until this, the roster knew nothing about the delivery, so an athlete Cole
+ * had assessed and one he had never watched read identically from here. The
+ * three states are the report's three states, and "assessed, clean" must
+ * never look like "nobody looked".
+ * ------------------------------------------------------------------ */
+
+test("an athlete whose delivery was not assessed says so on the roster", () => {
+  roster([rowOf({ delivery: { kind: "not-assessed", count: 0 } }),]);
+  assert.match(document.body.textContent!, /delivery not assessed/i);
+});
+
+test("assessed and clean reads as a result, not as an absence", () => {
+  roster([rowOf({ delivery: { kind: "clean", count: 0 } })]);
+  assert.match(document.body.textContent!, /no inhibitors/i);
+  assert.doesNotMatch(document.body.textContent!, /not assessed/i);
+});
+
+test("marked inhibitors are counted, and read as a plural when there are several", () => {
+  roster([rowOf({ delivery: { kind: "marked", count: 3 } })]);
+  assert.match(document.body.textContent!, /3 inhibitors/i);
+});
+
+test("one inhibitor is not called 1 inhibitors", () => {
+  roster([rowOf({ delivery: { kind: "marked", count: 1 } })]);
+  assert.match(document.body.textContent!, /1 inhibitor(?!s)/i);
+  assert.doesNotMatch(document.body.textContent!, /1 inhibitors/i);
+});
+
+test("an athlete with no screen at all is not described as unassessed", async () => {
+  /*
+   * "No screen" and "screened but the delivery was not assessed" are
+   * different facts. The roster already separates athletes with no screen
+   * into their own list, and nothing about the delivery belongs on them.
+   */
+  roster([rowOf({ last: null, lastFull: null, summary: null, delivery: null }),]);
+  assert.doesNotMatch(document.body.textContent!, /not assessed/i);
+});

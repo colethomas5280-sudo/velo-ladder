@@ -646,7 +646,7 @@ function DeliverySection({
   if (!screen.deliveryAssessed) {
     return (
       <div className="sc-block">
-        <div className="eyebrow sc-h">Delivery</div>
+        <div className="eyebrow sc-h">Pitching Inhibitors</div>
         <p className="widget-empty">
           The delivery wasn&apos;t assessed at this screen.
         </p>
@@ -658,7 +658,7 @@ function DeliverySection({
 
   return (
     <div className="sc-block">
-      <div className="eyebrow sc-h">Delivery</div>
+      <div className="eyebrow sc-h">Pitching Inhibitors</div>
       {reports.length === 0 ? (
         <p className="sc-clean">Delivery assessed. Nothing found.</p>
       ) : (

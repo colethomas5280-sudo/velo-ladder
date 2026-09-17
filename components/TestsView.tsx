@@ -242,6 +242,21 @@ function Roster() {
                       {r.summary!.painful} painful
                     </em>
                   )}
+                  {/*
+                    * The delivery, in one line. "Assessed, nothing found" is
+                    * a result and gets said out loud: leaving it blank would
+                    * make a pitcher Cole watched look like one he never did.
+                    */}
+                  {r.delivery && (
+                    <em className="tr-delivery">
+                      {" · "}
+                      {r.delivery.kind === "not-assessed"
+                        ? "delivery not assessed"
+                        : r.delivery.kind === "clean"
+                          ? "no inhibitors"
+                          : `${r.delivery.count} inhibitor${r.delivery.count === 1 ? "" : "s"}`}
+                    </em>
+                  )}
                 </span>
                 <span className="tr-when">
                   {due.lead.days === null

@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { abnormalFor, explainFlaw, sidesWanted } from "@/lib/big12Explain";
+import {
+  abnormalFor,
+  deliveryStatus,
+  explainFlaw,
+  sidesWanted,
+} from "@/lib/big12Explain";
 import { flawByKey } from "@/lib/big12";
 import { NOT_TESTED, PAINFUL } from "@/lib/screen";
 
@@ -187,4 +192,47 @@ test("a cause the screen cannot measure never counts as an explanation", () => {
   const r = explainFlaw("hanging-back", {}, "R", new Set(["hanging-back"]))!;
   assert.equal(r.unexplained, true);
   assert.ok(sway().causes.some((c) => c.tests.length === 0));
+});
+
+/* ------------------------------------------------------------------ *
+ * The roster's one-line version
+ *
+ * The tests roster shows every athlete at a glance. Until now it knew
+ * nothing about the delivery, so a pitcher Cole assessed and one he never
+ * watched looked identical from there. Same three states as the report, and
+ * derived in ONE place so the two cannot drift into disagreeing about the
+ * same athlete on the same day.
+ * ------------------------------------------------------------------ */
+
+test("a screen with the delivery unassessed says so, whatever else is on it", () => {
+  assert.deepEqual(deliveryStatus({}, false), { kind: "not-assessed", count: 0 });
+});
+
+test("assessed with nothing marked is clean, which is a result and not an absence", () => {
+  assert.deepEqual(deliveryStatus({}, true), { kind: "clean", count: 0 });
+});
+
+test("assessed with marks counts them", () => {
+  assert.deepEqual(deliveryStatus({ sway: true, "high-hand": true }, true), {
+    kind: "marked",
+    count: 2,
+  });
+});
+
+test("an unticked flaw stored as false is not counted", () => {
+  /*
+   * The write path drops false rather than storing it, but a row written
+   * before that rule, or by hand, must not inflate the count.
+   */
+  assert.deepEqual(deliveryStatus({ sway: true, "late-riser": false }, true), {
+    kind: "marked",
+    count: 1,
+  });
+});
+
+test("a key that is not one of the twelve is not counted", () => {
+  assert.deepEqual(deliveryStatus({ "sway-ish": true }, true), {
+    kind: "clean",
+    count: 0,
+  });
 });

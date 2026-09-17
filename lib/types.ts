@@ -1,3 +1,4 @@
+import type { DeliveryStatus } from "./big12Explain";
 import type { ScreenSummary } from "./screen";
 import type { Lifts } from "./strength";
 
@@ -142,6 +143,13 @@ export interface ScreenOverviewRow {
   called: { since: string; reason: string } | null;
   /** Training block — in-season pauses the full-screen clock. */
   phase: string | null;
+  /**
+   * The delivery assessment on the MOST RECENT screen, or null when there is
+   * no screen at all. Not carried forward the way test results are: a mark is
+   * what the coach saw on that date, and "he swayed in June" is not a claim
+   * about today.
+   */
+  delivery: DeliveryStatus | null;
 }
 
 export interface RecoveryEntry {

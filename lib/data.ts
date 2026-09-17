@@ -848,7 +848,14 @@ export interface AthleteScreens {
   rescreenReason: string | null;
   /** Training block — in-season pauses the full-screen clock. */
   phase: string | null;
-  screens: { date: string; results: Record<string, string> }[];
+  screens: {
+    date: string;
+    results: Record<string, string>;
+    /** Big 12 marks, per day. Never carried forward: they are what Cole
+     *  ticked on THAT date, not a standing picture like the test results. */
+    flaws: Record<string, boolean>;
+    deliveryAssessed: boolean;
+  }[];
 }
 
 /**
@@ -865,7 +872,8 @@ export interface AthleteScreens {
 export async function listAllScreens(): Promise<AthleteScreens[]> {
   const rows = (await sql`
     SELECT a.id AS athlete_id, a.name, a.hand,
-           a.rescreen_since, a.rescreen_reason, a.phase, m.date, m.results
+           a.rescreen_since, a.rescreen_reason, a.phase, m.date, m.results,
+           m.flaws, m.delivery_assessed
     FROM athletes a
     LEFT JOIN movement_screens m ON m.athlete_id = a.id
     WHERE a.archived = false
@@ -893,6 +901,8 @@ export async function listAllScreens(): Promise<AthleteScreens[]> {
       entry.screens.push({
         date: isoDate(r.date),
         results: (r.results ?? {}) as Record<string, string>,
+        flaws: (r.flaws ?? {}) as Record<string, boolean>,
+        deliveryAssessed: r.delivery_assessed === true,
       });
   }
   return [...byAthlete.values()];
