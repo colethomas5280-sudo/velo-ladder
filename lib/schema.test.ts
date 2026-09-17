@@ -6,6 +6,7 @@ import {
   SEED_SQL,
   SCHEMA_VERSION,
   schemaTables,
+  schemaFile,
   seedFingerprint,
 } from "@/lib/schema";
 import { seedLifts } from "@/lib/strength";
@@ -437,4 +438,27 @@ test("it moves when a recipe's content changes, which the version does not", asy
 test("it moves when the lift menu changes too", async () => {
   const { seedLifts } = await import("@/lib/strength");
   assert.ok(seedFingerprint().length === 8 && seedLifts().length > 0);
+});
+
+test("the Big 12 columns arrive on existing screens as well as new ones", () => {
+  const sql = schemaFile();
+  assert.match(sql, /ALTER TABLE movement_screens\s+ADD COLUMN IF NOT EXISTS flaws jsonb/);
+  assert.match(
+    sql,
+    /ALTER TABLE movement_screens\s+ADD COLUMN IF NOT EXISTS delivery_assessed boolean NOT NULL DEFAULT false/,
+  );
+});
+
+test("an existing screen is not retroactively claimed as assessed", () => {
+  /*
+   * Every screen already in Cole's database was taken before the delivery
+   * was ever assessed. A default of true, or a backfill setting it from the
+   * presence of a row, would put a statement in his records that he never
+   * made and could not tell apart from one he did.
+   */
+  const sql = schemaFile();
+  assert.ok(
+    !/UPDATE movement_screens SET delivery_assessed = true/.test(sql),
+    "a backfill claimed old screens were assessed",
+  );
 });
