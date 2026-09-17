@@ -33,6 +33,7 @@ import ProgressChart from "./ProgressChart";
 import HistoryTable from "./HistoryTable";
 import SessionModal from "./SessionModal";
 import RecoveryPanel from "./RecoveryPanel";
+import RecoveryModal from "./RecoveryModal";
 import ScreenLink from "./ScreenLink";
 import StrengthLink from "./StrengthLink";
 import { AthleteRetestPrompt } from "./RetestPrompt";
@@ -41,6 +42,23 @@ import ProfileSummary from "./ProfileSummary";
 
 
 type Me = { role: "coach" | "athlete" | "none"; athleteId: string | null };
+
+type SectionId =
+  | "progress"
+  | "recovery"
+  | "screen"
+  | "lifting"
+  | "history"
+  | "profile";
+
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: "progress", label: "Progress" },
+  { id: "recovery", label: "Recovery" },
+  { id: "screen", label: "Movement Screen" },
+  { id: "lifting", label: "Lifting" },
+  { id: "history", label: "Session History" },
+  { id: "profile", label: "Profile" },
+];
 
 export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const { data: me } = useSWR<Me>("/api/me", fetcher);
@@ -62,6 +80,8 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
     fetcher,
   );
   const recovery = useMemo(() => recoveryData ?? [], [recoveryData]);
+  const todayRecoveryEntry =
+    recovery.find((e) => e.date === todayISO()) ?? null;
 
   const [tracker, setTracker] = useTracker();
   const cfg = TRACKERS[tracker];
@@ -85,6 +105,10 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [chartGroup, setChartGroup] =
     useState<Partial<Record<TrackerId, string>>>({});
+  const [section, setSection] = useState<SectionId>("progress");
+  const [recoveryModal, setRecoveryModal] = useState<
+    RecoveryEntry | "new" | null
+  >(null);
   const [saving, setSaving] = useState(false);
   /** Shown inside the pop-up and kept there until the next attempt — a save
    *  failure must never be a toast the athlete can miss behind the modal. */
@@ -251,6 +275,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
       <Masthead
         athlete={athlete}
         sessions={allSessions}
+        onLogRecovery={() => setRecoveryModal(todayRecoveryEntry ?? "new")}
         action={
           <button
             className="track-link"
@@ -266,65 +291,85 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
 
       <GuidanceCard athleteId={athleteId} isCoach={!!canManage} />
 
-      <div className="view-switch">
-        <span className="eyebrow">Progress</span>
-        <div className="seg" role="group" aria-label="Tracker">
-          {TRACKER_IDS.map((t) => (
-            <button
-              key={t}
-              aria-pressed={tracker === t}
-              onClick={() => setTracker(t)}
-            >
-              {TRACKERS[t].label}
-            </button>
-          ))}
-        </div>
+      <div className="chips" role="group" aria-label="Athlete sections">
+        {SECTIONS.map((s) => (
+          <button
+            key={s.id}
+            className="chip"
+            aria-pressed={section === s.id}
+            onClick={() => setSection(s.id)}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
-      <ProgressChart
-        cfg={cfg}
-        trackerId={tracker}
-        sessions={allSessions}
-        groupId={groupId}
-        setGroupId={(id) => setChartGroup((p) => ({ ...p, [tracker]: id }))}
-        recovery={recovery}
-      />
+      {section === "progress" && (
+        <>
+          <div className="view-switch">
+            <span className="eyebrow">Progress</span>
+            <div className="seg" role="group" aria-label="Tracker">
+              {TRACKER_IDS.map((t) => (
+                <button
+                  key={t}
+                  aria-pressed={tracker === t}
+                  onClick={() => setTracker(t)}
+                >
+                  {TRACKERS[t].label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <RecoveryPanel
-        athleteId={athleteId}
-        sessions={allSessions}
-        onChanged={() => mutateRecovery()}
-      />
+          <ProgressChart
+            cfg={cfg}
+            trackerId={tracker}
+            sessions={allSessions}
+            groupId={groupId}
+            setGroupId={(id) => setChartGroup((p) => ({ ...p, [tracker]: id }))}
+            recovery={recovery}
+          />
+        </>
+      )}
 
-      <ScreenLink athleteId={athleteId} hand={athlete.hand} />
-
-      <StrengthLink athleteId={athleteId} />
-
-      {sessionsLoading ? (
-        <div
-          className="card pad"
-          style={{ marginTop: 16, color: "var(--ink-dim)" }}
-        >
-          Loading sessions…
-        </div>
-      ) : (
-        <HistoryTable
-          cfg={cfg}
-          trackerId={tracker}
+      {section === "recovery" && (
+        <RecoveryPanel
+          athleteId={athleteId}
           sessions={allSessions}
-          expanded={expanded}
-          toggle={toggleExpand}
-          onEdit={editSession}
-          onDelete={deleteSession}
-          onExport={exportCsv}
-          readOnly={false}
+          onChanged={() => mutateRecovery()}
         />
       )}
 
-      {canManage && (
-        <div style={{ marginTop: 18 }}>
-          <ProfileSummary athleteId={athleteId} isCoach />
-        </div>
+      {section === "screen" && (
+        <ScreenLink athleteId={athleteId} hand={athlete.hand} />
+      )}
+
+      {section === "lifting" && <StrengthLink athleteId={athleteId} />}
+
+      {section === "history" &&
+        (sessionsLoading ? (
+          <div
+            className="card pad"
+            style={{ marginTop: 16, color: "var(--ink-dim)" }}
+          >
+            Loading sessions…
+          </div>
+        ) : (
+          <HistoryTable
+            cfg={cfg}
+            trackerId={tracker}
+            sessions={allSessions}
+            expanded={expanded}
+            toggle={toggleExpand}
+            onEdit={editSession}
+            onDelete={deleteSession}
+            onExport={exportCsv}
+            readOnly={false}
+          />
+        ))}
+
+      {section === "profile" && (isSelf || canManage) && (
+        <ProfileSummary athleteId={athleteId} isCoach={!!canManage} />
       )}
 
       {(isSelf || canManage) && (
@@ -365,6 +410,20 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
             error={saveError}
           />
         </SessionModal>
+      )}
+
+      {recoveryModal && (
+        <RecoveryModal
+          athleteId={athleteId}
+          existing={recoveryModal === "new" ? null : recoveryModal}
+          date={recoveryModal === "new" ? todayISO() : recoveryModal.date}
+          onClose={() => setRecoveryModal(null)}
+          onSaved={async (msg) => {
+            await mutateRecovery();
+            setRecoveryModal(null);
+            showToast(msg);
+          }}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

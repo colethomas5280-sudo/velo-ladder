@@ -146,8 +146,6 @@ export default function AthletesTable() {
                 <th>Level</th>
                 <th>Date of birth</th>
                 <th>Access</th>
-                <th>Mound</th>
-                <th>Pull-Down</th>
                 <th>Last session</th>
                 <th />
               </tr>
@@ -155,7 +153,7 @@ export default function AthletesTable() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={11} style={{ color: "var(--ink-dim)" }}>
+                  <td colSpan={9} style={{ color: "var(--ink-dim)" }}>
                     Loading…
                   </td>
                 </tr>
@@ -170,7 +168,7 @@ export default function AthletesTable() {
                       aria-label={`Select ${a.name}`}
                     />
                   </td>
-                  <td>
+                  <td className="cell-name">
                     <Link href={`/athletes/${a.id}`} className="name-link">
                       {a.name}
                     </Link>
@@ -194,6 +192,7 @@ export default function AthletesTable() {
                   </td>
                   <td>
                     <select
+                      className="roster-field hand"
                       value={a.hand}
                       onChange={(e) =>
                         patch(a.id, { hand: e.target.value as Hand })
@@ -206,6 +205,7 @@ export default function AthletesTable() {
                   </td>
                   <td>
                     <select
+                      className="roster-field"
                       aria-label={`${a.name} level`}
                       value={a.level ?? ""}
                       onChange={(e) =>
@@ -222,7 +222,7 @@ export default function AthletesTable() {
                   </td>
                   <td>
                     <input
-                      className="tin"
+                      className="roster-field"
                       type="date"
                       aria-label={`${a.name} date of birth`}
                       value={a.birthDate ?? ""}
@@ -231,7 +231,7 @@ export default function AthletesTable() {
                       }
                     />
                   </td>
-                  <td>
+                  <td className="cell-access">
                     {resetFor === a.id ? (
                       <span style={{ display: "inline-flex", gap: 6 }}>
                         <input
@@ -256,59 +256,75 @@ export default function AthletesTable() {
                         </button>
                       </span>
                     ) : (
-                      <span className="access-cell">
-                        <button
-                          className={`btn sm${a.hasPassword ? " ghost" : " primary"}`}
-                          disabled={inviting === a.id}
-                          onClick={() => invite(a)}
-                          title={
-                            a.inviteEmail
-                              ? "Copy a single-use link that lets them set their own password"
-                              : "Add a login email first"
+                      <select
+                        className="roster-field access-select"
+                        value=""
+                        disabled={inviting === a.id}
+                        aria-label={`${a.name} access actions`}
+                        onChange={(e) => {
+                          const action = e.target.value;
+                          if (action === "invite") invite(a);
+                          else if (action === "password") {
+                            setResetFor(a.id);
+                            setResetPw("");
                           }
-                        >
+                        }}
+                      >
+                        <option value="" disabled>
                           {inviting === a.id
                             ? "…"
                             : a.hasPassword
-                              ? "New invite"
+                              ? "● active"
                               : a.hasInvite
-                                ? "Copy invite again"
-                                : "Copy invite link"}
-                        </button>
-                        <button
-                          className="btn sm ghost"
-                          onClick={() => {
-                            setResetFor(a.id);
-                            setResetPw("");
-                          }}
-                        >
+                                ? "invite sent"
+                                : "set password"}
+                        </option>
+                        <option value="invite">
                           {a.hasPassword
-                            ? "● active"
+                            ? "New invite"
                             : a.hasInvite
-                              ? "invite sent"
-                              : "set password"}
-                        </button>
-                      </span>
+                              ? "Copy invite again"
+                              : "Copy invite link"}
+                        </option>
+                        <option value="password">
+                          {a.hasPassword ? "Reset password" : "Set password"}
+                        </option>
+                      </select>
                     )}
                   </td>
-                  <td className="mono">{a.mound}</td>
-                  <td className="mono">{a.pulldown}</td>
                   <td className="mono">
                     {a.lastDate ? fmtDate(a.lastDate) : EMPTY}
                   </td>
                   <td style={{ textAlign: "right" }}>
                     <button
-                      className="btn sm danger"
+                      className="btn sm danger icon-btn"
                       onClick={() => archive(a)}
+                      aria-label={`Remove ${a.name}`}
+                      title={`Remove ${a.name}`}
                     >
-                      Remove
+                      <svg
+                        width="15"
+                        height="15"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
                     </button>
                   </td>
                 </tr>
               ))}
               {!isLoading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} style={{ color: "var(--ink-dim)" }}>
+                  <td colSpan={9} style={{ color: "var(--ink-dim)" }}>
                     No athletes match.
                   </td>
                 </tr>
