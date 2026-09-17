@@ -2526,15 +2526,6 @@ table.roster-table {
   margin-top: 2px;
   flex: 0 0 auto;
 }
-.ms-flaw-head {
-  border-top: 0;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
-  margin-bottom: 4px;
-}
-.ms-flaw-head b {
-  font-size: 13.5px;
-}
 .ms-flaw b {
   display: block;
   font-size: 13.5px;

@@ -3,7 +3,6 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SCREEN_TESTS } from "@/lib/screen";
-import { BIG_12 } from "@/lib/big12";
 import type { MovementScreen } from "@/lib/types";
 import { withSwr } from "./testSwr";
 import ScreenModal from "./ScreenModal";
@@ -176,113 +175,22 @@ test("a quiet date is not flagged", () => {
   assert.doesNotMatch(document.body.textContent!, /threw on this date/i);
 });
 
-/* ------------------------------------------------------------------ *
- * Recording the Big 12
- * ------------------------------------------------------------------ */
-
-test("the twelve are offered in Cole's order, behind the assessed checkbox", () => {
-  form();
-  const assessed = document.querySelector('input[name="deliveryAssessed"]');
-  assert.ok(assessed, "no delivery-assessed checkbox");
-  for (const flaw of BIG_12)
-    assert.ok(
-      document.querySelector(`input[name="flaw:${flaw.key}"]`),
-      `${flaw.label} is not offered`,
-    );
-});
+/*
+ * The Big 12 moved to its own modal (see DeliveryModal.test.tsx) along with
+ * every assertion this file used to carry about it: the offered order, the
+ * description/how-to-spot split, ticking a flaw into the saved payload, and
+ * flaws surviving an edit. The delivery-assessed flag itself did not move —
+ * a saved delivery row is the assessment now, so that mechanism is gone
+ * outright rather than moved anywhere.
+ */
 
 /*
- * Welded once already, in a different component (recipe cards), and called
- * out for it twice. The description and the how-to-spot procedure are
- * different kinds of copy and must render as distinct blocks, never
- * concatenated into one string a coach has to read all the way through to
- * find where the procedure starts.
+ * The carried finding: `upsertScreen` writes EXCLUDED.notes on conflict, so a
+ * submit that omits `notes` wipes out whatever was already recorded. A coach
+ * who opens a screen, edits something unrelated, and saves again must not
+ * silently erase his own note.
  */
-test("a flaw's description and how-to-spot render as separate blocks, not one string", () => {
-  form();
-  const flaw = BIG_12[0];
-  const card = document
-    .querySelector(`input[name="flaw:${flaw.key}"]`)!
-    .closest(".ms-flaw-card")!;
-  fireEvent.click(card.querySelector(".ms-test-toggle")!);
-
-  const body = card.querySelector(".ms-test-body")!;
-  const blocks = [...body.querySelectorAll(".ms-help")];
-  assert.equal(blocks.length, 2, "description and how-to-spot must be separate elements");
-  assert.equal(blocks[0].textContent, flaw.description);
-  assert.equal(blocks[1].textContent, flaw.howToSpot);
-  assert.ok(
-    !body.textContent!.includes(`${flaw.description} ${flaw.howToSpot}`),
-    "must not be welded into one run-on string",
-  );
-  assert.match(body.textContent!, /how to spot it/i);
-});
-
-test("ticking a flaw marks the delivery as assessed", async () => {
-  /*
-   * The server refuses a record where these disagree. The UI must not be
-   * able to build one, or a coach loses a screen he thought he had saved.
-   */
-  const { submitted, restore } = mockApi();
-  try {
-    form();
-    fireEvent.click(
-      document.querySelector<HTMLInputElement>('input[name="flaw:sway"]')!,
-    );
-    assert.equal(
-      document.querySelector<HTMLInputElement>('input[name="deliveryAssessed"]')!
-        .checked,
-      true,
-    );
-    fireEvent.click(screen.getByText(/save screen/i));
-    await waitFor(() => assert.ok(submitted()));
-    assert.equal(submitted().deliveryAssessed, true);
-    assert.deepEqual(submitted().flaws, { sway: true });
-  } finally {
-    restore();
-  }
-});
-
-/*
- * The fix for the wipe hole: unticking "assessed" while a flaw is marked
- * used to silently clear every ticked flaw. That destroyed a coach's work on
- * one mis-click, with no confirm and no undo. The UI must refuse instead —
- * disable the box and explain why, the same way delete already protects
- * against a stray click rather than acting on it.
- */
-test("the assessed checkbox cannot be unticked while a flaw is marked", () => {
-  form();
-  fireEvent.click(
-    document.querySelector<HTMLInputElement>('input[name="flaw:sway"]')!,
-  );
-  const assessed = document.querySelector<HTMLInputElement>(
-    'input[name="deliveryAssessed"]',
-  )!;
-  assert.equal(assessed.checked, true);
-  assert.equal(assessed.disabled, true, "must refuse, not wipe, while a flaw is marked");
-
-  fireEvent.click(assessed);
-  assert.equal(assessed.checked, true, "a disabled checkbox must not toggle off");
-  assert.equal(
-    document.querySelector<HTMLInputElement>('input[name="flaw:sway"]')!.checked,
-    true,
-    "the flaw survives the attempted uncheck",
-  );
-});
-
-test("an athlete never sees the recording controls", () => {
-  form({ isCoach: false });
-  assert.equal(document.querySelector('input[name="flaw:sway"]'), null);
-  assert.equal(document.querySelector('input[name="deliveryAssessed"]'), null);
-});
-
-/*
- * The carried finding: `upsertScreen` writes EXCLUDED.flaws on conflict, so a
- * submit that omits `flaws` wipes out whatever was already recorded. A coach
- * who opens a screen with a flaw already marked, edits something unrelated,
- * and saves again must not silently erase his own assessment.
- */
-test("editing an already-assessed screen keeps sending its flaws", async () => {
+test("editing an existing screen keeps sending its notes", async () => {
   const { submitted, restore } = mockApi();
   try {
     const existing: MovementScreen = {
@@ -291,20 +199,14 @@ test("editing an already-assessed screen keeps sending its flaws", async () => {
       date: "2020-01-01",
       results: {},
       notes: "old note",
-      flaws: { sway: true },
-      deliveryAssessed: true,
+      flaws: {},
+      deliveryAssessed: false,
     };
     form({ initial: existing });
 
-    // Change something unrelated to the Big 12 section entirely.
-    fireEvent.change(screen.getByPlaceholderText(/guarding on the left/i), {
-      target: { value: "new note" },
-    });
-
     fireEvent.click(screen.getByText(/update screen/i));
     await waitFor(() => assert.ok(submitted()));
-    assert.deepEqual(submitted().flaws, { sway: true });
-    assert.equal(submitted().deliveryAssessed, true);
+    assert.equal(submitted().notes, "old note");
   } finally {
     restore();
   }
