@@ -50,5 +50,7 @@ export function parseDeliveryInput(body: unknown, today: string): ParsedDelivery
     if (value === true) flaws[key] = true;
   }
 
-  return { ok: true, value: { date, flaws, notes: String(b.notes ?? "") } };
+  const notes = typeof b.notes === "string" ? b.notes.slice(0, 2000) : "";
+
+  return { ok: true, value: { date, flaws, notes } };
 }

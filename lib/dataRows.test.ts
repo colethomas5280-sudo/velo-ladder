@@ -102,3 +102,25 @@ test("an athlete never assessed reads last: null, count: 0 from the join", () =>
   ]);
   assert.deepEqual(rows, [{ athleteId: "a1", name: "Kid", last: null, count: 0, phase: null }]);
 });
+
+test("with two assessments, the later date wins for both last and count", () => {
+  /*
+   * The query orders rows `a.name, d.date` ascending, so the reducer relies
+   * on "last one seen wins" to land on the most recent assessment. Two
+   * different dates with different marks is the only shape that can tell
+   * "took the last row" apart from "took the first" or "merged both."
+   */
+  const rows = reduceDeliveryOverview([
+    { athlete_id: "a1", name: "Kid", phase: null, date: "2026-01-01", flaws: { sway: true } },
+    {
+      athlete_id: "a1",
+      name: "Kid",
+      phase: null,
+      date: "2026-02-01",
+      flaws: { sway: true, "high-hand": true },
+    },
+  ]);
+  assert.deepEqual(rows, [
+    { athleteId: "a1", name: "Kid", last: "2026-02-01", count: 2, phase: null },
+  ]);
+});

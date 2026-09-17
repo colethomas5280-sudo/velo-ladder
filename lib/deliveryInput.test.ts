@@ -79,3 +79,21 @@ test("notes default to empty rather than undefined", () => {
   const got = parseDeliveryInput({ date: "2026-01-01" }, "2026-06-01");
   assert.equal(got.value!.notes, "");
 });
+
+test("a non-string notes becomes empty rather than a coerced string", () => {
+  /*
+   * String(b.notes ?? "") would turn a stray object or number into
+   * "[object Object]" or "123" and store it. Matching the screen path's
+   * typeof guard instead means a malformed value is dropped, not stored.
+   */
+  const got = parseDeliveryInput({ date: "2026-01-01", notes: { rogue: true } }, "2026-06-01");
+  assert.equal(got.ok, true);
+  assert.equal(got.value!.notes, "");
+});
+
+test("notes longer than 2000 characters are truncated, not refused", () => {
+  const long = "x".repeat(2500);
+  const got = parseDeliveryInput({ date: "2026-01-01", notes: long }, "2026-06-01");
+  assert.equal(got.ok, true);
+  assert.equal(got.value!.notes.length, 2000);
+});
