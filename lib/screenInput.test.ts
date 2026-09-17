@@ -110,3 +110,68 @@ test("an answer on a closed branch is kept, not stripped", () => {
   assert.equal(r.ok, true);
   assert.equal(r.value!.results[fieldKey("wide-squat", "arms-down")], "maintained");
 });
+
+test("a screen with no flaws is valid, and reads as unassessed", () => {
+  // `notes` alone carries this past the pre-existing "record something" gate
+  // (see "nothing at all is refused" above) — this test is about the flaws
+  // defaults, not about whether a bare date is enough to save.
+  const got = parseScreenInput({ date: "2026-01-01", notes: "screened" }, "2026-06-01");
+  assert.equal(got.ok, true);
+  assert.deepEqual(got.value!.flaws, {});
+  assert.equal(got.value!.deliveryAssessed, false);
+});
+
+test("a marked flaw is kept", () => {
+  const got = parseScreenInput(
+    { date: "2026-01-01", flaws: { sway: true }, deliveryAssessed: true },
+    "2026-06-01",
+  );
+  assert.equal(got.ok, true);
+  assert.deepEqual(got.value!.flaws, { sway: true });
+});
+
+test("a flaw key nobody recognises is refused by name", () => {
+  const got = parseScreenInput(
+    { date: "2026-01-01", flaws: { "sway-ish": true }, deliveryAssessed: true },
+    "2026-06-01",
+  );
+  assert.equal(got.ok, false);
+  assert.match(got.error!, /sway-ish/);
+});
+
+test("an unticked flaw is dropped rather than stored as false", () => {
+  const got = parseScreenInput(
+    { date: "2026-01-01", flaws: { sway: false }, deliveryAssessed: true },
+    "2026-06-01",
+  );
+  assert.equal(got.ok, true);
+  assert.deepEqual(got.value!.flaws, {});
+});
+
+test("flaws without the assessed flag are refused rather than quietly fixed", () => {
+  /*
+   * The two cannot disagree. A record in this shape means the caller built
+   * it wrong, and repairing it silently hides that from the one person who
+   * could fix the caller.
+   */
+  const got = parseScreenInput(
+    { date: "2026-01-01", flaws: { sway: true }, deliveryAssessed: false },
+    "2026-06-01",
+  );
+  assert.equal(got.ok, false);
+  assert.match(got.error!, /assessed/i);
+});
+
+test("assessed with nothing marked is valid, because it is a result", () => {
+  const got = parseScreenInput(
+    { date: "2026-01-01", flaws: {}, deliveryAssessed: true },
+    "2026-06-01",
+  );
+  assert.equal(got.ok, true);
+  assert.equal(got.value!.deliveryAssessed, true);
+});
+
+test("flaws must be an object", () => {
+  const got = parseScreenInput({ date: "2026-01-01", flaws: "sway" }, "2026-06-01");
+  assert.equal(got.ok, false);
+});

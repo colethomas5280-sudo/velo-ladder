@@ -833,6 +833,8 @@ export function toScreen(r: Record<string, unknown>): MovementScreen {
     date: isoDate(r.date),
     results: (r.results ?? {}) as Record<string, string>,
     notes: String(r.notes ?? ""),
+    flaws: (r.flaws ?? {}) as Record<string, boolean>,
+    deliveryAssessed: r.delivery_assessed === true,
   };
 }
 
@@ -908,6 +910,8 @@ export interface ScreenInput {
   date: string;
   results: Record<string, string>;
   notes: string;
+  flaws: Record<string, boolean>;
+  deliveryAssessed: boolean;
 }
 
 /**
@@ -922,12 +926,16 @@ export async function upsertScreen(
 ): Promise<MovementScreen> {
   const id = crypto.randomUUID();
   const rows = (await sql`
-    INSERT INTO movement_screens (id, athlete_id, date, results, notes, created_by)
+    INSERT INTO movement_screens
+      (id, athlete_id, date, results, notes, created_by, flaws, delivery_assessed)
     VALUES (${id}, ${athleteId}, ${input.date},
-            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy})
+            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy},
+            ${JSON.stringify(input.flaws)}::jsonb, ${input.deliveryAssessed})
     ON CONFLICT (athlete_id, date) DO UPDATE SET
       results = EXCLUDED.results,
       notes = EXCLUDED.notes,
+      flaws = EXCLUDED.flaws,
+      delivery_assessed = EXCLUDED.delivery_assessed,
       updated_at = now()
     RETURNING *
   `) as Record<string, unknown>[];

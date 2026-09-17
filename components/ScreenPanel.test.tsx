@@ -24,6 +24,8 @@ const scr = (date: string, results: Results, notes = ""): MovementScreen => ({
   date,
   results,
   notes,
+  flaws: {},
+  deliveryAssessed: false,
 });
 
 function panel(screens: MovementScreen[], props: Partial<Parameters<typeof ScreenPanel>[0]> = {}) {

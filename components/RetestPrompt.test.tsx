@@ -81,7 +81,15 @@ test("dismissing it keeps it shut for the rest of the day", () => {
 /* An athlete cannot run their own screen, so this is a heads-up, not a task. */
 test("the athlete's prompt asks them to mention it, not to do it", () => {
   const screens: MovementScreen[] = [
-    { id: "s1", athleteId: "a1", date: daysAgo(100), results: screenOf(), notes: "" },
+    {
+      id: "s1",
+      athleteId: "a1",
+      date: daysAgo(100),
+      results: screenOf(),
+      notes: "",
+      flaws: {},
+      deliveryAssessed: false,
+    },
   ];
   render(
     withSwr(
