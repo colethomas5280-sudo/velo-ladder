@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .pglite-data/
+
+# Claude Code worktrees: isolated copies of this repo, never part of it
+.claude/worktrees/
