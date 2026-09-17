@@ -44,7 +44,6 @@ export interface DashboardData {
   stale: StaleRow[];
   pendingInvites: { athleteId: string; name: string; hasEmail: boolean }[];
   activity: ActivityRow[];
-  resources: { id: string; title: string; category: string }[];
   setbacks: {
     id: string;
     athleteId: string;
@@ -208,11 +207,6 @@ export async function getDashboard(): Promise<DashboardData> {
       };
     });
 
-  const resourceRows = (await sql`
-    SELECT id, title, category FROM resources WHERE archived = false
-    ORDER BY lower(category), position, lower(title) LIMIT 6
-  `) as Record<string, unknown>[];
-
   const openSetbacks = await listOpenSetbacks();
 
   const thisWeek = sessions.filter((s) => daysAgo(s.date) <= RECENT_DAYS);
@@ -229,11 +223,6 @@ export async function getDashboard(): Promise<DashboardData> {
       kind: s.kind,
       openedOn: s.openedOn,
       detail: s.detail,
-    })),
-    resources: resourceRows.map((r) => ({
-      id: String(r.id),
-      title: String(r.title),
-      category: String(r.category ?? ""),
     })),
     snapshot: {
       athletes: athleteRows.length,

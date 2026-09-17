@@ -13,6 +13,7 @@ import CustomizeDashboard, {
   setWidgets,
   useWidgets,
 } from "./CustomizeDashboard";
+import { useScreeningDue, screeningDueLabel } from "./RetestPrompt";
 
 export default function Dashboard() {
   const { data, isLoading } = useSWR<DashboardData>("/api/dashboard", fetcher);
@@ -52,7 +53,7 @@ export default function Dashboard() {
           <div className="dash-grid">
             {shown("attention") && <NeedsAttention data={data} />}
             {shown("activity") && <Activity data={data} />}
-            {shown("resources") && <ResourcesWidget data={data} />}
+            {shown("screening") && <ScreeningDue />}
           </div>
 
           {on.length === 0 && (
@@ -322,35 +323,34 @@ function Setbacks({ data }: { data: DashboardData }) {
   );
 }
 
-function ResourcesWidget({ data }: { data: DashboardData }) {
+function ScreeningDue() {
+  const due = useScreeningDue();
   return (
-    <WidgetShell title="Resources" sub="protocols & how-tos">
-      {data.resources.length === 0 ? (
-        <Empty>
-          Nothing in the library yet.{" "}
-          <Link href="/resources" className="name-link">
-            Add the first one
-          </Link>
-          .
-        </Empty>
+    <WidgetShell title="Screening due" sub="movement screens">
+      {due.length === 0 ? (
+        <Empty>Nobody&rsquo;s due for a screen right now.</Empty>
       ) : (
-        <>
-          <ul className="feed">
-            {data.resources.map((r) => (
-              <li key={r.id}>
-                <div className="feed-main">
-                  <Link href="/resources" className="name-link">
-                    {r.title}
-                  </Link>
-                  <span className="feed-sub">{r.category || "General"}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <Link className="btn sm ghost" href="/resources" style={{ marginTop: 10, display: "inline-block" }}>
-            Open resources
-          </Link>
-        </>
+        <ul className="feed">
+          {due.slice(0, 8).map(({ row, clocks }) => (
+            <li key={row.athleteId}>
+              <div className="feed-main">
+                <Link href={`/athletes/${row.athleteId}`} className="name-link">
+                  {row.name}
+                </Link>
+                <span className="feed-sub">
+                  {row.called
+                    ? row.called.reason
+                    : screeningDueLabel(clocks.lead, row.spotTests)}
+                </span>
+              </div>
+              <span
+                className={`pill ${clocks.lead.state === "overdue" ? "warn" : ""}`}
+              >
+                {clocks.lead.state === "overdue" ? "overdue" : "due"}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </WidgetShell>
   );

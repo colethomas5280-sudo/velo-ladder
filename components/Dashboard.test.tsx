@@ -5,7 +5,9 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import type { DashboardData } from "@/lib/dashboard";
 import { RECENT_DAYS, STALE_DAYS } from "@/lib/types";
 import { CNS_WINDOW_DAYS } from "@/lib/setback";
+import { screenSummary } from "@/lib/screen";
 import { withSwr } from "./testSwr";
+import { daysAgo, rowOf, screenOf, TODAY } from "./testRender";
 import Dashboard from "./Dashboard";
 import GuidanceCard from "./GuidanceCard";
 
@@ -25,12 +27,18 @@ const EMPTY: DashboardData = {
   stale: [],
   pendingInvites: [],
   activity: [],
-  resources: [],
   setbacks: [],
   snapshot: { athletes: 0, sessionsThisWeek: 0, activeThisWeek: 0, prsThisWeek: 0 },
 };
 
-beforeEach(cleanup);
+beforeEach(() => {
+  cleanup();
+  try {
+    localStorage.clear();
+  } catch {
+    /* storage is optional */
+  }
+});
 
 test("the recent-PRs window is read from the config that computes it", () => {
   render(withSwr({ "/api/dashboard": EMPTY }, <Dashboard />));
@@ -66,4 +74,79 @@ test("the CNS explainer quotes the window the engine actually uses", () => {
     screen.getByText(new RegExp(`${CNS_WINDOW_DAYS}-day average`, "i")),
     "the label should follow CNS_WINDOW_DAYS",
   );
+});
+
+/* ------------------------------------------------------------------ *
+ * Screening due
+ *
+ * Used to be a once-a-day popup over the whole dashboard; it's a standing
+ * card now, in the Resources card's old spot, so there's no dismiss
+ * behavior left to test — only the same due/overdue/spot-check/called
+ * logic the popup used to carry.
+ * ------------------------------------------------------------------ */
+
+test("nobody due, the card says so quietly", () => {
+  render(
+    withSwr(
+      { "/api/dashboard": EMPTY, "/api/screens/overview": [rowOf()] },
+      <Dashboard />,
+    ),
+  );
+  assert.ok(screen.getByText(/nobody.*due for a screen/i));
+});
+
+test("someone overdue is named on the card", () => {
+  render(
+    withSwr(
+      {
+        "/api/dashboard": EMPTY,
+        "/api/screens/overview": [
+          rowOf({ name: "Late Athlete", lastFull: daysAgo(100), last: daysAgo(100) }),
+        ],
+      },
+      <Dashboard />,
+    ),
+  );
+  assert.ok(screen.getByText("Late Athlete"));
+  assert.ok(screen.getByText(/overdue/i));
+});
+
+/* The bug this suite is named for. */
+test("a spot-check offers the failing count, not the whole sheet", () => {
+  const results = screenOf({ "hip-45.45-degree-angle:R": "less" });
+  render(
+    withSwr(
+      {
+        "/api/dashboard": EMPTY,
+        "/api/screens/overview": [
+          rowOf({
+            last: daysAgo(40),
+            lastFull: daysAgo(40),
+            summary: screenSummary(results),
+            spotSince: daysAgo(40),
+            spotTests: 1,
+          }),
+        ],
+      },
+      <Dashboard />,
+    ),
+  );
+  const body = document.body.textContent!;
+  assert.match(body, /spot-check · 1 test/i);
+  assert.doesNotMatch(body, /16 tests/, "it cannot name tests it does not have");
+});
+
+test("a called re-screen shows its reason instead of a clock", () => {
+  render(
+    withSwr(
+      {
+        "/api/dashboard": EMPTY,
+        "/api/screens/overview": [
+          rowOf({ called: { since: TODAY, reason: "Back from an injury flag" } }),
+        ],
+      },
+      <Dashboard />,
+    ),
+  );
+  assert.match(document.body.textContent!, /back from an injury flag/i);
 });
