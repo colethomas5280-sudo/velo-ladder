@@ -1,4 +1,5 @@
 import { isCalendarDate } from "./velo";
+import { FLAW_KEYS } from "./big12";
 import {
   NOT_TESTED,
   SCREEN_TESTS,
@@ -20,7 +21,13 @@ import {
 export interface ParsedScreen {
   ok: boolean;
   error?: string;
-  value?: { date: string; results: Results; notes: string };
+  value?: {
+    date: string;
+    results: Results;
+    notes: string;
+    flaws: Record<string, boolean>;
+    deliveryAssessed: boolean;
+  };
 }
 
 export function parseScreenInput(
@@ -66,8 +73,30 @@ export function parseScreenInput(
   }
 
   const notes = typeof b.notes === "string" ? b.notes.slice(0, 2000) : "";
-  if (!Object.keys(results).length && !notes.trim())
+
+  if (b.flaws !== undefined && (typeof b.flaws !== "object" || b.flaws === null))
+    return { ok: false, error: "flaws must be an object" };
+  const rawFlaws = (b.flaws ?? {}) as Record<string, unknown>;
+  const flaws: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(rawFlaws)) {
+    if (!FLAW_KEYS.has(key)) return { ok: false, error: `unknown flaw '${key}'` };
+    // Unticked is an absence. Storing false would make "he does not have
+    // this" and "nobody looked" two different-looking records that mean the
+    // same thing, which is exactly what deliveryAssessed is for instead.
+    if (value === true) flaws[key] = true;
+  }
+
+  const deliveryAssessed = b.deliveryAssessed === true;
+  if (!deliveryAssessed && Object.keys(flaws).length > 0)
+    return {
+      ok: false,
+      error: "a screen with flaws marked must say the delivery was assessed",
+    };
+
+  // An assessed delivery is itself a recorded finding, even with nothing
+  // marked on it — that is what distinguishes "clean" from "never looked".
+  if (!Object.keys(results).length && !notes.trim() && !deliveryAssessed)
     return { ok: false, error: "Record at least one finding" };
 
-  return { ok: true, value: { date, results, notes } };
+  return { ok: true, value: { date, results, notes, flaws, deliveryAssessed } };
 }

@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 25). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 26). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -235,6 +235,17 @@ WHERE results ?| array['push-off-mound.planted', 'push-off-mound.released',
 
 CREATE UNIQUE INDEX IF NOT EXISTS ms_athlete_date_uidx
   ON movement_screens(athlete_id, date);
+
+-- v26: the Big 12. Cole assesses the delivery at the same session as the
+-- physical screen, so the marks live on the screen record rather than in a
+-- table of their own.
+--
+-- delivery_assessed defaults to false and is NEVER backfilled. Without it an
+-- unticked record cannot say whether the delivery was watched and looked
+-- clean or was never watched at all, and six months later that difference is
+-- gone. Every screen already stored is honestly "not assessed".
+ALTER TABLE movement_screens ADD COLUMN IF NOT EXISTS flaws jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE movement_screens ADD COLUMN IF NOT EXISTS delivery_assessed boolean NOT NULL DEFAULT false;
 
 -- v18: strength. One lifting day per athlete per date, like the check-in and
 -- the screen — re-saving a date replaces it rather than leaving two versions

@@ -5,6 +5,11 @@ import useSWR from "swr";
 import type { MovementScreen } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
+  explainScreen,
+  type Explanation,
+  type FlawReport,
+} from "@/lib/big12Explain";
+import {
   SCREEN_GROUPS,
   SCREEN_TESTS,
   asymmetryReport,
@@ -19,6 +24,7 @@ import {
   type Hand,
   type RescreenCall,
   type ReportReading,
+  type Results,
   type TestReport,
   type Trend,
 } from "@/lib/screen";
@@ -407,6 +413,12 @@ export default function ScreenPanel({
             </p>
           )}
 
+          <DeliverySection
+            screen={screen}
+            standingResults={standing.results}
+            hand={hand}
+          />
+
           {isCoach && screen.notes && (
             <div className="insight sc-notes">
               <div className="eyebrow">Coach&apos;s note · not shown to the athlete</div>
@@ -438,6 +450,7 @@ export default function ScreenPanel({
           athleteName={athleteName}
           initial={editing === "new" ? null : editing}
           takenDates={screens.map((s) => s.date)}
+          isCoach={isCoach}
           onClose={() => setEditing(null)}
           onSaved={async (msg) => {
             setEditing(null);
@@ -603,6 +616,130 @@ function CarryBlock({
         })}
       </ul>
       {note && <span className="cz-note">{note}</span>}
+    </div>
+  );
+}
+
+/*
+ * The delivery report: three states, because "clean" and "not looked at" are
+ * different facts and only one of them is good news. `explainScreen` already
+ * folds a missing hand into "show both sides" for the affected causes, so a
+ * null hand needs no special case here beyond satisfying the type.
+ *
+ * `standingResults` — not `screen.results` — is what explains a flaw. The
+ * flaw marks themselves belong to this row (the coach ticked Sway today),
+ * but a spot-check only re-runs a few tests, and the other findings are
+ * still true until re-screened. Every other reader on this panel already
+ * reads off `standing.results` for exactly this reason; a limitation from
+ * an old full screen has to keep explaining the flaw it explains until
+ * something re-screens it away.
+ */
+function DeliverySection({
+  screen,
+  standingResults,
+  hand,
+}: {
+  screen: MovementScreen;
+  standingResults: Results;
+  hand: Hand | null;
+}) {
+  if (!screen.deliveryAssessed) {
+    return (
+      <div className="sc-block">
+        <div className="eyebrow sc-h">Delivery</div>
+        <p className="widget-empty">
+          The delivery wasn&apos;t assessed at this screen.
+        </p>
+      </div>
+    );
+  }
+
+  const reports = explainScreen(screen.flaws, standingResults, hand ?? "");
+
+  return (
+    <div className="sc-block">
+      <div className="eyebrow sc-h">Delivery</div>
+      {reports.length === 0 ? (
+        <p className="sc-clean">Delivery assessed. Nothing found.</p>
+      ) : (
+        <ul className="sc-list">
+          {reports.map((r) => (
+            <FlawExplanation key={r.flaw.key} report={r} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** One marked flaw: the lead cause, the rest behind a toggle, and the misses. */
+function FlawExplanation({ report }: { report: FlawReport }) {
+  const [showMore, setShowMore] = useState(false);
+
+  return (
+    <li className="sc-row open">
+      <div className="sc-row-head">
+        <span className="sc-name">{report.flaw.label}</span>
+      </div>
+      <div className="sc-row-body">
+        {report.lead && <CauseExplanation explanation={report.lead} />}
+
+        {report.rest.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="btn sm ghost"
+              onClick={() => setShowMore((v) => !v)}
+            >
+              {showMore
+                ? "Show fewer causes"
+                : `${report.rest.length} more possible ${
+                    report.rest.length === 1 ? "cause" : "causes"
+                  }`}
+            </button>
+            {showMore &&
+              report.rest.map((exp, i) => (
+                <CauseExplanation key={i} explanation={exp} />
+              ))}
+          </>
+        )}
+
+        {report.alsoMarked.length > 0 && (
+          <p className="cz-note">
+            Also marked on this screen:{" "}
+            {report.alsoMarked.map((f) => f.label).join(", ")}
+          </p>
+        )}
+
+        {report.unexplained && (
+          <p className="sc-unexplained">
+            Nothing on this screen explains this.
+          </p>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/** One cause's name and the findings behind it, pain called out as an alert. */
+function CauseExplanation({ explanation }: { explanation: Explanation }) {
+  return (
+    <div>
+      <div className="sc-cause-label">{explanation.cause.label}</div>
+      <ul className="sc-findings">
+        {explanation.findings.map((f, i) => (
+          <li key={`${f.testKey}.${f.subTestLabel}.${f.sideLabel ?? "one"}.${i}`}>
+            <span className="cz-note">
+              {f.testLabel} · {f.subTestLabel}
+            </span>
+            <div className={`sc-finding${f.painful ? " alert" : ""}`}>
+              {f.painful && <span className="ms-dot alert" />}
+              {f.sideLabel && <span className="sc-side">{f.sideLabel}</span>}
+              <b>{f.findingLabel}</b>
+            </div>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

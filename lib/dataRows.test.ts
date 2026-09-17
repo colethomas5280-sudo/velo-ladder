@@ -45,3 +45,30 @@ test("a screen with no findings yet reads as empty, not undefined", () => {
   assert.deepEqual(s.results, {});
   assert.equal(s.notes, "");
 });
+
+test("a screen row with no flaws column reads back as none, not as undefined", () => {
+  const s = toScreen({ id: "s1", athlete_id: "a1", date: "2026-01-01" });
+  assert.deepEqual(s.flaws, {});
+  assert.equal(s.deliveryAssessed, false);
+});
+
+test("a screen row carries its flaws and its assessed flag through", () => {
+  const s = toScreen({
+    id: "s1", athlete_id: "a1", date: "2026-01-01",
+    flaws: { sway: true }, delivery_assessed: true,
+  });
+  assert.deepEqual(s.flaws, { sway: true });
+  assert.equal(s.deliveryAssessed, true);
+});
+
+test("an assessed screen with nothing marked is not the same as an unassessed one", () => {
+  /*
+   * This is the whole reason the flag exists. Both have no flaws; one is a
+   * result and the other is an absence, and six months on nothing else can
+   * tell them apart.
+   */
+  const clean = toScreen({ id: "s1", athlete_id: "a1", date: "2026-01-01", delivery_assessed: true });
+  const never = toScreen({ id: "s2", athlete_id: "a1", date: "2026-01-02" });
+  assert.notEqual(clean.deliveryAssessed, never.deliveryAssessed);
+  assert.deepEqual(clean.flaws, never.flaws);
+});

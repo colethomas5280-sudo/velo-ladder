@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import type { MovementScreen, TrainingSession } from "@/lib/types";
 import { api, ApiError, fetcher } from "@/lib/fetcher";
+import { BIG_12 } from "@/lib/big12";
 import {
   NOT_TESTED,
   SCREEN_GROUPS,
@@ -55,6 +56,7 @@ export default function ScreenModal({
   athleteName,
   initial,
   takenDates,
+  isCoach,
   onClose,
   onSaved,
 }: {
@@ -64,6 +66,8 @@ export default function ScreenModal({
   initial: MovementScreen | null;
   /** Dates that already hold a screen, so a new one can warn before it lands on one. */
   takenDates: string[];
+  /** The Big 12 section is coach-only presentation; the route enforces it for real. */
+  isCoach: boolean;
   onClose: () => void;
   onSaved: (msg: string) => void;
 }) {
@@ -77,6 +81,10 @@ export default function ScreenModal({
   const [date, setDate] = useState(initial?.date ?? todayISO());
   const [results, setResults] = useState<Results>(initial?.results ?? {});
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [flaws, setFlaws] = useState<Record<string, boolean>>(initial?.flaws ?? {});
+  const [deliveryAssessed, setDeliveryAssessed] = useState(
+    initial?.deliveryAssessed ?? false,
+  );
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -138,6 +146,10 @@ export default function ScreenModal({
   );
 
   const clash = !existing && takenDates.includes(date);
+  // Flaws only ever hold `true` entries (see toggleFlaw), so any key present
+  // means the coach marked something — and "delivery assessed" can't be
+  // turned off out from under them without wiping that work.
+  const anyFlawTicked = Object.keys(flaws).length > 0;
 
   const setField = (key: string, value: string) =>
     setResults((prev) => {
@@ -155,6 +167,23 @@ export default function ScreenModal({
       return next;
     });
 
+  /*
+   * Ticking any flaw asserts the delivery was assessed — the server refuses
+   * a record where those disagree, so the UI must never be able to build
+   * one. Unticking the last flaw does NOT clear it back: "I looked and he
+   * is clean" is still an assessed delivery.
+   */
+  const toggleFlaw = (key: string) => {
+    const nowOn = !flaws[key];
+    setFlaws((prev) => {
+      const next = { ...prev };
+      if (nowOn) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+    if (nowOn) setDeliveryAssessed(true);
+  };
+
   async function save() {
     setBusy(true);
     setErr(null);
@@ -163,6 +192,8 @@ export default function ScreenModal({
         date,
         results,
         notes: notes.trim(),
+        flaws,
+        deliveryAssessed,
       });
       onSaved(existing ? "Screen updated" : "Screen saved");
     } catch (e) {
@@ -234,6 +265,8 @@ export default function ScreenModal({
                   setExisting(null);
                   setResults({});
                   setNotes("");
+                  setFlaws({});
+                  setDeliveryAssessed(false);
                   setConfirmDelete(false);
                 }}
               >
@@ -258,7 +291,8 @@ export default function ScreenModal({
 
           {clash && (
             <p className="ms-note warn" role="status">
-              A screen already exists for {fmtDate(date)}. Saving will replace it.
+              A screen already exists for {fmtDate(date)}. Saving will
+              replace it, and that takes the delivery assessment with it too.
             </p>
           )}
 
@@ -290,6 +324,70 @@ export default function ScreenModal({
               {flagged.length === 1 ? "One reading is" : `${flagged.length} readings are`}{" "}
               marked painful. Those replace the colour rather than joining the scale.
             </p>
+          )}
+
+          {isCoach && (
+            <div className="ms-group">
+              <div className="eyebrow">Big 12 delivery check</div>
+              <label className="ms-flaw ms-flaw-head">
+                <input
+                  type="checkbox"
+                  name="deliveryAssessed"
+                  checked={deliveryAssessed}
+                  disabled={anyFlawTicked}
+                  onChange={(e) => {
+                    // Belt and suspenders alongside `disabled`: this can
+                    // never turn itself off while a flaw is still marked.
+                    if (anyFlawTicked) return;
+                    setDeliveryAssessed(e.target.checked);
+                  }}
+                />
+                <span>
+                  <b>I assessed the delivery</b>
+                  {anyFlawTicked && (
+                    <span className="ms-help">
+                      Untick the flaws below first if he turned out clean after
+                      all.
+                    </span>
+                  )}
+                </span>
+              </label>
+              {BIG_12.map((flaw) => {
+                const key = `flaw:${flaw.key}`;
+                const isOpen = open.has(key);
+                return (
+                  <section className={`ms-flaw-card${isOpen ? " open" : ""}`} key={flaw.key}>
+                    <div className="ms-flaw-toggle-row">
+                      <input
+                        type="checkbox"
+                        name={key}
+                        aria-label={flaw.label}
+                        checked={!!flaws[flaw.key]}
+                        onChange={() => toggleFlaw(flaw.key)}
+                      />
+                      <button
+                        type="button"
+                        className="ms-test-toggle"
+                        aria-expanded={isOpen}
+                        onClick={() => toggle(key)}
+                      >
+                        <span className="ms-test-name">{flaw.label}</span>
+                        <span className="caret">{isOpen ? "▾" : "▸"}</span>
+                      </button>
+                    </div>
+                    {isOpen && (
+                      <div className="ms-test-body">
+                        <p className="ms-help">{flaw.description}</p>
+                        <div className="ms-flaw-spot">
+                          <div className="eyebrow">How to spot it</div>
+                          <p className="ms-help">{flaw.howToSpot}</p>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
+            </div>
           )}
 
           <label className="field">

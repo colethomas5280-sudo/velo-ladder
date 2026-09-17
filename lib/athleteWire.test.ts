@@ -111,7 +111,13 @@ async function seed(): Promise<Seeded> {
   );
   await data.upsertScreen(
     athlete.id,
-    { date: "2026-09-01", results: { "hip-45.45-degree-angle:L": "greater" }, notes: SCREEN_NOTE },
+    {
+      date: "2026-09-01",
+      results: { "hip-45.45-degree-angle:L": "greater" },
+      notes: SCREEN_NOTE,
+      flaws: {},
+      deliveryAssessed: false,
+    },
     COACH_EMAIL,
   );
   /*
