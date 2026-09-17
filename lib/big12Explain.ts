@@ -65,19 +65,43 @@ function anyLrGraded(cause: Cause): boolean {
 }
 
 /**
+ * Whether any test a cause names is graded dominant/non-dominant.
+ *
+ * Mirrors `anyLrGraded` for the other side vocabulary: "throwing" resolves
+ * to Dominant on a test graded this way, per the spec's sides table, and
+ * this keeps that resolution scoped to causes that actually name such a
+ * test.
+ */
+function anyDominanceGraded(cause: Cause): boolean {
+  return cause.tests.some((testKey) => {
+    const test = SCREEN_TESTS.find((t) => t.key === testKey);
+    return !!test && test.subTests.some((sub) => sub.sides === "dominance");
+  });
+}
+
+/**
  * Which side keys a cause wants, or null for "whatever the test has".
  *
- * A marker is a REQUEST. Only tests graded left/right can answer it, and
- * only from a recorded hand. Dominance answers for the throwing arm and
- * cannot say which LEG is dominant, so a leg marker against a
- * dominance-graded test shows both rather than guessing.
+ * A marker is a REQUEST, and only from a recorded hand. `front`/`back` are
+ * leg markers: only a test graded left/right can answer them, and a
+ * dominance-graded test shows both rather than guessing which leg
+ * "dominant" means. `throwing` is different — it names the throwing ARM,
+ * which a dominance-graded test can answer directly (Dominant is always the
+ * throwing side), so it resolves on either vocabulary a cause names. A
+ * cause naming both kinds of test gets both keys back; `abnormalFor`
+ * filters each test against whichever of them it understands.
  */
 export function sidesWanted(cause: Cause, hand: Hand): string[] | null {
   if (!cause.side || !hand) return null;
-  if (!anyLrGraded(cause)) return null;
   const side: CauseSide = cause.side;
-  if (side === "throwing" || side === "back") return [hand];
-  return [hand === "R" ? "L" : "R"];
+  const lr = anyLrGraded(cause);
+  const dominance = side === "throwing" && anyDominanceGraded(cause);
+  if (!lr && !dominance) return null;
+
+  const wanted: string[] = [];
+  if (lr) wanted.push(side === "front" ? (hand === "R" ? "L" : "R") : hand);
+  if (dominance) wanted.push("D");
+  return wanted;
 }
 
 function findingLabel(sub: SubTest, value: string): string {

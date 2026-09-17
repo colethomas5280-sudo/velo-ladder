@@ -79,6 +79,24 @@ test("a leg-side marker against a dominance-graded test shows both", () => {
   assert.equal(sidesWanted(cause, "R"), null, "guessed which leg 'dominant' means");
 });
 
+test("a backside marker against a dominance-graded test still shows both", () => {
+  const cause = { label: "x", tests: ["lunge-extension"], side: "back" as const };
+  assert.equal(sidesWanted(cause, "R"), null, "'back' is a leg marker too, not the throwing arm");
+});
+
+test("a throwing-side cause resolves to the dominant side on a dominance-graded test", () => {
+  /*
+   * Per the spec's sides table, `throwing` names the throwing ARM, and a
+   * dominance-graded test can answer that directly — Dominant is always
+   * the throwing side, regardless of which hand it is. No current cause
+   * pairs `throwing` with lunge-extension, but the next one that does must
+   * not silently get both sides instead of the dominant one.
+   */
+  const cause = { label: "x", tests: ["lunge-extension"], side: "throwing" as const };
+  assert.deepEqual(sidesWanted(cause, "R"), ["D"]);
+  assert.deepEqual(sidesWanted(cause, "L"), ["D"]);
+});
+
 test("a side marker for a mixed cause never drops the dominance-graded test's findings", () => {
   /*
    * A cause naming both an lr test and a dominance test (e.g. one mapping

@@ -291,7 +291,8 @@ export default function ScreenModal({
 
           {clash && (
             <p className="ms-note warn" role="status">
-              A screen already exists for {fmtDate(date)}. Saving will replace it.
+              A screen already exists for {fmtDate(date)}. Saving will
+              replace it, and that takes the delivery assessment with it too.
             </p>
           )}
 

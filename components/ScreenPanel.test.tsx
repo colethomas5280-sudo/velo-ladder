@@ -194,12 +194,54 @@ test("a flaw nothing explains says that, instead of going quiet", () => {
   assert.match(document.body.textContent!, /nothing on this screen/i);
 });
 
+/*
+ * The bug: DeliverySection read the picked row's own `results`, while every
+ * other reader on this panel reads `standing.results` — each test's own last
+ * reading, carried forward across screens. A spot-check covers a few tests;
+ * the other tests are still true. Cole's cadence is quarterly full screens
+ * with spot-checks every 3-4 weeks, so most delivery-bearing screens ARE
+ * spot-checks, and a hip-45 limitation from June must still explain Sway on
+ * a spot-check today that never re-ran hip-45.
+ */
+test("a spot-check that skips a test still explains a flaw from its last recorded finding", () => {
+  panel(
+    [
+      bigScr({
+        id: daysAgo(60),
+        date: daysAgo(60),
+        results: screenOf({ "hip-45.45-degree-angle:R": "less" }),
+      }),
+      bigScr({
+        id: TODAY,
+        date: TODAY,
+        deliveryAssessed: true,
+        flaws: { sway: true },
+        // A spot-check: only shoulder-90-90 re-run today, hip-45 not touched.
+        results: { "shoulder-90-90.external-rotation:L": "greater" },
+      }),
+    ],
+    { hand: "R" },
+  );
+  assert.match(document.body.textContent!, /Sway/);
+  assert.match(
+    document.body.textContent!,
+    /Backside hip rotation/i,
+    "hip 45 has been limited since the full screen and this spot-check never re-ran it",
+  );
+  assert.doesNotMatch(
+    document.body.textContent!,
+    /nothing on this screen explains this/i,
+    "the athlete's own screen findings should still explain Sway",
+  );
+});
+
 test("an athlete sees his own flaws, and never a coach note", () => {
   panel(
-    [bigScr({ deliveryAssessed: true, flaws: { sway: true }, notes: "" })],
+    [bigScr({ deliveryAssessed: true, flaws: { sway: true }, notes: "SENTINEL" })],
     { isCoach: false },
   );
   assert.match(document.body.textContent!, /Sway/);
+  assert.doesNotMatch(document.body.textContent!, /SENTINEL/);
 });
 
 test("a painful finding reaches the report as an alert, not a plain explanation", () => {

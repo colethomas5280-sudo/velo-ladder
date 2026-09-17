@@ -24,6 +24,7 @@ import {
   type Hand,
   type RescreenCall,
   type ReportReading,
+  type Results,
   type TestReport,
   type Trend,
 } from "@/lib/screen";
@@ -412,7 +413,11 @@ export default function ScreenPanel({
             </p>
           )}
 
-          <DeliverySection screen={screen} hand={hand} />
+          <DeliverySection
+            screen={screen}
+            standingResults={standing.results}
+            hand={hand}
+          />
 
           {isCoach && screen.notes && (
             <div className="insight sc-notes">
@@ -620,12 +625,22 @@ function CarryBlock({
  * different facts and only one of them is good news. `explainScreen` already
  * folds a missing hand into "show both sides" for the affected causes, so a
  * null hand needs no special case here beyond satisfying the type.
+ *
+ * `standingResults` — not `screen.results` — is what explains a flaw. The
+ * flaw marks themselves belong to this row (the coach ticked Sway today),
+ * but a spot-check only re-runs a few tests, and the other findings are
+ * still true until re-screened. Every other reader on this panel already
+ * reads off `standing.results` for exactly this reason; a limitation from
+ * an old full screen has to keep explaining the flaw it explains until
+ * something re-screens it away.
  */
 function DeliverySection({
   screen,
+  standingResults,
   hand,
 }: {
   screen: MovementScreen;
+  standingResults: Results;
   hand: Hand | null;
 }) {
   if (!screen.deliveryAssessed) {
@@ -639,7 +654,7 @@ function DeliverySection({
     );
   }
 
-  const reports = explainScreen(screen.flaws, screen.results, hand ?? "");
+  const reports = explainScreen(screen.flaws, standingResults, hand ?? "");
 
   return (
     <div className="sc-block">
