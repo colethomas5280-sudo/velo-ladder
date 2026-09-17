@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 26). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 27). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -246,6 +246,43 @@ CREATE UNIQUE INDEX IF NOT EXISTS ms_athlete_date_uidx
 -- gone. Every screen already stored is honestly "not assessed".
 ALTER TABLE movement_screens ADD COLUMN IF NOT EXISTS flaws jsonb NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE movement_screens ADD COLUMN IF NOT EXISTS delivery_assessed boolean NOT NULL DEFAULT false;
+
+-- v27: Pitching Inhibitors became their own assessment.
+--
+-- They shipped on the movement screen row because Cole assessed both in one
+-- session. He now records them independently, and on a shared row that breaks
+-- twice: a row carrying only marks would read as a movement screen with no
+-- tests and start the 8-week clock, and saving one half would blank the other,
+-- because the upsert writes both.
+CREATE TABLE IF NOT EXISTS delivery_screens (
+  id          text PRIMARY KEY,
+  athlete_id  text NOT NULL REFERENCES athletes(id) ON DELETE CASCADE,
+  date        date NOT NULL,
+  flaws       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  notes       text NOT NULL DEFAULT '',
+  created_by  text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- One assessment per athlete per day, and the conflict target the migration
+-- below depends on. It must exist before that INSERT runs.
+CREATE UNIQUE INDEX IF NOT EXISTS delivery_screens_athlete_date_uidx
+  ON delivery_screens(athlete_id, date);
+
+-- Carry across whatever was recorded while the two shared a row. The id is
+-- derived from the screen's, so a second run produces the same row rather
+-- than a duplicate.
+--
+-- DO NOTHING, never DO UPDATE: once a row is here it IS the record, and a
+-- re-run must not reach back to the old columns and undo an edit made since.
+-- An assessed-but-clean screen arrives as flaws = '{}', which in this shape
+-- still means "assessed, nothing found" -- which is why delivery_assessed is
+-- not carried across and does not need to be.
+INSERT INTO delivery_screens (id, athlete_id, date, flaws, notes, created_by, created_at)
+SELECT 'from-screen-' || id, athlete_id, date, flaws, '', created_by, created_at
+  FROM movement_screens
+ WHERE delivery_assessed = true
+ON CONFLICT (athlete_id, date) DO NOTHING;
 
 -- v18: strength. One lifting day per athlete per date, like the check-in and
 -- the screen — re-saving a date replaces it rather than leaving two versions

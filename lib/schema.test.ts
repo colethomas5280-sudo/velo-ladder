@@ -191,6 +191,7 @@ test("the schema applies to an empty database", async () => {
 
   assert.deepEqual(await tablesIn(db), [
     "athletes",
+    "delivery_screens",
     "lift_sessions",
     "lifts",
     "movement_screens",
@@ -461,4 +462,50 @@ test("an existing screen is not retroactively claimed as assessed", () => {
     !/UPDATE movement_screens SET delivery_assessed = true/.test(sql),
     "a backfill claimed old screens were assessed",
   );
+});
+
+test("the delivery screens table and its one-per-day index both exist", () => {
+  const sql = schemaFile();
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS delivery_screens/);
+  assert.match(
+    sql,
+    /CREATE UNIQUE INDEX IF NOT EXISTS delivery_screens_athlete_date_uidx/,
+  );
+});
+
+test("the index the migration conflicts on is created BEFORE the migration runs", () => {
+  /*
+   * ON CONFLICT (athlete_id, date) needs that unique index to exist. Ordered
+   * the other way round this is a syntax error at setup time, not a silent
+   * no-op, and every screen save stays broken until someone notices.
+   */
+  const sql = schemaFile();
+  const index = sql.indexOf("delivery_screens_athlete_date_uidx");
+  const migration = sql.indexOf("INSERT INTO delivery_screens");
+  assert.ok(index > -1 && migration > -1, "one of the two statements is missing");
+  assert.ok(index < migration, "the migration runs before its conflict target exists");
+});
+
+test("the migration carries marks forward and never reaches back", () => {
+  const sql = schemaFile();
+  assert.match(sql, /INSERT INTO delivery_screens[\s\S]*?FROM movement_screens/);
+  assert.match(sql, /WHERE delivery_assessed = true/);
+  assert.match(sql, /ON CONFLICT \(athlete_id, date\) DO NOTHING/);
+  assert.ok(
+    !/ON CONFLICT \(athlete_id, date\) DO UPDATE/.test(sql),
+    "a re-run would overwrite an edit made since the first one",
+  );
+});
+
+test("nothing in this version drops a column", () => {
+  // Scoped to just the v27 block: the file is not laid out in strict version
+  // order (v18-v24 physically follow v27), and an earlier, legitimate
+  // migration (v20, recipes) already drops a column. Scanning the whole file
+  // would fail regardless of anything this version does.
+  const sql = schemaFile();
+  const start = sql.indexOf("-- v27:");
+  const end = sql.indexOf("-- v18: strength");
+  assert.ok(start > -1 && end > start, "could not isolate the v27 block");
+  const v27 = sql.slice(start, end);
+  assert.ok(!/DROP COLUMN/i.test(v27), "a migration dropped a column");
 });
