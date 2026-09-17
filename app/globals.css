@@ -2824,6 +2824,14 @@ table.roster-table {
 .sc-block.sc-good li {
   color: var(--ink);
 }
+.sc-cause-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin: 10px 0 2px;
+}
+.sc-cause-label:first-child {
+  margin-top: 0;
+}
 
 /* ---------- tests tab ---------- */
 .tests-head {

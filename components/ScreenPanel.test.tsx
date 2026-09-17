@@ -141,3 +141,63 @@ test("a standing re-screen call is shown with its reason", () => {
   assert.match(document.body.textContent!, /re-screen called/i);
   assert.match(document.body.textContent!, /new arm slot with cole/i);
 });
+
+/* ------------------------------------------------------------------ *
+ * The Big 12 report: three states, not two.
+ * ------------------------------------------------------------------ */
+
+function bigScr(over: Partial<MovementScreen> = {}): MovementScreen {
+  return {
+    id: TODAY,
+    athleteId: ID,
+    date: TODAY,
+    results: {},
+    notes: "",
+    flaws: {},
+    deliveryAssessed: false,
+    ...over,
+  };
+}
+
+test("an unassessed delivery says so, rather than showing an empty list", () => {
+  panel([bigScr({ deliveryAssessed: false, flaws: {} })]);
+  assert.match(document.body.textContent!, /wasn't assessed/i);
+});
+
+test("assessed and clean reads as a result, not as an absence", () => {
+  panel([bigScr({ deliveryAssessed: true, flaws: {} })]);
+  assert.match(document.body.textContent!, /nothing found/i);
+  assert.doesNotMatch(document.body.textContent!, /wasn't assessed/i);
+});
+
+test("a marked flaw leads with Cole's own wording for the cause", () => {
+  panel(
+    [
+      bigScr({
+        deliveryAssessed: true,
+        flaws: { sway: true },
+        results: { "pelvic-rotation.rotation": "limited-bilateral" },
+      }),
+    ],
+    { hand: "R" },
+  );
+  assert.match(document.body.textContent!, /Sway/);
+  assert.match(document.body.textContent!, /Spine disassociation/);
+});
+
+test("a flaw nothing explains says that, instead of going quiet", () => {
+  panel(
+    [bigScr({ deliveryAssessed: true, flaws: { sway: true }, results: {} })],
+    { hand: "R" },
+  );
+  assert.match(document.body.textContent!, /Sway/);
+  assert.match(document.body.textContent!, /nothing on this screen/i);
+});
+
+test("an athlete sees his own flaws, and never a coach note", () => {
+  panel(
+    [bigScr({ deliveryAssessed: true, flaws: { sway: true }, notes: "" })],
+    { isCoach: false },
+  );
+  assert.match(document.body.textContent!, /Sway/);
+});
