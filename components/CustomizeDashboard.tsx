@@ -11,7 +11,7 @@ export type WidgetId =
   | "prs"
   | "attention"
   | "activity"
-  | "resources"
+  | "screening"
   | "setbacks";
 
 interface WidgetDef {
@@ -57,10 +57,10 @@ export const WIDGETS: WidgetDef[] = [
       "Open soreness, CNS-readiness and pain flags across the roster, worst first",
   },
   {
-    id: "resources",
-    group: "Coaching",
-    name: "Resources",
-    blurb: "Quick links into your protocols and how-to library",
+    id: "screening",
+    group: "Athlete monitoring",
+    name: "Screening due",
+    blurb: "Athletes overdue or due for their next movement screen",
   },
   {
     id: "activity",

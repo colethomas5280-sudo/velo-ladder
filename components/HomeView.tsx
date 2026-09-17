@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
 import Dashboard from "./Dashboard";
-import { CoachRetestPrompt } from "./RetestPrompt";
 
 type Me = {
   role: "coach" | "athlete" | "none";
@@ -49,10 +48,5 @@ export default function HomeView() {
       </div>
     );
   }
-  return (
-    <>
-      <CoachRetestPrompt />
-      <Dashboard />
-    </>
-  );
+  return <Dashboard />;
 }

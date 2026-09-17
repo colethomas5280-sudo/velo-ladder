@@ -18,10 +18,13 @@ import { useDailyPrompt } from "./useDailyPrompt";
 import { callOf } from "./AthleteTests";
 
 /* ------------------------------------------------------------------ *
- * "Who needs screening" on the way in
+ * "Who needs screening"
  *
- * Opens on the first visit of the day and stays shut once answered — see
- * `useDailyPrompt` for why it isn't every page load.
+ * The coach-side list used to be a once-a-day popup on the way in; it now
+ * lives as a standing card on the dashboard instead (see Dashboard.tsx's
+ * ScreeningDue widget), so `useScreeningDue` below is the only piece of
+ * that shared with this file — the athlete-facing prompt is still a daily
+ * pop-up (see `useDailyPrompt` for why it isn't every page load).
  *
  * It renders nothing at all when nothing is due, which is the property that
  * matters: a prompt that appears on a quiet morning is a prompt that gets
@@ -38,51 +41,29 @@ const WHAT: Record<string, string> = {
  * `count` comes from the caller, not from `due.tests`: a clock built from a
  * roster row knows how many tests are failing, not which ones.
  */
-function label(due: RetestDue, count?: number): string {
+export function screeningDueLabel(due: RetestDue, count?: number): string {
   const what = WHAT[due.kind] ?? "screen";
   if (due.kind === "spot" && count)
     return `${what} · ${count} ${count === 1 ? "test" : "tests"}`;
   return what;
 }
 
-export function CoachRetestPrompt() {
+export interface ScreeningDueRow {
+  row: ScreenOverviewRow;
+  clocks: ReturnType<typeof clocksFor>;
+}
+
+/** Every athlete whose lead clock (full screen or spot-check re-test) is due or overdue, worst first. */
+export function useScreeningDue(): ScreeningDueRow[] {
   const { data } = useSWR<ScreenOverviewRow[]>("/api/screens/overview", fetcher);
-  const [open, dismiss] = useDailyPrompt("coach");
   const today = todayISO();
 
-  const due = useMemo(() => {
+  return useMemo(() => {
     return (data ?? [])
       .map((row) => ({ row, clocks: clocksFor(row, today) }))
       .filter((x) => needsScreening(x.clocks.lead))
       .sort((a, b) => dueRank(b.clocks.lead.state) - dueRank(a.clocks.lead.state));
   }, [data, today]);
-
-  if (!open || !due.length) return null;
-
-  return (
-    <Prompt
-      title={`${due.length} ${due.length === 1 ? "athlete needs" : "athletes need"} screening`}
-      onClose={dismiss}
-      href="/tests"
-      cta="Open Tests"
-    >
-      <ul className="rp-list">
-        {due.slice(0, 6).map(({ row, clocks }) => (
-          <li key={row.athleteId}>
-            <b>{row.name}</b>
-            <span>
-              {row.called
-                ? row.called.reason
-                : `${clocks.lead.state === "overdue" ? "Overdue" : "Due"} · ${label(clocks.lead, row.spotTests)}`}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {due.length > 6 && (
-        <p className="cz-note">and {due.length - 6} more on the Tests page.</p>
-      )}
-    </Prompt>
-  );
 }
 
 export function AthleteRetestPrompt({ athleteId }: { athleteId: string }) {
@@ -128,7 +109,7 @@ export function AthleteRetestPrompt({ athleteId }: { athleteId: string }) {
         * they have failed to do — the clock is the coach's to keep.
         */}
       <p>
-        Your next <b>{label(mine.lead, mine.spotTests)}</b> is due. Mention it at
+        Your next <b>{screeningDueLabel(mine.lead, mine.spotTests)}</b> is due. Mention it at
         your next session
         and your coach will run it.
       </p>
