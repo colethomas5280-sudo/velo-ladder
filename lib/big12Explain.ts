@@ -4,7 +4,9 @@ import {
   PAINFUL,
   SCREEN_TESTS,
   fieldKey,
+  isApplicable,
   sidesOf,
+  type Field,
   type Results,
   type SubTest,
 } from "./screen";
@@ -47,10 +49,13 @@ export interface FlawReport {
 /**
  * Whether any test a cause names is actually graded left/right.
  *
- * A front/back/throwing marker only translates into "L" or "R" meaningfully
- * against a test graded that way. Lunge with Extension is graded dominant /
- * non-dominant instead, and "D"/"N" are not leg labels a front/back request
- * can be mapped onto — guessing would silently filter every reading away.
+ * Belt-and-braces: `abnormalFor` already degrades a side request back to
+ * "show whatever the test has" per sub-test when the request doesn't match
+ * that sub-test's own side vocabulary, so a cause naming both an lr test
+ * and a dominance test no longer loses the dominance one's findings. This
+ * check instead keeps `sidesWanted` itself from claiming a specific leg for
+ * a cause that names no lr-graded test at all — "front"/"back" isn't a
+ * meaningful request when there is nothing to point it at.
  */
 function anyLrGraded(cause: Cause): boolean {
   return cause.tests.some((testKey) => {
@@ -100,15 +105,33 @@ export function abnormalFor(
     if (sub.diagnostic) continue;
 
     const testSides = sidesOf(sub);
-    const wanted =
-      testSides.length === 0
-        ? [undefined]
-        : sides
-          ? testSides.filter((s) => sides.includes(s.key))
-          : testSides;
+    let wanted: ({ key: string; label: string } | undefined)[];
+    if (testSides.length === 0) {
+      wanted = [undefined];
+    } else if (sides) {
+      /*
+       * A request that doesn't match this sub-test's own side vocabulary
+       * (e.g. a front/back leg marker against a dominance-graded test)
+       * degrades to "show whatever the test has" rather than filtering to
+       * nothing. Otherwise a cause naming both an lr test and a
+       * dominance test loses the dominance one's findings whenever the
+       * marker happens to be honoured by the lr test.
+       */
+      const filtered = testSides.filter((s) => sides.includes(s.key));
+      wanted = [...(filtered.length ? filtered : testSides)];
+    } else {
+      wanted = [...testSides];
+    }
 
     for (const side of wanted) {
       const key = fieldKey(test.key, sub.key, side?.key);
+      const field: Field = { key, test, subTest: sub, side: side?.key };
+      // A dependent sub-test whose gate answer has since changed is not a
+      // live reading — the screen itself hides and discounts it, and a
+      // value left sitting in `results` from before the gate changed must
+      // not explain anything either. Sharing `isApplicable` with
+      // `deviations()` keeps the two rules from drifting apart.
+      if (!isApplicable(field, results)) continue;
       const value = results[key];
       if (!value || value === NOT_TESTED) continue;
       if (isNormal(sub, value)) continue;

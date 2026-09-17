@@ -79,6 +79,41 @@ test("a leg-side marker against a dominance-graded test shows both", () => {
   assert.equal(sidesWanted(cause, "R"), null, "guessed which leg 'dominant' means");
 });
 
+test("a side marker for a mixed cause never drops the dominance-graded test's findings", () => {
+  /*
+   * A cause naming both an lr test and a dominance test (e.g. one mapping
+   * Heel Lift and Lunge w/ Extension together) hands the SAME side request
+   * to both tests. Heel Lift can honour "L"; Lunge w/ Extension is graded
+   * D/N and cannot. The request must degrade to "show both" for the
+   * dominance test rather than filtering it to nothing just because a
+   * sibling test in the same cause happened to answer to that request.
+   */
+  const got = abnormalFor("lunge-extension", { "lunge-extension.extension:D": "limited" }, ["L"]);
+  assert.equal(got.length, 1, "a side request meant for a different test silently dropped this one");
+});
+
+test("a stale dependent finding does not survive a corrected gate answer", () => {
+  /*
+   * The screen itself hides and discounts a dependent sub-test once its
+   * gate answer no longer opens it, but ScreenModal never deletes the
+   * stale value from stored results. Recorded in sequence: Heel Lift's
+   * height came back "good", quality was graded "rolls-outside", and then
+   * the height was corrected to "limited". The quality reading is now
+   * unreachable and must not explain anything, even though it is still
+   * sitting in the results map.
+   */
+  const results = {
+    "heel-lift.height:L": "limited",
+    "heel-lift.quality:L": "rolls-outside",
+  };
+  const got = abnormalFor("heel-lift", results, ["L"]);
+  assert.deepEqual(
+    got.map((f) => f.findingLabel),
+    ["Limited lift"],
+    "the stale quality reading explained the flaw after its gate closed",
+  );
+});
+
 test("the lead explanation is the highest-ranked cause that has one", () => {
   /*
    * Sway ranks backside hip rotation first and spine disassociation third.
