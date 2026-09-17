@@ -438,6 +438,7 @@ export default function ScreenPanel({
           athleteName={athleteName}
           initial={editing === "new" ? null : editing}
           takenDates={screens.map((s) => s.date)}
+          isCoach={isCoach}
           onClose={() => setEditing(null)}
           onSaved={async (msg) => {
             setEditing(null);

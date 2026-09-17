@@ -2512,6 +2512,34 @@ table.roster-table {
   margin-left: auto;
   color: var(--ink-faint);
 }
+.ms-flaw {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 4px;
+  border-top: 1px solid var(--line-soft);
+}
+.ms-flaw:first-of-type {
+  border-top: 0;
+}
+.ms-flaw input {
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+.ms-flaw-head {
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+}
+.ms-flaw-head b {
+  font-size: 13.5px;
+}
+.ms-flaw b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+}
 @media (max-width: 560px) {
   .ms-answers.sided {
     flex-direction: column;

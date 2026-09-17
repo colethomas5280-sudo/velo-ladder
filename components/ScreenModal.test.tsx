@@ -1,8 +1,10 @@
 import "./testDom";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SCREEN_TESTS } from "@/lib/screen";
+import { BIG_12 } from "@/lib/big12";
+import type { MovementScreen } from "@/lib/types";
 import { withSwr } from "./testSwr";
 import ScreenModal from "./ScreenModal";
 import { todayISO } from "@/lib/velo";
@@ -16,20 +18,54 @@ import { todayISO } from "@/lib/velo";
  * ------------------------------------------------------------------ */
 
 const ID = "a1";
-const form = (sessions: unknown[] = []) =>
+const form = (
+  opts: {
+    sessions?: unknown[];
+    isCoach?: boolean;
+    initial?: MovementScreen | null;
+  } = {},
+) =>
   render(
     withSwr(
-      { [`/api/athletes/${ID}/sessions`]: sessions },
+      { [`/api/athletes/${ID}/sessions`]: opts.sessions ?? [] },
       <ScreenModal
         athleteId={ID}
         athleteName="Test Athlete"
-        initial={null}
+        initial={opts.initial ?? null}
         takenDates={[]}
+        isCoach={opts.isCoach ?? true}
         onClose={() => {}}
         onSaved={() => {}}
       />,
     ),
   );
+
+/**
+ * Stubs the network call `save()` makes, so a test can inspect exactly what
+ * left the browser without a real server. Must be restored after use, or the
+ * next test's fetch silently hits this stub instead of the "no fixture"
+ * tripwire `withSwr` relies on.
+ */
+function mockApi() {
+  const calls: Record<string, unknown>[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    if (init?.method === "POST" && typeof init.body === "string") {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return real(input as string, init);
+  }) as typeof fetch;
+  return {
+    submitted: () => calls[calls.length - 1],
+    restore: () => {
+      globalThis.fetch = real;
+    },
+  };
+}
 
 const open = (label: RegExp) => {
   const head = [...document.querySelectorAll(".ms-test-toggle")].find((h) =>
@@ -126,12 +162,96 @@ test("the footer offers to fill only what it can actually fill", () => {
 /* Screen fresh, not post-throwing. */
 test("a date the athlete threw on is flagged, not blocked", () => {
   // The form opens dated today, so the session has to be dated today too.
-  form([{ id: "s1", athleteId: ID, type: "mound", date: todayISO(), notes: "", throws: {} }]);
+  form({
+    sessions: [{ id: "s1", athleteId: ID, type: "mound", date: todayISO(), notes: "", throws: {} }],
+  });
   assert.match(document.body.textContent!, /threw on this date/i);
   assert.ok(screen.getByText(/save screen/i), "still recordable");
 });
 
 test("a quiet date is not flagged", () => {
-  form([{ id: "s1", athleteId: ID, type: "mound", date: "2020-01-01", notes: "", throws: {} }]);
+  form({
+    sessions: [{ id: "s1", athleteId: ID, type: "mound", date: "2020-01-01", notes: "", throws: {} }],
+  });
   assert.doesNotMatch(document.body.textContent!, /threw on this date/i);
+});
+
+/* ------------------------------------------------------------------ *
+ * Recording the Big 12
+ * ------------------------------------------------------------------ */
+
+test("the twelve are offered in Cole's order, behind the assessed checkbox", () => {
+  form();
+  const assessed = document.querySelector('input[name="deliveryAssessed"]');
+  assert.ok(assessed, "no delivery-assessed checkbox");
+  for (const flaw of BIG_12)
+    assert.ok(
+      document.querySelector(`input[name="flaw:${flaw.key}"]`),
+      `${flaw.label} is not offered`,
+    );
+});
+
+test("ticking a flaw marks the delivery as assessed", async () => {
+  /*
+   * The server refuses a record where these disagree. The UI must not be
+   * able to build one, or a coach loses a screen he thought he had saved.
+   */
+  const { submitted, restore } = mockApi();
+  try {
+    form();
+    fireEvent.click(
+      document.querySelector<HTMLInputElement>('input[name="flaw:sway"]')!,
+    );
+    assert.equal(
+      document.querySelector<HTMLInputElement>('input[name="deliveryAssessed"]')!
+        .checked,
+      true,
+    );
+    fireEvent.click(screen.getByText(/save screen/i));
+    await waitFor(() => assert.ok(submitted()));
+    assert.equal(submitted().deliveryAssessed, true);
+    assert.deepEqual(submitted().flaws, { sway: true });
+  } finally {
+    restore();
+  }
+});
+
+test("an athlete never sees the recording controls", () => {
+  form({ isCoach: false });
+  assert.equal(document.querySelector('input[name="flaw:sway"]'), null);
+  assert.equal(document.querySelector('input[name="deliveryAssessed"]'), null);
+});
+
+/*
+ * The carried finding: `upsertScreen` writes EXCLUDED.flaws on conflict, so a
+ * submit that omits `flaws` wipes out whatever was already recorded. A coach
+ * who opens a screen with a flaw already marked, edits something unrelated,
+ * and saves again must not silently erase his own assessment.
+ */
+test("editing an already-assessed screen keeps sending its flaws", async () => {
+  const { submitted, restore } = mockApi();
+  try {
+    const existing: MovementScreen = {
+      id: "scr1",
+      athleteId: ID,
+      date: "2020-01-01",
+      results: {},
+      notes: "old note",
+      flaws: { sway: true },
+      deliveryAssessed: true,
+    };
+    form({ initial: existing });
+
+    // Change something unrelated to the Big 12 section entirely.
+    fireEvent.change(screen.getByPlaceholderText(/guarding on the left/i), {
+      target: { value: "new note" },
+    });
+
+    fireEvent.click(screen.getByText(/update screen/i));
+    await waitFor(() => assert.ok(submitted()));
+    assert.deepEqual(submitted().flaws, { sway: true });
+    assert.equal(submitted().deliveryAssessed, true);
+  } finally {
+    restore();
+  }
 });

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import type { MovementScreen, TrainingSession } from "@/lib/types";
 import { api, ApiError, fetcher } from "@/lib/fetcher";
+import { BIG_12 } from "@/lib/big12";
 import {
   NOT_TESTED,
   SCREEN_GROUPS,
@@ -55,6 +56,7 @@ export default function ScreenModal({
   athleteName,
   initial,
   takenDates,
+  isCoach,
   onClose,
   onSaved,
 }: {
@@ -64,6 +66,8 @@ export default function ScreenModal({
   initial: MovementScreen | null;
   /** Dates that already hold a screen, so a new one can warn before it lands on one. */
   takenDates: string[];
+  /** The Big 12 section is coach-only presentation; the route enforces it for real. */
+  isCoach: boolean;
   onClose: () => void;
   onSaved: (msg: string) => void;
 }) {
@@ -77,6 +81,10 @@ export default function ScreenModal({
   const [date, setDate] = useState(initial?.date ?? todayISO());
   const [results, setResults] = useState<Results>(initial?.results ?? {});
   const [notes, setNotes] = useState(initial?.notes ?? "");
+  const [flaws, setFlaws] = useState<Record<string, boolean>>(initial?.flaws ?? {});
+  const [deliveryAssessed, setDeliveryAssessed] = useState(
+    initial?.deliveryAssessed ?? false,
+  );
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -155,6 +163,30 @@ export default function ScreenModal({
       return next;
     });
 
+  /*
+   * Ticking any flaw asserts the delivery was assessed — the server refuses
+   * a record where those disagree, so the UI must never be able to build
+   * one. Unticking the last flaw does NOT clear it back: "I looked and he
+   * is clean" is still an assessed delivery.
+   */
+  const toggleFlaw = (key: string) => {
+    const nowOn = !flaws[key];
+    setFlaws((prev) => {
+      const next = { ...prev };
+      if (nowOn) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+    if (nowOn) setDeliveryAssessed(true);
+  };
+
+  // Unassessing by hand has to take any marked flaws with it, for the same
+  // reason: a clean checkbox can't sit next to flaws nobody unmarked.
+  const setAssessed = (value: boolean) => {
+    setDeliveryAssessed(value);
+    if (!value) setFlaws({});
+  };
+
   async function save() {
     setBusy(true);
     setErr(null);
@@ -163,6 +195,8 @@ export default function ScreenModal({
         date,
         results,
         notes: notes.trim(),
+        flaws,
+        deliveryAssessed,
       });
       onSaved(existing ? "Screen updated" : "Screen saved");
     } catch (e) {
@@ -234,6 +268,8 @@ export default function ScreenModal({
                   setExisting(null);
                   setResults({});
                   setNotes("");
+                  setFlaws({});
+                  setDeliveryAssessed(false);
                   setConfirmDelete(false);
                 }}
               >
@@ -290,6 +326,39 @@ export default function ScreenModal({
               {flagged.length === 1 ? "One reading is" : `${flagged.length} readings are`}{" "}
               marked painful. Those replace the colour rather than joining the scale.
             </p>
+          )}
+
+          {isCoach && (
+            <div className="ms-group">
+              <div className="eyebrow">Big 12 delivery check</div>
+              <label className="ms-flaw ms-flaw-head">
+                <input
+                  type="checkbox"
+                  name="deliveryAssessed"
+                  checked={deliveryAssessed}
+                  onChange={(e) => setAssessed(e.target.checked)}
+                />
+                <span>
+                  <b>I assessed the delivery</b>
+                </span>
+              </label>
+              {BIG_12.map((flaw) => (
+                <label className="ms-flaw" key={flaw.key}>
+                  <input
+                    type="checkbox"
+                    name={`flaw:${flaw.key}`}
+                    checked={!!flaws[flaw.key]}
+                    onChange={() => toggleFlaw(flaw.key)}
+                  />
+                  <span>
+                    <b>{flaw.label}</b>
+                    <span className="ms-help">
+                      {flaw.description} {flaw.howToSpot}
+                    </span>
+                  </span>
+                </label>
+              ))}
+            </div>
           )}
 
           <label className="field">
