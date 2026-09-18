@@ -3,9 +3,9 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup } from "@testing-library/react";
 import { RETEST_CADENCE, screenSummary } from "@/lib/screen";
-import type { ScreenOverviewRow } from "@/lib/types";
+import type { DeliveryOverviewRow, ScreenOverviewRow } from "@/lib/types";
 import { withSwr } from "./testSwr";
-import { daysAgo, rowOf, screenOf, TODAY } from "./testRender";
+import { daysAgo, deliveryRowOf, rowOf, screenOf, TODAY } from "./testRender";
 import TestsView from "./TestsView";
 
 /* ------------------------------------------------------------------ *
@@ -18,10 +18,14 @@ import TestsView from "./TestsView";
  * re-screen reason carried to a never-screened row and then dropped.
  * ------------------------------------------------------------------ */
 
-const roster = (rows: ScreenOverviewRow[]) =>
+const roster = (rows: ScreenOverviewRow[], deliveries: DeliveryOverviewRow[] = []) =>
   render(
     withSwr(
-      { "/api/me": { role: "coach", athleteId: null }, "/api/screens/overview": rows },
+      {
+        "/api/me": { role: "coach", athleteId: null },
+        "/api/screens/overview": rows,
+        "/api/delivery/overview": deliveries,
+      },
       <TestsView />,
     ),
   );
@@ -128,9 +132,68 @@ test("an athlete sees their own tests and never the roster", () => {
   assert.equal(screen.queryByText(/full screen every/i), null, "no roster caption");
 });
 
+test("the screen card no longer carries a delivery line", () => {
+  /*
+   * It lived there while the two shared a record. Saying it in two places is
+   * how two views drift into disagreeing about the same athlete.
+   */
+  roster([rowOf()]);
+  assert.doesNotMatch(document.body.textContent!, /delivery not assessed/i);
+});
+
+/* ------------------------------------------------------------------ *
+ * Pitching Inhibitors
+ *
+ * Its own card, its own record (delivery_screens), and its own clock — see
+ * the note above about why the movement screen's row no longer says this.
+ * ------------------------------------------------------------------ */
+
+test("an athlete never assessed is listed as not assessed yet, not as clean", () => {
+  roster([rowOf()], [deliveryRowOf({ last: null, count: 0 })]);
+  assert.match(document.body.textContent!, /not assessed yet/i);
+  assert.doesNotMatch(document.body.textContent!, /no inhibitors/i);
+});
+
+test("an assessment with nothing found reads as a result", () => {
+  roster([rowOf()], [deliveryRowOf({ last: TODAY, count: 0 })]);
+  assert.match(document.body.textContent!, /no inhibitors/i);
+});
+
+test("marks are counted, and one is not called 1 inhibitors", () => {
+  roster([rowOf()], [deliveryRowOf({ last: TODAY, count: 1 })]);
+  assert.match(document.body.textContent!, /1 inhibitor(?!s)/i);
+});
+
 /*
- * Pitching Inhibitors moved off `ScreenOverviewRow` onto their own
- * assessment (delivery_screens / DeliveryOverviewRow). Their roster
- * presence gets its own tests wherever that UI lands; this roster no
- * longer carries a `delivery` field to test here.
+ * Mutates the shared constant rather than just re-deriving the expected
+ * number from it: RETEST_CADENCE.full / 7 is 8 today, so a caption that
+ * merely typed "8" would pass a test that compared against that same
+ * arithmetic. Changing the constant to a value that ISN'T 8 makes a typed
+ * "8" and a genuinely computed one diverge, which is the only way to catch
+ * the bug this guards against — see the movement screen's own cadence
+ * caption note above about a typed number outliving the config it once
+ * matched.
  */
+test("the clock is the 8-week one, from the config", () => {
+  const original = RETEST_CADENCE.full;
+  try {
+    RETEST_CADENCE.full = 70;
+    roster([rowOf()], [deliveryRowOf({ last: TODAY, count: 0 })]);
+    const sub = screen.getByText(/checked every/i).textContent!;
+    assert.match(sub, new RegExp(`every ${RETEST_CADENCE.full / 7} weeks`, "i"));
+  } finally {
+    RETEST_CADENCE.full = original;
+  }
+});
+
+test("an assessment older than the cadence is flagged", () => {
+  roster(
+    [rowOf()],
+    [deliveryRowOf({ last: daysAgo(RETEST_CADENCE.full + 7), count: 0 })],
+  );
+  const badges = [...document.querySelectorAll(".tr-due")];
+  assert.ok(
+    badges.some((b) => /overdue/i.test(b.textContent ?? "")),
+    "an overdue badge is shown",
+  );
+});

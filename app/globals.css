@@ -2922,6 +2922,10 @@ table.roster-table {
 .tests-card .sec-h .sub {
   min-width: 0;
 }
+/* Pitching Inhibitors sits below the movement screen as its own card. */
+.tests-card + .tests-card {
+  margin-top: 22px;
+}
 
 /* the pointer left on the athlete profile */
 .screen-link {
