@@ -196,7 +196,7 @@ test("explanations come from the screen as it stood on the assessment's date", (
     { hand: "R" },
     [del(daysAgo(60), { sway: true })],
   );
-  assert.match(document.body.textContent!, /nothing on this screen/i);
+  assert.match(document.body.textContent!, /nothing found so far/i);
 });
 
 test("a limitation recorded before the assessment does explain it", () => {
@@ -212,7 +212,7 @@ test("an athlete with inhibitors and no screen at all gets them all unexplained"
   // Correct, and must not render as an error or a crash.
   panel([], {}, [del(TODAY, { sway: true })]);
   assert.match(document.body.textContent!, /Sway/);
-  assert.match(document.body.textContent!, /nothing on this screen/i);
+  assert.match(document.body.textContent!, /nothing found so far/i);
 });
 
 test("a marked flaw leads with Cole's own wording for the cause", () => {
@@ -228,7 +228,7 @@ test("a marked flaw leads with Cole's own wording for the cause", () => {
 test("a flaw nothing explains says that, instead of going quiet", () => {
   panel([scr(TODAY, {})], { hand: "R" }, [del(TODAY, { sway: true })]);
   assert.match(document.body.textContent!, /Sway/);
-  assert.match(document.body.textContent!, /nothing on this screen/i);
+  assert.match(document.body.textContent!, /nothing found so far/i);
 });
 
 /*
@@ -259,7 +259,7 @@ test("a spot-check that skips a test still explains a flaw from its last recorde
   );
   assert.doesNotMatch(
     document.body.textContent!,
-    /nothing on this screen explains this/i,
+    /nothing found so far explains this/i,
     "the athlete's own screen findings should still explain Sway",
   );
 });
@@ -286,7 +286,7 @@ test("a flaw explained by another marked flaw says which one", () => {
   panel([], { hand: "R" }, [
     del(TODAY, { "flying-open": true, "short-stride": true }),
   ]);
-  assert.match(document.body.textContent!, /Also marked on this screen/i);
+  assert.match(document.body.textContent!, /Also marked on this assessment/i);
   assert.match(document.body.textContent!, /Short Stride/);
 });
 

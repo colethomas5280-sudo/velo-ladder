@@ -251,9 +251,9 @@ function Roster() {
                   )}
                   {/*
                     * Pitching Inhibitors moved off the movement screen row
-                    * onto their own assessment (delivery_screens). This
-                    * roster has no delivery line to show until their own
-                    * UI lands.
+                    * onto their own assessment (delivery_screens), with its
+                    * own card below (see InhibitorsRoster). This roster has
+                    * nothing more of theirs to show.
                     */}
                 </span>
                 <span className="tr-when">

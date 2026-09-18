@@ -60,15 +60,19 @@ mock.module("@/lib/auth", {
 
 let athleteId = "";
 type Route = typeof import("../app/api/athletes/[id]/delivery/route");
+type ScreensRoute = typeof import("../app/api/athletes/[id]/screens/route");
 let route: Route;
+let screensRoute: ScreensRoute;
+let sql: import("@/lib/db").SqlTag;
 
 before(async () => {
-  const { execScript } = await import("@/lib/db");
-  const { SCHEMA_SQL } = await import("@/lib/schema");
-  await execScript(SCHEMA_SQL);
+  const db = await import("@/lib/db");
+  await db.execScript((await import("@/lib/schema")).SCHEMA_SQL);
+  sql = db.sql;
   const data = await import("@/lib/data");
   athleteId = (await data.createAthlete({ name: "Delivery Kid", hand: "R", inviteEmail: ATHLETE })).id;
   route = await import("../app/api/athletes/[id]/delivery/route");
+  screensRoute = await import("../app/api/athletes/[id]/screens/route");
 });
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
@@ -83,6 +87,15 @@ const post = (id: string, body: unknown) =>
 const del = (id: string, date: string) =>
   route.DELETE(
     new Request(`http://delivery.test/api?date=${date}`, { method: "DELETE" }),
+    ctx(id),
+  );
+
+const postScreen = (id: string, body: unknown) =>
+  screensRoute.POST(
+    new Request("http://delivery.test/api", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
     ctx(id),
   );
 
@@ -109,4 +122,82 @@ test("a coach can record an assessment through the route", async () => {
   signedInAs = COACH;
   const res = await post(athleteId, anAssessment());
   assert.equal(res.status, 201, await res.text());
+});
+
+/* ------------------------------------------------------------------ *
+ * The wipe class this split exists to prevent
+ *
+ * The two assessments used to share a row, and saving one blanked the
+ * other because the shared upsert wrote both halves. Splitting them onto
+ * separate tables is only a fix if each write path stays off the other's
+ * table. Tested from both directions, against the real routes and a real
+ * database, not by reading the SQL each upsert issues.
+ * ------------------------------------------------------------------ */
+
+test("recording inhibitors never writes to movement_screens", async () => {
+  signedInAs = COACH;
+  const res = await post(athleteId, anAssessment({ date: "2026-02-01" }));
+  assert.equal(res.status, 201, await res.text());
+
+  const rows = (await sql`
+    SELECT id FROM movement_screens WHERE athlete_id = ${athleteId} AND date = '2026-02-01'
+  `) as Record<string, unknown>[];
+  assert.equal(rows.length, 0, "recording inhibitors created a movement_screens row");
+});
+
+test("recording a screen never writes to delivery_screens", async () => {
+  signedInAs = COACH;
+  const res = await postScreen(athleteId, {
+    date: "2026-02-02",
+    results: { "hip-45.45-degree-angle:L": "greater" },
+    notes: "",
+  });
+  assert.equal(res.status, 201, await res.text());
+
+  const rows = (await sql`
+    SELECT id FROM delivery_screens WHERE athlete_id = ${athleteId} AND date = '2026-02-02'
+  `) as Record<string, unknown>[];
+  assert.equal(rows.length, 0, "recording a screen created a delivery_screens row");
+});
+
+/*
+ * lib/data.ts:942-951 (upsertScreen) used to write `flaws` and
+ * `delivery_assessed` back into movement_screens on every save, including
+ * the DO UPDATE branch. The screen modal never sends either field, so they
+ * silently defaulted to `{}` / false — blanking a row a coach had already
+ * marked assessed. In the window between a deploy going live and someone
+ * running /api/setup, that meant the v27 migration's
+ * `WHERE delivery_assessed = true` would skip the row for good.
+ */
+test("saving a movement screen does not touch a delivery-assessed row's own columns", async () => {
+  await sql`
+    INSERT INTO movement_screens
+      (id, athlete_id, date, results, flaws, delivery_assessed, created_by)
+    VALUES ('ms-pre-migration', ${athleteId}, '2026-03-01', '{}'::jsonb,
+            '{"early-trunk-rotation":true}'::jsonb, true, ${COACH})
+  `;
+
+  signedInAs = COACH;
+  const res = await postScreen(athleteId, {
+    date: "2026-03-01",
+    results: { "hip-45.45-degree-angle:L": "greater" },
+    notes: "re-tested the hip",
+  });
+  assert.equal(res.status, 201, await res.text());
+
+  const rows = (await sql`
+    SELECT flaws, delivery_assessed FROM movement_screens
+    WHERE athlete_id = ${athleteId} AND date = '2026-03-01'
+  `) as Record<string, unknown>[];
+  assert.equal(rows.length, 1);
+  assert.deepEqual(
+    rows[0].flaws,
+    { "early-trunk-rotation": true },
+    "the screen save blanked the pre-existing flaws column",
+  );
+  assert.equal(
+    rows[0].delivery_assessed,
+    true,
+    "the screen save reset delivery_assessed to false",
+  );
 });

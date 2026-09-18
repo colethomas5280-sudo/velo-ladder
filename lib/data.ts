@@ -922,14 +922,17 @@ export interface ScreenInput {
   date: string;
   results: Record<string, string>;
   notes: string;
-  flaws: Record<string, boolean>;
-  deliveryAssessed: boolean;
 }
 
 /**
  * One screen per athlete per day. Re-saving the same date replaces it, so a
  * coach correcting a mis-tap doesn't leave two versions of the same session
  * for the comparison view to disagree about.
+ *
+ * `flaws` and `delivery_assessed` are deliberately not written here. They
+ * split off onto `delivery_screens` in v27 and are left frozen on this table
+ * for the migration to read once; writing them again from here would blank
+ * an assessed row before the migration ever sees it. See lib/data.test.ts.
  */
 export async function upsertScreen(
   athleteId: string,
@@ -939,15 +942,12 @@ export async function upsertScreen(
   const id = crypto.randomUUID();
   const rows = (await sql`
     INSERT INTO movement_screens
-      (id, athlete_id, date, results, notes, created_by, flaws, delivery_assessed)
+      (id, athlete_id, date, results, notes, created_by)
     VALUES (${id}, ${athleteId}, ${input.date},
-            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy},
-            ${JSON.stringify(input.flaws)}::jsonb, ${input.deliveryAssessed})
+            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy})
     ON CONFLICT (athlete_id, date) DO UPDATE SET
       results = EXCLUDED.results,
       notes = EXCLUDED.notes,
-      flaws = EXCLUDED.flaws,
-      delivery_assessed = EXCLUDED.delivery_assessed,
       updated_at = now()
     RETURNING *
   `) as Record<string, unknown>[];

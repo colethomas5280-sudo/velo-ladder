@@ -253,6 +253,7 @@ export default function ScreenPanel({
     });
 
   return (
+    <>
     <section className="card pad screen-card">
       <div className="sec-h">
         <h3>Movement screen</h3>
@@ -465,14 +466,15 @@ export default function ScreenPanel({
           )}
         </>
       )}
+    </section>
 
-      <DeliverySection
-        delivery={delivery}
-        standingResults={deliveryStanding}
-        hand={hand}
-      />
+    <DeliverySection
+      delivery={delivery}
+      standingResults={deliveryStanding}
+      hand={hand}
+    />
 
-      {choosing && (
+    {choosing && (
         <RecordChooser
           onClose={() => setChoosing(false)}
           onPick={(kind) => {
@@ -510,6 +512,7 @@ export default function ScreenPanel({
           athleteId={athleteId}
           date={todayISO()}
           initial={recordingDelivery === "new" ? null : recordingDelivery}
+          takenDates={deliveries.map((d) => d.date)}
           onClose={() => setRecordingDelivery(null)}
           onSaved={async (msg) => {
             setRecordingDelivery(null);
@@ -519,8 +522,8 @@ export default function ScreenPanel({
         />
       )}
 
-      {toast && <div className="toast">{toast}</div>}
-    </section>
+    {toast && <div className="toast">{toast}</div>}
+    </>
   );
 }
 
@@ -688,6 +691,11 @@ function CarryBlock({
  * The Big 12 now live on their own record with their own date, so `delivery`
  * is the athlete's most recent assessment, not a field on the picked
  * movement-screen row — an athlete with no screen at all can still have one.
+ * That is also why this is its own card rather than living inside the
+ * movement screen's: an athlete with no screen reads "No screen recorded
+ * yet" and then, nested under that same heading, an inhibitors section that
+ * has nothing to do with it. Each assessment gets its own card and its own
+ * date, so a coach can tell whether it is from today or from June.
  *
  * `standingResults` is the screen as it stood on the ASSESSMENT's date, not
  * today's and not whatever screen the coach happens to be paging through
@@ -704,30 +712,31 @@ function DeliverySection({
   standingResults: Results;
   hand: Hand | null;
 }) {
-  if (!delivery) {
-    return (
-      <div className="sc-block">
-        <div className="eyebrow sc-h">Pitching Inhibitors</div>
-        <p className="widget-empty">No delivery assessment on record.</p>
-      </div>
-    );
-  }
-
-  const reports = explainScreen(delivery.flaws, standingResults, hand ?? "");
+  const reports = delivery
+    ? explainScreen(delivery.flaws, standingResults, hand ?? "")
+    : [];
 
   return (
-    <div className="sc-block">
-      <div className="eyebrow sc-h">Pitching Inhibitors</div>
-      {reports.length === 0 ? (
+    <section className="card pad screen-card">
+      <div className="sec-h">
+        <h3>Pitching Inhibitors</h3>
+        {delivery && <span className="sub">{fmtDate(delivery.date)}</span>}
+      </div>
+
+      {!delivery && (
+        <p className="widget-empty">No delivery assessment on record.</p>
+      )}
+      {delivery && reports.length === 0 && (
         <p className="sc-clean">Assessed, nothing found.</p>
-      ) : (
+      )}
+      {delivery && reports.length > 0 && (
         <ul className="sc-list">
           {reports.map((r) => (
             <FlawExplanation key={r.flaw.key} report={r} />
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -765,14 +774,14 @@ function FlawExplanation({ report }: { report: FlawReport }) {
 
         {report.alsoMarked.length > 0 && (
           <p className="cz-note">
-            Also marked on this screen:{" "}
+            Also marked on this assessment:{" "}
             {report.alsoMarked.map((f) => f.label).join(", ")}
           </p>
         )}
 
         {report.unexplained && (
           <p className="sc-unexplained">
-            Nothing on this screen explains this.
+            Nothing found so far explains this.
           </p>
         )}
       </div>

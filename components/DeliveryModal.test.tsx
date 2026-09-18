@@ -20,6 +20,7 @@ const modal = (
   opts: {
     date?: string;
     initial?: DeliveryScreen | null;
+    takenDates?: string[];
   } = {},
 ) =>
   render(
@@ -27,6 +28,7 @@ const modal = (
       athleteId={ID}
       date={opts.date ?? TODAY}
       initial={opts.initial ?? null}
+      takenDates={opts.takenDates ?? []}
       onClose={() => {}}
       onSaved={() => {}}
     />,
@@ -160,6 +162,35 @@ test("ticking a flaw includes it in the saved assessment", async () => {
  * would wipe out whatever was already recorded. Editing something unrelated
  * (the notes) must not silently erase the marks already on the row.
  */
+/*
+ * The date input is disabled while editing, so this only matters for a NEW
+ * assessment. The POST upserts on (athlete_id, date), so a coach picking a
+ * past date that already has an assessment would silently replace it with
+ * whatever is on screen — the same wipe class ScreenModal's `takenDates`
+ * warning already guards against.
+ */
+test("picking a date that already has an assessment warns before it replaces it", () => {
+  modal({ date: "2026-01-05", takenDates: ["2026-01-01", "2026-01-05"] });
+  assert.match(document.body.textContent!, /already exists/i);
+});
+
+test("a date with no assessment on it yet does not warn", () => {
+  modal({ date: "2026-01-05", takenDates: ["2026-01-01"] });
+  assert.doesNotMatch(document.body.textContent!, /already exists/i);
+});
+
+test("editing does not warn even though its own date is in takenDates", () => {
+  const existing: DeliveryScreen = {
+    id: "d1",
+    athleteId: ID,
+    date: "2026-01-05",
+    flaws: {},
+    notes: "",
+  };
+  modal({ initial: existing, takenDates: ["2026-01-05"] });
+  assert.doesNotMatch(document.body.textContent!, /already exists/i);
+});
+
 test("editing an already-recorded assessment keeps sending its flaws", async () => {
   const { submitted, restore } = mockApi();
   try {

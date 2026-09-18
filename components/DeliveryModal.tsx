@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { DeliveryScreen } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
 import { BIG_12 } from "@/lib/big12";
-import { todayISO } from "@/lib/velo";
+import { fmtDate, todayISO } from "@/lib/velo";
 
 /* ------------------------------------------------------------------ *
  * Recording a delivery assessment
@@ -20,6 +20,7 @@ export default function DeliveryModal({
   athleteId,
   date: openingDate,
   initial,
+  takenDates,
   onClose,
   onSaved,
 }: {
@@ -27,6 +28,8 @@ export default function DeliveryModal({
   /** The date this opens on — today's, unless editing an existing assessment. */
   date: string;
   initial: DeliveryScreen | null;
+  /** Dates that already hold an assessment, so a new one can warn before it lands on one. */
+  takenDates: string[];
   onClose: () => void;
   onSaved: (msg: string) => void;
 }) {
@@ -36,6 +39,14 @@ export default function DeliveryModal({
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  /*
+   * The POST upserts on (athlete_id, date): landing a new assessment on a
+   * date that already has one replaces it, with whatever is on screen right
+   * now. Editing is disabled below and never hits this, so it's new-only,
+   * same as the screen modal's warning.
+   */
+  const clash = !initial && takenDates.includes(date);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -110,6 +121,13 @@ export default function DeliveryModal({
               />
             </label>
           </div>
+
+          {clash && (
+            <p className="ms-note warn" role="status">
+              An assessment already exists for {fmtDate(date)}. Saving will
+              replace it.
+            </p>
+          )}
 
           <div className="ms-group">
             {BIG_12.map((flaw) => {
