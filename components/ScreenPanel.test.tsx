@@ -31,7 +31,12 @@ const scr = (date: string, results: Results, notes = ""): MovementScreen => ({
 function panel(screens: MovementScreen[], props: Partial<Parameters<typeof ScreenPanel>[0]> = {}) {
   return render(
     withSwr(
-      { [`/api/athletes/${ID}/screens`]: screens },
+      {
+        [`/api/athletes/${ID}/screens`]: screens,
+        // The screen modal, opened from this panel's chooser, asks for the
+        // athlete's sessions to warn about a screen taken after throwing.
+        [`/api/athletes/${ID}/sessions`]: [],
+      },
       <ScreenPanel
         athleteId={ID}
         athleteName="Test Athlete"
@@ -301,4 +306,43 @@ test("the causes behind the lead one are hidden until asked for", () => {
     /Spine disassociation/,
     "and appears once the toggle is opened",
   );
+});
+
+/* ------------------------------------------------------------------ *
+ * The chooser: two assessments now live behind one record button.
+ * ------------------------------------------------------------------ */
+
+test("recording asks which assessment before opening anything", () => {
+  panel([]);
+  fireEvent.click(screen.getByText(/record a screen/i));
+  assert.match(document.body.textContent!, /movement screen/i);
+  assert.match(document.body.textContent!, /pitching inhibitors/i);
+});
+
+test("choosing the movement screen opens the screen modal, not the inhibitors one", () => {
+  panel([]);
+  fireEvent.click(screen.getByText(/record a screen/i));
+  const [screenChoice] = document.querySelectorAll(".type-card");
+  fireEvent.click(screenChoice);
+  assert.ok(
+    document.querySelector('input[type="date"]'),
+    "the screen modal's date field",
+  );
+  assert.equal(document.querySelector('input[name^="flaw:"]'), null);
+});
+
+test("choosing inhibitors opens the twelve, not the sixteen tests", () => {
+  panel([]);
+  fireEvent.click(screen.getByText(/record a screen/i));
+  const [, deliveryChoice] = document.querySelectorAll(".type-card");
+  fireEvent.click(deliveryChoice);
+  assert.equal(
+    [...document.querySelectorAll('input[name^="flaw:"]')].length,
+    12,
+  );
+});
+
+test("an athlete is never offered the chooser", () => {
+  panel([], { isCoach: false });
+  assert.equal(screen.queryByText(/record a screen/i), null);
 });

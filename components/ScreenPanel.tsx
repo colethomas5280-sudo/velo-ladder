@@ -30,6 +30,8 @@ import {
 } from "@/lib/screen";
 import { fmtDate, todayISO } from "@/lib/velo";
 import ScreenModal from "./ScreenModal";
+import DeliveryModal from "./DeliveryModal";
+import RecordChooser from "./RecordChooser";
 
 /* ------------------------------------------------------------------ *
  * The screen, read back
@@ -118,7 +120,9 @@ export default function ScreenPanel({
   const screens = useMemo(() => data ?? [], [data]);
 
   const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState(false);
   const [editing, setEditing] = useState<MovementScreen | "new" | null>(null);
+  const [recordingDelivery, setRecordingDelivery] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const show = (m: string) => {
@@ -243,12 +247,7 @@ export default function ScreenPanel({
             </select>
           )}
           {isCoach && (
-            <button
-              className="btn sm"
-              onClick={() =>
-                setEditing(screens.find((s) => s.date === todayISO()) ?? "new")
-              }
-            >
+            <button className="btn sm" onClick={() => setChoosing(true)}>
               + Record a screen
             </button>
           )}
@@ -444,6 +443,20 @@ export default function ScreenPanel({
         </>
       )}
 
+      {choosing && (
+        <RecordChooser
+          onClose={() => setChoosing(false)}
+          onPick={(kind) => {
+            setChoosing(false);
+            if (kind === "screen") {
+              setEditing(screens.find((s) => s.date === todayISO()) ?? "new");
+            } else {
+              setRecordingDelivery(true);
+            }
+          }}
+        />
+      )}
+
       {editing && (
         <ScreenModal
           athleteId={athleteId}
@@ -456,6 +469,19 @@ export default function ScreenPanel({
             setEditing(null);
             setPickedDate(null);
             await mutate();
+            show(msg);
+          }}
+        />
+      )}
+
+      {recordingDelivery && (
+        <DeliveryModal
+          athleteId={athleteId}
+          date={todayISO()}
+          initial={null}
+          onClose={() => setRecordingDelivery(false)}
+          onSaved={(msg) => {
+            setRecordingDelivery(false);
             show(msg);
           }}
         />
