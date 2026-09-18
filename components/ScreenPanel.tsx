@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import useSWR from "swr";
-import type { MovementScreen } from "@/lib/types";
+import type { DeliveryScreen, MovementScreen } from "@/lib/types";
 import { fetcher, api, ApiError } from "@/lib/fetcher";
 import {
   explainScreen,
@@ -119,16 +119,45 @@ export default function ScreenPanel({
   );
   const screens = useMemo(() => data ?? [], [data]);
 
+  const { data: deliveryData, mutate: mutateDelivery } = useSWR<DeliveryScreen[]>(
+    `/api/athletes/${athleteId}/delivery`,
+    fetcher,
+  );
+  // The API already sends these most recent first.
+  const deliveries = useMemo(() => deliveryData ?? [], [deliveryData]);
+  const delivery = deliveries[0] ?? null;
+
   const [pickedDate, setPickedDate] = useState<string | null>(null);
   const [choosing, setChoosing] = useState(false);
   const [editing, setEditing] = useState<MovementScreen | "new" | null>(null);
-  const [recordingDelivery, setRecordingDelivery] = useState(false);
+  const [recordingDelivery, setRecordingDelivery] = useState<
+    DeliveryScreen | "new" | null
+  >(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
   const show = (m: string) => {
     setToast(m);
     setTimeout(() => setToast(null), 2600);
   };
+
+  /*
+   * The Pitching Inhibitors report explains its marks against the screen as
+   * it stood on the ASSESSMENT'S date, not today's and not the picked
+   * screen's. A limitation recorded before the assessment explains what was
+   * watched that day; one recorded after it cannot, so this truncates
+   * independently of whichever screen the coach happens to be paging
+   * through above.
+   */
+  const deliveryStanding = useMemo(
+    () =>
+      delivery
+        ? standingScreen(
+            screens.filter((s) => s.date <= delivery.date),
+            SCREEN_TESTS,
+          ).results
+        : {},
+    [screens, delivery],
+  );
 
   // Newest first is how they're chosen; the API sends them oldest first.
   const ordered = useMemo(() => [...screens].reverse(), [screens]);
@@ -412,12 +441,6 @@ export default function ScreenPanel({
             </p>
           )}
 
-          <DeliverySection
-            screen={screen}
-            standingResults={standing.results}
-            hand={hand}
-          />
-
           {isCoach && screen.notes && (
             <div className="insight sc-notes">
               <div className="eyebrow">Coach&apos;s note · not shown to the athlete</div>
@@ -443,6 +466,12 @@ export default function ScreenPanel({
         </>
       )}
 
+      <DeliverySection
+        delivery={delivery}
+        standingResults={deliveryStanding}
+        hand={hand}
+      />
+
       {choosing && (
         <RecordChooser
           onClose={() => setChoosing(false)}
@@ -451,7 +480,9 @@ export default function ScreenPanel({
             if (kind === "screen") {
               setEditing(screens.find((s) => s.date === todayISO()) ?? "new");
             } else {
-              setRecordingDelivery(true);
+              setRecordingDelivery(
+                deliveries.find((d) => d.date === todayISO()) ?? "new",
+              );
             }
           }}
         />
@@ -478,10 +509,11 @@ export default function ScreenPanel({
         <DeliveryModal
           athleteId={athleteId}
           date={todayISO()}
-          initial={null}
-          onClose={() => setRecordingDelivery(false)}
-          onSaved={(msg) => {
-            setRecordingDelivery(false);
+          initial={recordingDelivery === "new" ? null : recordingDelivery}
+          onClose={() => setRecordingDelivery(null)}
+          onSaved={async (msg) => {
+            setRecordingDelivery(null);
+            await mutateDelivery();
             show(msg);
           }}
         />
@@ -647,46 +679,47 @@ function CarryBlock({
 }
 
 /*
- * The delivery report: three states, because "clean" and "not looked at" are
- * different facts and only one of them is good news. `explainScreen` already
- * folds a missing hand into "show both sides" for the affected causes, so a
- * null hand needs no special case here beyond satisfying the type.
+ * The delivery report: two states plus an absence, because "clean" and
+ * "never looked at" are different facts and only one of them is good news.
+ * `explainScreen` already folds a missing hand into "show both sides" for
+ * the affected causes, so a null hand needs no special case here beyond
+ * satisfying the type.
  *
- * `standingResults` — not `screen.results` — is what explains a flaw. The
- * flaw marks themselves belong to this row (the coach ticked Sway today),
- * but a spot-check only re-runs a few tests, and the other findings are
- * still true until re-screened. Every other reader on this panel already
- * reads off `standing.results` for exactly this reason; a limitation from
- * an old full screen has to keep explaining the flaw it explains until
- * something re-screens it away.
+ * The Big 12 now live on their own record with their own date, so `delivery`
+ * is the athlete's most recent assessment, not a field on the picked
+ * movement-screen row — an athlete with no screen at all can still have one.
+ *
+ * `standingResults` is the screen as it stood on the ASSESSMENT's date, not
+ * today's and not whatever screen the coach happens to be paging through
+ * above: a limitation recorded before the assessment explains what was
+ * watched that day, and one recorded after it cannot, so the caller
+ * truncates `standingScreen` to the delivery date before this ever sees it.
  */
 function DeliverySection({
-  screen,
+  delivery,
   standingResults,
   hand,
 }: {
-  screen: MovementScreen;
+  delivery: DeliveryScreen | null;
   standingResults: Results;
   hand: Hand | null;
 }) {
-  if (!screen.deliveryAssessed) {
+  if (!delivery) {
     return (
       <div className="sc-block">
         <div className="eyebrow sc-h">Pitching Inhibitors</div>
-        <p className="widget-empty">
-          The delivery wasn&apos;t assessed at this screen.
-        </p>
+        <p className="widget-empty">No delivery assessment on record.</p>
       </div>
     );
   }
 
-  const reports = explainScreen(screen.flaws, standingResults, hand ?? "");
+  const reports = explainScreen(delivery.flaws, standingResults, hand ?? "");
 
   return (
     <div className="sc-block">
       <div className="eyebrow sc-h">Pitching Inhibitors</div>
       {reports.length === 0 ? (
-        <p className="sc-clean">Delivery assessed. Nothing found.</p>
+        <p className="sc-clean">Assessed, nothing found.</p>
       ) : (
         <ul className="sc-list">
           {reports.map((r) => (

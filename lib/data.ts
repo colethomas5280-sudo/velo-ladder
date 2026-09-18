@@ -837,8 +837,6 @@ export function toScreen(r: Record<string, unknown>): MovementScreen {
     date: isoDate(r.date),
     results: (r.results ?? {}) as Record<string, string>,
     notes: String(r.notes ?? ""),
-    flaws: (r.flaws ?? {}) as Record<string, boolean>,
-    deliveryAssessed: r.delivery_assessed === true,
   };
 }
 

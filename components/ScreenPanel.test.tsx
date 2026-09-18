@@ -2,7 +2,7 @@ import "./testDom";
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
-import type { MovementScreen } from "@/lib/types";
+import type { DeliveryScreen, MovementScreen } from "@/lib/types";
 import { withSwr } from "./testSwr";
 import { daysAgo, screenOf, TODAY } from "./testRender";
 import { fmtDate } from "@/lib/velo";
@@ -24,15 +24,31 @@ const scr = (date: string, results: Results, notes = ""): MovementScreen => ({
   date,
   results,
   notes,
-  flaws: {},
-  deliveryAssessed: false,
 });
 
-function panel(screens: MovementScreen[], props: Partial<Parameters<typeof ScreenPanel>[0]> = {}) {
+/** A delivery (Pitching Inhibitors) assessment fixture. */
+const del = (
+  date: string,
+  flaws: Record<string, boolean> = {},
+  notes = "",
+): DeliveryScreen => ({
+  id: date,
+  athleteId: ID,
+  date,
+  flaws,
+  notes,
+});
+
+function panel(
+  screens: MovementScreen[],
+  props: Partial<Parameters<typeof ScreenPanel>[0]> = {},
+  deliveries: DeliveryScreen[] = [],
+) {
   return render(
     withSwr(
       {
         [`/api/athletes/${ID}/screens`]: screens,
+        [`/api/athletes/${ID}/delivery`]: deliveries,
         // The screen modal, opened from this panel's chooser, asks for the
         // athlete's sessions to warn about a screen taken after throwing.
         [`/api/athletes/${ID}/sessions`]: [],
@@ -148,84 +164,92 @@ test("a standing re-screen call is shown with its reason", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * The Big 12 report: three states, not two.
+ * The Pitching Inhibitors report: it now reads its own record.
+ *
+ * The Big 12 moved off the movement-screen row onto its own record with its
+ * own date (v27). Explanations still come from the movement screen, but
+ * resolved against the screen as it stood on the DELIVERY assessment's
+ * date, never the picked screen's — a limitation recorded before the
+ * assessment explains what was watched that day; one recorded after it
+ * cannot.
  * ------------------------------------------------------------------ */
 
-function bigScr(over: Partial<MovementScreen> = {}): MovementScreen {
-  return {
-    id: TODAY,
-    athleteId: ID,
-    date: TODAY,
-    results: {},
-    notes: "",
-    flaws: {},
-    deliveryAssessed: false,
-    ...over,
-  };
-}
-
-test("an unassessed delivery says so, rather than showing an empty list", () => {
-  panel([bigScr({ deliveryAssessed: false, flaws: {} })]);
-  assert.match(document.body.textContent!, /wasn't assessed/i);
+test("no assessment on record says so, rather than showing an empty list", () => {
+  panel([], {}, []);
+  assert.match(document.body.textContent!, /no delivery assessment/i);
 });
 
-test("assessed and clean reads as a result, not as an absence", () => {
-  panel([bigScr({ deliveryAssessed: true, flaws: {} })]);
+test("an assessment with nothing found reads as a result", () => {
+  panel([], {}, [del(TODAY)]);
   assert.match(document.body.textContent!, /nothing found/i);
-  assert.doesNotMatch(document.body.textContent!, /wasn't assessed/i);
+  assert.doesNotMatch(document.body.textContent!, /no delivery assessment/i);
+});
+
+test("explanations come from the screen as it stood on the assessment's date", () => {
+  /*
+   * A limitation recorded AFTER the delivery was watched cannot explain what
+   * was seen that day: a screen dated today marking hip-45 limited cannot
+   * explain a Sway marked 60 days ago.
+   */
+  panel(
+    [scr(TODAY, screenOf({ "hip-45.45-degree-angle:R": "less" }))],
+    { hand: "R" },
+    [del(daysAgo(60), { sway: true })],
+  );
+  assert.match(document.body.textContent!, /nothing on this screen/i);
+});
+
+test("a limitation recorded before the assessment does explain it", () => {
+  panel(
+    [scr(daysAgo(90), screenOf({ "hip-45.45-degree-angle:R": "less" }))],
+    { hand: "R" },
+    [del(daysAgo(60), { sway: true })],
+  );
+  assert.match(document.body.textContent!, /backside hip rotation/i);
+});
+
+test("an athlete with inhibitors and no screen at all gets them all unexplained", () => {
+  // Correct, and must not render as an error or a crash.
+  panel([], {}, [del(TODAY, { sway: true })]);
+  assert.match(document.body.textContent!, /Sway/);
+  assert.match(document.body.textContent!, /nothing on this screen/i);
 });
 
 test("a marked flaw leads with Cole's own wording for the cause", () => {
   panel(
-    [
-      bigScr({
-        deliveryAssessed: true,
-        flaws: { sway: true },
-        results: { "pelvic-rotation.rotation": "limited-bilateral" },
-      }),
-    ],
+    [scr(TODAY, { "pelvic-rotation.rotation": "limited-bilateral" })],
     { hand: "R" },
+    [del(TODAY, { sway: true })],
   );
   assert.match(document.body.textContent!, /Sway/);
   assert.match(document.body.textContent!, /Spine disassociation/);
 });
 
 test("a flaw nothing explains says that, instead of going quiet", () => {
-  panel(
-    [bigScr({ deliveryAssessed: true, flaws: { sway: true }, results: {} })],
-    { hand: "R" },
-  );
+  panel([scr(TODAY, {})], { hand: "R" }, [del(TODAY, { sway: true })]);
   assert.match(document.body.textContent!, /Sway/);
   assert.match(document.body.textContent!, /nothing on this screen/i);
 });
 
 /*
- * The bug: DeliverySection read the picked row's own `results`, while every
- * other reader on this panel reads `standing.results` — each test's own last
- * reading, carried forward across screens. A spot-check covers a few tests;
- * the other tests are still true. Cole's cadence is quarterly full screens
- * with spot-checks every 3-4 weeks, so most delivery-bearing screens ARE
- * spot-checks, and a hip-45 limitation from June must still explain Sway on
- * a spot-check today that never re-ran hip-45.
+ * The bug this once was: DeliverySection read the picked row's own
+ * `results`, while every other reader on this panel reads `standing.results`
+ * — each test's own last reading, carried forward across screens. A
+ * spot-check covers a few tests; the other tests are still true. Cole's
+ * cadence is quarterly full screens with spot-checks every 3-4 weeks, so
+ * most delivery-bearing screens ARE spot-checks, and a hip-45 limitation
+ * from June must still explain Sway on a spot-check today that never re-ran
+ * hip-45.
  */
 test("a spot-check that skips a test still explains a flaw from its last recorded finding", () => {
   panel(
     [
-      bigScr({
-        id: daysAgo(60),
-        date: daysAgo(60),
-        results: screenOf({ "hip-45.45-degree-angle:R": "less" }),
-      }),
-      bigScr({
-        id: TODAY,
-        date: TODAY,
-        deliveryAssessed: true,
-        flaws: { sway: true },
-        // A spot-check: only shoulder-90-90 re-run today, hip-45 not touched.
-        results: { "shoulder-90-90.external-rotation:L": "greater" },
-      }),
+      scr(daysAgo(60), screenOf({ "hip-45.45-degree-angle:R": "less" })),
+      // A spot-check: only shoulder-90-90 re-run today, hip-45 not touched.
+      scr(TODAY, { "shoulder-90-90.external-rotation:L": "greater" }),
     ],
     { hand: "R" },
+    [del(TODAY, { sway: true })],
   );
   assert.match(document.body.textContent!, /Sway/);
   assert.match(
@@ -240,25 +264,17 @@ test("a spot-check that skips a test still explains a flaw from its last recorde
   );
 });
 
-test("an athlete sees his own flaws, and never a coach note", () => {
-  panel(
-    [bigScr({ deliveryAssessed: true, flaws: { sway: true }, notes: "SENTINEL" })],
-    { isCoach: false },
-  );
+test("an athlete sees his own flaws, and never the coach's notes on the assessment", () => {
+  panel([], { isCoach: false }, [del(TODAY, { sway: true }, "SENTINEL")]);
   assert.match(document.body.textContent!, /Sway/);
   assert.doesNotMatch(document.body.textContent!, /SENTINEL/);
 });
 
 test("a painful finding reaches the report as an alert, not a plain explanation", () => {
   panel(
-    [
-      bigScr({
-        deliveryAssessed: true,
-        flaws: { sway: true },
-        results: { "pelvic-rotation.rotation": "painful" },
-      }),
-    ],
+    [scr(TODAY, { "pelvic-rotation.rotation": "painful" })],
     { hand: "R" },
+    [del(TODAY, { sway: true })],
   );
   assert.ok(
     document.querySelector(".ms-dot.alert"),
@@ -267,16 +283,9 @@ test("a painful finding reaches the report as an alert, not a plain explanation"
 });
 
 test("a flaw explained by another marked flaw says which one", () => {
-  panel(
-    [
-      bigScr({
-        deliveryAssessed: true,
-        flaws: { "flying-open": true, "short-stride": true },
-        results: {},
-      }),
-    ],
-    { hand: "R" },
-  );
+  panel([], { hand: "R" }, [
+    del(TODAY, { "flying-open": true, "short-stride": true }),
+  ]);
   assert.match(document.body.textContent!, /Also marked on this screen/i);
   assert.match(document.body.textContent!, /Short Stride/);
 });
@@ -284,16 +293,13 @@ test("a flaw explained by another marked flaw says which one", () => {
 test("the causes behind the lead one are hidden until asked for", () => {
   panel(
     [
-      bigScr({
-        deliveryAssessed: true,
-        flaws: { sway: true },
-        results: {
-          "hip-45.45-degree-angle:R": "less",
-          "pelvic-rotation.rotation": "limited-bilateral",
-        },
+      scr(TODAY, {
+        "hip-45.45-degree-angle:R": "less",
+        "pelvic-rotation.rotation": "limited-bilateral",
       }),
     ],
     { hand: "R" },
+    [del(TODAY, { sway: true })],
   );
   assert.doesNotMatch(
     document.body.textContent!,

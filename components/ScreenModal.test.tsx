@@ -199,8 +199,6 @@ test("editing an existing screen keeps sending its notes", async () => {
       date: "2020-01-01",
       results: {},
       notes: "old note",
-      flaws: {},
-      deliveryAssessed: false,
     };
     form({ initial: existing });
 

@@ -97,13 +97,6 @@ export interface MovementScreen {
   date: string;
   results: Record<string, string>;
   notes: string;
-  /** Big 12 marks. A key present and true means Cole saw that flaw. */
-  flaws: Record<string, boolean>;
-  /**
-   * Whether the delivery was assessed at all. False on every screen taken
-   * before the Big 12 existed, which is the truth about them.
-   */
-  deliveryAssessed: boolean;
 }
 
 /*
