@@ -32,8 +32,6 @@ test("the athlete's prompt asks them to mention it, not to do it", () => {
       date: daysAgo(100),
       results: screenOf(),
       notes: "",
-      flaws: {},
-      deliveryAssessed: false,
     },
   ];
   render(

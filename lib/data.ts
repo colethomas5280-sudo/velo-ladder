@@ -13,12 +13,16 @@ import type {
   LiftSession,
   Recipe,
   RecipeKind,
+  DeliveryScreen,
+  DeliveryOverviewRow,
 } from "@/lib/types";
 import { evaluate, CNS_DEFAULT_PCT } from "@/lib/setback";
 import { liftKeyFrom, type Lift, type LiftMode } from "@/lib/strength";
 import { joinName, splitName } from "./profile";
 import { todayISO } from "./velo";
 import type { LeaderboardAthlete } from "./leaderboard";
+import type { DeliveryInput } from "./deliveryInput";
+import { countInhibitors } from "./big12Explain";
 
 function toAthlete(r: Record<string, unknown>): Athlete {
   return {
@@ -833,8 +837,6 @@ export function toScreen(r: Record<string, unknown>): MovementScreen {
     date: isoDate(r.date),
     results: (r.results ?? {}) as Record<string, string>,
     notes: String(r.notes ?? ""),
-    flaws: (r.flaws ?? {}) as Record<string, boolean>,
-    deliveryAssessed: r.delivery_assessed === true,
   };
 }
 
@@ -920,14 +922,17 @@ export interface ScreenInput {
   date: string;
   results: Record<string, string>;
   notes: string;
-  flaws: Record<string, boolean>;
-  deliveryAssessed: boolean;
 }
 
 /**
  * One screen per athlete per day. Re-saving the same date replaces it, so a
  * coach correcting a mis-tap doesn't leave two versions of the same session
  * for the comparison view to disagree about.
+ *
+ * `flaws` and `delivery_assessed` are deliberately not written here. They
+ * split off onto `delivery_screens` in v27 and are left frozen on this table
+ * for the migration to read once; writing them again from here would blank
+ * an assessed row before the migration ever sees it. See lib/data.test.ts.
  */
 export async function upsertScreen(
   athleteId: string,
@@ -937,15 +942,12 @@ export async function upsertScreen(
   const id = crypto.randomUUID();
   const rows = (await sql`
     INSERT INTO movement_screens
-      (id, athlete_id, date, results, notes, created_by, flaws, delivery_assessed)
+      (id, athlete_id, date, results, notes, created_by)
     VALUES (${id}, ${athleteId}, ${input.date},
-            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy},
-            ${JSON.stringify(input.flaws)}::jsonb, ${input.deliveryAssessed})
+            ${JSON.stringify(input.results)}::jsonb, ${input.notes}, ${createdBy})
     ON CONFLICT (athlete_id, date) DO UPDATE SET
       results = EXCLUDED.results,
       notes = EXCLUDED.notes,
-      flaws = EXCLUDED.flaws,
-      delivery_assessed = EXCLUDED.delivery_assessed,
       updated_at = now()
     RETURNING *
   `) as Record<string, unknown>[];
@@ -966,6 +968,102 @@ export async function deleteScreen(athleteId: string, date: string): Promise<voi
   await sql`
     DELETE FROM movement_screens WHERE athlete_id = ${athleteId} AND date = ${date}
   `;
+}
+
+/* ------------------------------------------------------------------ *
+ * Pitching Inhibitors (delivery assessments)
+ *
+ * Split off the movement screen row in v27: a delivery row IS the
+ * assessment now, so there is no separate assessed flag to carry.
+ * ------------------------------------------------------------------ */
+
+export function toDeliveryScreen(r: Record<string, unknown>): DeliveryScreen {
+  return {
+    id: String(r.id),
+    athleteId: String(r.athlete_id),
+    date: isoDate(r.date),
+    flaws: (r.flaws ?? {}) as Record<string, boolean>,
+    notes: String(r.notes ?? ""),
+  };
+}
+
+export async function listDeliveryScreens(athleteId: string): Promise<DeliveryScreen[]> {
+  const rows = (await sql`
+    SELECT * FROM delivery_screens WHERE athlete_id = ${athleteId} ORDER BY date DESC
+  `) as Record<string, unknown>[];
+  return rows.map(toDeliveryScreen);
+}
+
+export async function upsertDeliveryScreen(
+  athleteId: string,
+  input: DeliveryInput,
+  createdBy: string,
+): Promise<DeliveryScreen> {
+  const id = crypto.randomUUID();
+  const rows = (await sql`
+    INSERT INTO delivery_screens (id, athlete_id, date, flaws, notes, created_by)
+    VALUES (${id}, ${athleteId}, ${input.date},
+            ${JSON.stringify(input.flaws)}::jsonb, ${input.notes}, ${createdBy})
+    ON CONFLICT (athlete_id, date) DO UPDATE SET
+      flaws = EXCLUDED.flaws,
+      notes = EXCLUDED.notes,
+      updated_at = now()
+    RETURNING *
+  `) as Record<string, unknown>[];
+  return toDeliveryScreen(rows[0]);
+}
+
+export async function deleteDeliveryScreen(athleteId: string, date: string): Promise<void> {
+  await sql`
+    DELETE FROM delivery_screens WHERE athlete_id = ${athleteId} AND date = ${date}
+  `;
+}
+
+/**
+ * Reduces the athlete/delivery join into one row per athlete.
+ *
+ * Exported (rather than inlined in `listAllDeliveryScreens`) so the "never
+ * assessed" edge case — a LEFT JOIN row with no date — can be unit tested
+ * without a database.
+ *
+ * An athlete who has never been assessed still appears, with last = null. The
+ * card needs them: "nobody has looked at this pitcher's delivery" is the
+ * whole point of having a queue.
+ */
+export function reduceDeliveryOverview(
+  rows: Record<string, unknown>[],
+): DeliveryOverviewRow[] {
+  const byAthlete = new Map<string, DeliveryOverviewRow>();
+  for (const r of rows) {
+    const id = String(r.athlete_id);
+    const entry = byAthlete.get(id) ?? {
+      athleteId: id,
+      name: String(r.name),
+      last: null,
+      count: 0,
+      phase: (r.phase as string | null) ?? null,
+    };
+    // The LEFT JOIN gives one null row for an athlete never assessed. Rows are
+    // ordered by date, so the last one seen is the most recent.
+    if (r.date) {
+      entry.last = isoDate(r.date);
+      entry.count = countInhibitors((r.flaws ?? {}) as Record<string, boolean>);
+    }
+    byAthlete.set(id, entry);
+  }
+  return [...byAthlete.values()];
+}
+
+/** Every athlete with their most recent assessment, for the Tests roster. */
+export async function listAllDeliveryScreens(): Promise<DeliveryOverviewRow[]> {
+  const rows = (await sql`
+    SELECT a.id AS athlete_id, a.name, a.phase, d.date, d.flaws
+      FROM athletes a
+      LEFT JOIN delivery_screens d ON d.athlete_id = a.id
+     WHERE a.archived = false
+     ORDER BY a.name, d.date
+  `) as Record<string, unknown>[];
+  return reduceDeliveryOverview(rows);
 }
 
 /* ------------------------------------------------------------------ *

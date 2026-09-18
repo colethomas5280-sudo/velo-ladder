@@ -3,14 +3,16 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import type { Athlete, ScreenOverviewRow } from "@/lib/types";
+import type { Athlete, DeliveryOverviewRow, ScreenOverviewRow } from "@/lib/types";
 import { fetcher } from "@/lib/fetcher";
 import {
+  IN_SEASON,
   RETEST_CADENCE,
   clocksFor,
   dueRank,
   retestState,
   statusRank,
+  type DueState,
   type ReportStatus,
   type RetestKind,
 } from "@/lib/screen";
@@ -67,7 +69,12 @@ export default function TestsView() {
     );
   }
 
-  return <Roster />;
+  return (
+    <>
+      <Roster />
+      <InhibitorsRoster />
+    </>
+  );
 }
 
 const DOT: Record<ReportStatus, string> = {
@@ -243,20 +250,11 @@ function Roster() {
                     </em>
                   )}
                   {/*
-                    * The delivery, in one line. "Assessed, nothing found" is
-                    * a result and gets said out loud: leaving it blank would
-                    * make a pitcher Cole watched look like one he never did.
+                    * Pitching Inhibitors moved off the movement screen row
+                    * onto their own assessment (delivery_screens), with its
+                    * own card below (see InhibitorsRoster). This roster has
+                    * nothing more of theirs to show.
                     */}
-                  {r.delivery && (
-                    <em className="tr-delivery">
-                      {" · "}
-                      {r.delivery.kind === "not-assessed"
-                        ? "delivery not assessed"
-                        : r.delivery.kind === "clean"
-                          ? "no inhibitors"
-                          : `${r.delivery.count} inhibitor${r.delivery.count === 1 ? "" : "s"}`}
-                    </em>
-                  )}
                 </span>
                 <span className="tr-when">
                   {due.lead.days === null
@@ -288,6 +286,134 @@ function Roster() {
                   <span className="tr-work dim">
                     {r.called ? r.called.reason : "no screen on record"}
                   </span>
+                  <span className="tr-when dim">Record one →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Pitching Inhibitors
+ *
+ * Its own card, its own record (delivery_screens), and its own clock. It
+ * used to be a line on the movement screen's row, back when the two shared
+ * one record — see the note on that row's tr-work above. One cadence
+ * rather than two: there is no corrective-work spot-check here, just the
+ * same full-check interval the movement screen calls "full".
+ * ------------------------------------------------------------------ */
+
+/** An inhibitors row's clock, from its own most recent assessment. */
+function inhibitorsClock(row: DeliveryOverviewRow, today: string) {
+  const scheduled = retestState("full", row.last, today);
+  return {
+    ...scheduled,
+    // In-season pauses this clock too, same as the movement screen's.
+    state: (row.phase === IN_SEASON ? "paused" : scheduled.state) as DueState,
+  };
+}
+
+/** "due in 12 days" / "8-week check" / "in-season · paused" — the clock in words. */
+function describeInhibitors(due: ReturnType<typeof inhibitorsClock>): string {
+  if (due.state === "paused") return "in-season · paused";
+  if (due.days === null) return "no assessment on record";
+  if (due.state === "not-due") return `due in ${due.every - due.days} days`;
+  return `${RETEST_CADENCE.full / 7}-week check`;
+}
+
+function InhibitorsRoster() {
+  const { data, error, isLoading } = useSWR<DeliveryOverviewRow[]>(
+    "/api/delivery/overview",
+    fetcher,
+  );
+  const rows = useMemo(() => data ?? [], [data]);
+  const today = todayISO();
+
+  const assessed = useMemo(
+    () =>
+      rows
+        .filter((r) => r.last)
+        .map((r) => ({ row: r, due: inhibitorsClock(r, today) }))
+        .sort(
+          (a, b) =>
+            dueRank(b.due.state) - dueRank(a.due.state) ||
+            // Then longest since assessed, so the stalest sits above the fresh.
+            (a.row.last ?? "").localeCompare(b.row.last ?? ""),
+        ),
+    [rows, today],
+  );
+  const never = useMemo(() => rows.filter((r) => !r.last), [rows]);
+
+  return (
+    <section className="card pad tests-card">
+      <div className="sec-h">
+        <h3>Pitching Inhibitors</h3>
+        <div className="sub sr-sub">
+          {/*
+            * Read off RETEST_CADENCE rather than typed, same reason as the
+            * movement screen's caption above: a typed number stops matching
+            * the config the moment the config changes.
+            */}
+          <span>Checked every {weeks("full")} weeks</span>
+        </div>
+      </div>
+
+      {isLoading && <p className="widget-empty">Loading…</p>}
+      {error != null && (
+        <p className="form-error" role="alert">
+          Couldn&rsquo;t load the roster. Reload the page.
+        </p>
+      )}
+
+      {!isLoading && rows.length === 0 && (
+        <p className="widget-empty">
+          No athletes on the roster yet. Add one and their assessment shows up here.
+        </p>
+      )}
+
+      {assessed.length > 0 && (
+        <ul className="tr-list">
+          {assessed.map(({ row: r, due }) => (
+            <li key={r.athleteId}>
+              <Link href={`/tests/${r.athleteId}`} className="tr-row">
+                <span className={`ms-dot ${r.count > 0 ? "red" : "green"}`} />
+                <span className="tr-name">
+                  {r.name}
+                  {due.state !== "not-due" && due.state !== "paused" && (
+                    <em className={`tr-due t-${due.state}`}>
+                      {due.state === "overdue" ? "Overdue" : "Due"}
+                    </em>
+                  )}
+                </span>
+                <span className="tr-work">
+                  {r.count > 0
+                    ? `${r.count} inhibitor${r.count === 1 ? "" : "s"}`
+                    : "no inhibitors"}
+                </span>
+                <span className="tr-when">
+                  {due.days === null ? "never" : since(due.days)}
+                  <em>{describeInhibitors(due)}</em>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {never.length > 0 && (
+        <div className="tests-never">
+          <div className="eyebrow">Not assessed yet</div>
+          <ul className="tr-list">
+            {never.map((r) => (
+              <li key={r.athleteId}>
+                <Link href={`/tests/${r.athleteId}`} className="tr-row">
+                  <span className="ms-dot none" />
+                  <span className="tr-name">{r.name}</span>
+                  <span className="tr-work dim">not assessed yet</span>
                   <span className="tr-when dim">Record one →</span>
                 </Link>
               </li>

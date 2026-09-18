@@ -2526,15 +2526,6 @@ table.roster-table {
   margin-top: 2px;
   flex: 0 0 auto;
 }
-.ms-flaw-head {
-  border-top: 0;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 12px;
-  margin-bottom: 4px;
-}
-.ms-flaw-head b {
-  font-size: 13.5px;
-}
 .ms-flaw b {
   display: block;
   font-size: 13.5px;
@@ -2899,15 +2890,6 @@ table.roster-table {
   color: var(--bad);
   font-weight: 600;
 }
-/*
- * The delivery line is an em inside .tr-work, where em means "painful" and is
- * red and bold. It is not an alarm: "no inhibitors" in alarm red would read
- * as the opposite of what it says.
- */
-.tr-work em.tr-delivery {
-  color: var(--ink-dim);
-  font-weight: 400;
-}
 .tr-when {
   flex: 0 0 auto;
   text-align: right;
@@ -2939,6 +2921,10 @@ table.roster-table {
 }
 .tests-card .sec-h .sub {
   min-width: 0;
+}
+/* Pitching Inhibitors sits below the movement screen as its own card. */
+.tests-card + .tests-card {
+  margin-top: 22px;
 }
 
 /* the pointer left on the athlete profile */

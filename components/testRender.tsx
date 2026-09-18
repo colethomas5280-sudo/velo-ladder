@@ -1,6 +1,6 @@
 import "./testDom";
 import { shiftDate, todayISO } from "@/lib/velo";
-import type { ScreenOverviewRow } from "@/lib/types";
+import type { DeliveryOverviewRow, ScreenOverviewRow } from "@/lib/types";
 import { screenSummary, fillNormal, type Results } from "@/lib/screen";
 import { liftMenu, seedLifts } from "@/lib/strength";
 
@@ -22,9 +22,20 @@ export function rowOf(over: Partial<ScreenOverviewRow> = {}): ScreenOverviewRow 
     lastFull: TODAY,
     summary: screenSummary(screenOf()),
     spotSince: null,
-    delivery: null,
     spotTests: 0,
     called: null,
+    phase: null,
+    ...over,
+  };
+}
+
+/** A delivery-overview row, defaulting to an athlete assessed clean today. */
+export function deliveryRowOf(over: Partial<DeliveryOverviewRow> = {}): DeliveryOverviewRow {
+  return {
+    athleteId: "a1",
+    name: "Test Athlete",
+    last: TODAY,
+    count: 0,
     phase: null,
     ...over,
   };

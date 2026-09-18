@@ -231,27 +231,17 @@ export function explainScreen(
     .filter((r): r is FlawReport => r !== null);
 }
 
-/** The roster's one-line read of a screen's delivery assessment. */
-export interface DeliveryStatus {
-  kind: "not-assessed" | "clean" | "marked";
-  count: number;
-}
-
 /**
- * The three states, for anywhere that shows a screen without its detail.
+ * How many of the twelve are marked.
  *
- * Derived HERE rather than recomputed per view, so the roster and the report
- * cannot end up disagreeing about the same athlete on the same day. The
- * count is filtered through FLAW_KEYS: a key that is not one of the twelve
- * was never a flaw Cole ticked, and must not inflate the number he reads.
+ * Filtered through FLAW_KEYS: a key that is not one of the twelve was never a
+ * flaw Cole ticked and must not inflate the number he reads.
+ *
+ * There is no "assessed" state to report any more. A delivery row IS the
+ * assessment, so absence of a row is the absence of one, and the roster shows
+ * that by which list an athlete is in rather than by a value on the row.
  */
-export function deliveryStatus(
-  flaws: Record<string, boolean>,
-  deliveryAssessed: boolean,
-): DeliveryStatus {
-  if (!deliveryAssessed) return { kind: "not-assessed", count: 0 };
-  const count = Object.keys(flaws).filter(
-    (k) => flaws[k] === true && FLAW_KEYS.has(k),
-  ).length;
-  return { kind: count > 0 ? "marked" : "clean", count };
+export function countInhibitors(flaws: Record<string, boolean>): number {
+  return Object.keys(flaws).filter((k) => flaws[k] === true && FLAW_KEYS.has(k))
+    .length;
 }

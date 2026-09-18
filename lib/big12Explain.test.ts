@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   abnormalFor,
-  deliveryStatus,
+  countInhibitors,
   explainFlaw,
   sidesWanted,
 } from "@/lib/big12Explain";
@@ -195,44 +195,26 @@ test("a cause the screen cannot measure never counts as an explanation", () => {
 });
 
 /* ------------------------------------------------------------------ *
- * The roster's one-line version
+ * The roster's one-line count
  *
- * The tests roster shows every athlete at a glance. Until now it knew
- * nothing about the delivery, so a pitcher Cole assessed and one he never
- * watched looked identical from there. Same three states as the report, and
- * derived in ONE place so the two cannot drift into disagreeing about the
- * same athlete on the same day.
+ * A delivery row IS the assessment now, so there is no "assessed" state to
+ * derive — only how many of the twelve are marked on it. Filtered through
+ * FLAW_KEYS so a stray or renamed key can never inflate the number Cole
+ * reads.
  * ------------------------------------------------------------------ */
 
-test("a screen with the delivery unassessed says so, whatever else is on it", () => {
-  assert.deepEqual(deliveryStatus({}, false), { kind: "not-assessed", count: 0 });
+test("marked flaws are counted", () => {
+  assert.equal(countInhibitors({ sway: true, "high-hand": true }), 2);
 });
 
-test("assessed with nothing marked is clean, which is a result and not an absence", () => {
-  assert.deepEqual(deliveryStatus({}, true), { kind: "clean", count: 0 });
+test("an assessment with nothing marked counts zero rather than failing", () => {
+  assert.equal(countInhibitors({}), 0);
 });
 
-test("assessed with marks counts them", () => {
-  assert.deepEqual(deliveryStatus({ sway: true, "high-hand": true }, true), {
-    kind: "marked",
-    count: 2,
-  });
-});
-
-test("an unticked flaw stored as false is not counted", () => {
-  /*
-   * The write path drops false rather than storing it, but a row written
-   * before that rule, or by hand, must not inflate the count.
-   */
-  assert.deepEqual(deliveryStatus({ sway: true, "late-riser": false }, true), {
-    kind: "marked",
-    count: 1,
-  });
+test("a flaw stored as false is not counted", () => {
+  assert.equal(countInhibitors({ sway: true, "late-riser": false }), 1);
 });
 
 test("a key that is not one of the twelve is not counted", () => {
-  assert.deepEqual(deliveryStatus({ "sway-ish": true }, true), {
-    kind: "clean",
-    count: 0,
-  });
+  assert.equal(countInhibitors({ "sway-ish": true }), 0);
 });

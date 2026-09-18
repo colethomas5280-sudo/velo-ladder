@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isoDate, toScreen } from "@/lib/data";
+import { isoDate, toScreen, toDeliveryScreen, reduceDeliveryOverview } from "@/lib/data";
 
 /* ------------------------------------------------------------------ *
  * Row mappers
@@ -46,29 +46,54 @@ test("a screen with no findings yet reads as empty, not undefined", () => {
   assert.equal(s.notes, "");
 });
 
-test("a screen row with no flaws column reads back as none, not as undefined", () => {
-  const s = toScreen({ id: "s1", athlete_id: "a1", date: "2026-01-01" });
-  assert.deepEqual(s.flaws, {});
-  assert.equal(s.deliveryAssessed, false);
-});
-
-test("a screen row carries its flaws and its assessed flag through", () => {
-  const s = toScreen({
-    id: "s1", athlete_id: "a1", date: "2026-01-01",
-    flaws: { sway: true }, delivery_assessed: true,
+test("a delivery row reads back with its marks and notes", () => {
+  const d = toDeliveryScreen({
+    id: "d1", athlete_id: "a1", date: "2026-01-01",
+    flaws: { sway: true }, notes: "filmed from the side",
   });
-  assert.deepEqual(s.flaws, { sway: true });
-  assert.equal(s.deliveryAssessed, true);
+  assert.deepEqual(d.flaws, { sway: true });
+  assert.equal(d.notes, "filmed from the side");
+  assert.equal(d.athleteId, "a1");
 });
 
-test("an assessed screen with nothing marked is not the same as an unassessed one", () => {
+test("a delivery row with no marks is still an assessment", () => {
+  const d = toDeliveryScreen({ id: "d1", athlete_id: "a1", date: "2026-01-01" });
+  assert.deepEqual(d.flaws, {});
+  assert.equal(d.notes, "");
+});
+
+test("an athlete never assessed reads last: null, count: 0 from the join", () => {
   /*
-   * This is the whole reason the flag exists. Both have no flaws; one is a
-   * result and the other is an absence, and six months on nothing else can
-   * tell them apart.
+   * The LEFT JOIN hands back one row per athlete even when they have no
+   * delivery_screens row at all — date and flaws both null on that row. The
+   * `flaws` value here is one no real query would ever pair with a null
+   * date, chosen deliberately: `count` must come from the guarded block, not
+   * from `flaws` alone, and this is the only way to tell those apart.
    */
-  const clean = toScreen({ id: "s1", athlete_id: "a1", date: "2026-01-01", delivery_assessed: true });
-  const never = toScreen({ id: "s2", athlete_id: "a1", date: "2026-01-02" });
-  assert.notEqual(clean.deliveryAssessed, never.deliveryAssessed);
-  assert.deepEqual(clean.flaws, never.flaws);
+  const rows = reduceDeliveryOverview([
+    { athlete_id: "a1", name: "Kid", phase: null, date: null, flaws: { sway: true } },
+  ]);
+  assert.deepEqual(rows, [{ athleteId: "a1", name: "Kid", last: null, count: 0, phase: null }]);
+});
+
+test("with two assessments, the later date wins for both last and count", () => {
+  /*
+   * The query orders rows `a.name, d.date` ascending, so the reducer relies
+   * on "last one seen wins" to land on the most recent assessment. Two
+   * different dates with different marks is the only shape that can tell
+   * "took the last row" apart from "took the first" or "merged both."
+   */
+  const rows = reduceDeliveryOverview([
+    { athlete_id: "a1", name: "Kid", phase: null, date: "2026-01-01", flaws: { sway: true } },
+    {
+      athlete_id: "a1",
+      name: "Kid",
+      phase: null,
+      date: "2026-02-01",
+      flaws: { sway: true, "high-hand": true },
+    },
+  ]);
+  assert.deepEqual(rows, [
+    { athleteId: "a1", name: "Kid", last: "2026-02-01", count: 2, phase: null },
+  ]);
 });

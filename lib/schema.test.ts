@@ -191,6 +191,7 @@ test("the schema applies to an empty database", async () => {
 
   assert.deepEqual(await tablesIn(db), [
     "athletes",
+    "delivery_screens",
     "lift_sessions",
     "lifts",
     "movement_screens",
@@ -359,6 +360,62 @@ test("v17 moves an old Push-Off reading onto the merged keys", async () => {
   assert.deepEqual(again.rows[0].results, by.s1);
 });
 
+/*
+ * v27 split Pitching Inhibitors off the movement screen row onto their own
+ * table. The migration that carries existing marks across is only proven
+ * by running it against a database that ALREADY HOLDS an assessed screen —
+ * every one of the tests below this comment, before this one, checks the
+ * migration's SQL by string-matching schemaFile() and none of them ever
+ * apply it to a database that has data in it. This owner's rule is that a
+ * migration verified only on a fresh database has shipped a bug here twice.
+ */
+test("v27 migrates an assessed screen's marks, leaves an unassessed one alone, and a second run neither duplicates nor overwrites an edit", async () => {
+  const db = await freshDb();
+  await applyAsProduction(db, SCHEMA_SQL);
+
+  await db.query(`INSERT INTO athletes (id, name) VALUES ('a1', 'Delivery Athlete')`);
+  await db.query(`
+    INSERT INTO movement_screens
+      (id, athlete_id, date, results, flaws, delivery_assessed, created_by)
+    VALUES
+      ('ms-assessed', 'a1', '2026-07-01', '{}'::jsonb,
+       '{"early-trunk-rotation":true}'::jsonb, true, 'coach@test'),
+      ('ms-unassessed', 'a1', '2026-07-02',
+       '{"hip-45.45-degree-angle:L":"greater"}'::jsonb, '{}'::jsonb, false, 'coach@test')
+  `);
+
+  // Applying the schema again is what runs the migration against a database
+  // that already holds rows — the exact case a fresh database never proves.
+  await applyAsProduction(db, SCHEMA_SQL);
+
+  const rows = await db.query(
+    "SELECT athlete_id, date::text AS date, flaws FROM delivery_screens ORDER BY date",
+  );
+  assert.equal(rows.rows.length, 1, "only the assessed screen should have migrated");
+  assert.equal(rows.rows[0].athlete_id, "a1");
+  assert.equal(rows.rows[0].date, "2026-07-01", "carried the assessed screen's date");
+  assert.deepEqual(rows.rows[0].flaws, { "early-trunk-rotation": true });
+
+  // Edit the migrated row, the way a coach would after the split shipped.
+  await db.query(
+    `UPDATE delivery_screens SET flaws = '{"late-trunk-rotation":true}'::jsonb
+      WHERE athlete_id = 'a1' AND date = '2026-07-01'`,
+  );
+
+  // A second setup run must not duplicate the row, and must not reach back
+  // to the frozen movement_screens columns and stomp the edit just made.
+  await applyAsProduction(db, SCHEMA_SQL);
+  const again = await db.query(
+    "SELECT flaws FROM delivery_screens WHERE athlete_id = 'a1' AND date = '2026-07-01'",
+  );
+  assert.equal(again.rows.length, 1, "a second run duplicated the row");
+  assert.deepEqual(
+    again.rows[0].flaws,
+    { "late-trunk-rotation": true },
+    "a second run overwrote the edit made since the first",
+  );
+});
+
 test("the seed applies on top of a fresh schema", async () => {
   const db = await freshDb();
   await applyAsProduction(db, SCHEMA_SQL);
@@ -461,4 +518,50 @@ test("an existing screen is not retroactively claimed as assessed", () => {
     !/UPDATE movement_screens SET delivery_assessed = true/.test(sql),
     "a backfill claimed old screens were assessed",
   );
+});
+
+test("the delivery screens table and its one-per-day index both exist", () => {
+  const sql = schemaFile();
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS delivery_screens/);
+  assert.match(
+    sql,
+    /CREATE UNIQUE INDEX IF NOT EXISTS delivery_screens_athlete_date_uidx/,
+  );
+});
+
+test("the index the migration conflicts on is created BEFORE the migration runs", () => {
+  /*
+   * ON CONFLICT (athlete_id, date) needs that unique index to exist. Ordered
+   * the other way round this is a syntax error at setup time, not a silent
+   * no-op, and every screen save stays broken until someone notices.
+   */
+  const sql = schemaFile();
+  const index = sql.indexOf("delivery_screens_athlete_date_uidx");
+  const migration = sql.indexOf("INSERT INTO delivery_screens");
+  assert.ok(index > -1 && migration > -1, "one of the two statements is missing");
+  assert.ok(index < migration, "the migration runs before its conflict target exists");
+});
+
+test("the migration carries marks forward and never reaches back", () => {
+  const sql = schemaFile();
+  assert.match(sql, /INSERT INTO delivery_screens[\s\S]*?FROM movement_screens/);
+  assert.match(sql, /WHERE delivery_assessed = true/);
+  assert.match(sql, /ON CONFLICT \(athlete_id, date\) DO NOTHING/);
+  assert.ok(
+    !/ON CONFLICT \(athlete_id, date\) DO UPDATE/.test(sql),
+    "a re-run would overwrite an edit made since the first one",
+  );
+});
+
+test("nothing in this version drops a column", () => {
+  // Scoped to just the v27 block: the file is not laid out in strict version
+  // order (v18-v24 physically follow v27), and an earlier, legitimate
+  // migration (v20, recipes) already drops a column. Scanning the whole file
+  // would fail regardless of anything this version does.
+  const sql = schemaFile();
+  const start = sql.indexOf("-- v27:");
+  const end = sql.indexOf("-- v18: strength");
+  assert.ok(start > -1 && end > start, "could not isolate the v27 block");
+  const v27 = sql.slice(start, end);
+  assert.ok(!/DROP COLUMN/i.test(v27), "a migration dropped a column");
 });
