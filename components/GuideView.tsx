@@ -1,21 +1,17 @@
 "use client";
 
-import useSWR from "swr";
 import type { ReactNode } from "react";
 import type { MarkdownNode } from "@/lib/miniMarkdown";
-import { fetcher } from "@/lib/fetcher";
 
 /* ------------------------------------------------------------------ *
  * The evaluation scoring guide
  *
- * Coach-only, same shape as VeloLadder: an SWR fetch of /api/me and a role
- * check, nothing rendered for anyone who isn't a coach. app/velo/guide/
- * page.tsx resolves the file server-side (lib/miniMarkdown.ts is pure and
- * never touches disk) and hands the rendered nodes down as a prop, so the
- * markdown file itself is never something a browser fetches.
+ * Presentation only. There is deliberately no role check in here: this
+ * component receives `nodes` as a prop, and a prop from a server component
+ * is serialized into the payload the browser receives, so hiding it
+ * client-side would still hand the text to an athlete. The gate lives in
+ * app/velo/guide/page.tsx, which never reads the guide for a non-coach.
  * ------------------------------------------------------------------ */
-
-type Me = { role: "coach" | "athlete" | "none" };
 
 /** The one inline construct: `**text**` becomes <strong>. Everything else is literal. */
 function renderInline(text: string): ReactNode[] {
@@ -70,26 +66,6 @@ function GuideBlock({ node }: { node: MarkdownNode }) {
 }
 
 export default function GuideView({ nodes }: { nodes: MarkdownNode[] }) {
-  const { data: me, isLoading } = useSWR<Me>("/api/me", fetcher);
-
-  if (isLoading || !me) {
-    return (
-      <div className="card pad" style={{ color: "var(--ink-dim)" }}>
-        Loading&hellip;
-      </div>
-    );
-  }
-
-  if (me.role !== "coach") {
-    return (
-      <div className="card pad empty">
-        <div className="eyebrow">Evaluation Scoring Guide</div>
-        <h3>Not available</h3>
-        <p>This page is for coaches only.</p>
-      </div>
-    );
-  }
-
   return (
     <>
       <div className="tests-head">
