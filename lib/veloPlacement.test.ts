@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bandFor, evaluate, type Hand, type PlacementInput } from "@/lib/veloPlacement";
+import { bandFor, evaluate, DISCLOSURES, type Hand, type PlacementInput } from "@/lib/veloPlacement";
 import type { VeloRange } from "@/lib/veloTypes";
 
 /* ------------------------------------------------------------------ *
@@ -240,13 +240,32 @@ test("a below-average result says late development is not a red flag", () => {
 
 test("the low side is never called an outlier", () => {
   /*
-   * The guide is explicit. Several sources say sitting below the range is
-   * normal, and outlier language risks pathologising a late developer.
+   * The guide is explicit: on the low end, do not use "outlier" to describe
+   * the PITCHER. Several sources say sitting below the range is normal, and
+   * outlier language there risks pathologising a late developer.
+   *
+   * That is a rule about the label and about the classification-specific
+   * disclosures (the ones that exist because of where this particular
+   * result landed). It is not a rule about the standing percentile-scope
+   * caveat, which is a methodological note about what the underlying data
+   * can and cannot support and reads identically no matter where the
+   * pitcher sits. That caveat is exempt here by name, not filtered out
+   * because it happens to fail the check.
    */
   const at = (sitting: number) => okOrThrow(session(SIXTEEN_U, undefined, sitting - 3, sitting, sitting + 3));
   const all = [at(64), at(65), at(68)];
-  for (const r of all)
-    for (const text of [r.label, ...r.disclosures]) assert.ok(!/outlier/i.test(text), text);
+  for (const r of all) {
+    const classificationSpecific = r.disclosures.filter((d) => d !== DISCLOSURES.percentileScope);
+    for (const text of [r.label, ...classificationSpecific]) assert.ok(!/outlier/i.test(text), text);
+  }
+});
+
+test("a NOTABLY_BEHIND result still carries the percentile caveat and the not-a-red-flag disclosure", () => {
+  // 16U low 69, buffer 5: sitting 64 is NOTABLY_BEHIND.
+  const r = okOrThrow(session(SIXTEEN_U, undefined, 61, 64, 67));
+  assert.equal(r.placement, "NOTABLY_BEHIND");
+  assert.ok(r.disclosures.includes(DISCLOSURES.percentileScope));
+  assert.ok(r.disclosures.includes(DISCLOSURES.belowRangeNormal));
 });
 
 /* ------------------------------------------------------------------ *

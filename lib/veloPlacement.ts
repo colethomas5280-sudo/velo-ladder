@@ -8,16 +8,13 @@
  * No React, no fetch, no database, no import of lib/veloData.ts. That is
  * what makes this testable in isolation, and it is what the spec asks for.
  *
- * A deliberate deviation from the letter of the spec, flagged rather than
- * hidden: the spec lists the percentile-scope disclosure as "Always"
- * attached. But that string contains the word "outlier", and the standing
- * rule is that the word never appears anywhere in a below-average result
- * (label or disclosures) -- several of the coach's sources call sitting
- * below the range normal, and outlier language there risks pathologising a
- * late developer. Since that string cannot be reworded (disclosures are
- * verbatim), it is withheld specifically on BELOW_AVERAGE and
- * NOTABLY_BEHIND results. Every other disclosure rule in this file matches
- * the spec exactly.
+ * The rule against saying "outlier" on the low side is about what the
+ * PITCHER is called, not about every string in the disclosure list. The
+ * percentile-scope disclosure below is a methodological caveat about what
+ * the underlying data can and cannot support; it reads the same whether
+ * the athlete is sitting 95 or 65, and it is attached to every
+ * classification, including BELOW_AVERAGE and NOTABLY_BEHIND, exactly as
+ * the spec's "Always" says.
  * ------------------------------------------------------------------ */
 
 import type { VeloRange, VeloBand } from "@/lib/veloTypes";
@@ -165,12 +162,8 @@ function computeFlags(band: VeloBand, floor: number, sitting: number, peak: numb
 const LOW_SIDE_PLACEMENTS = new Set<Placement>(["BELOW_AVERAGE", "NOTABLY_BEHIND"]);
 
 function buildDisclosures(range: VeloRange, placement: Placement): string[] {
-  const disclosures: string[] = [DISCLOSURES.confidence(range.confidence)];
+  const disclosures: string[] = [DISCLOSURES.confidence(range.confidence), DISCLOSURES.percentileScope];
   const lowSide = LOW_SIDE_PLACEMENTS.has(placement);
-
-  // See the file header: withheld on the low side because it contains the
-  // word "outlier", which never describes sitting below the range.
-  if (!lowSide) disclosures.push(DISCLOSURES.percentileScope);
 
   if (placement === "OUTLIER_ABOVE_RANGE") disclosures.push(DISCLOSURES.outlierAboveRange(OUTLIER_BUFFER_MPH));
   if (placement === "OUTLIER_ELITE_TRAJECTORY") disclosures.push(DISCLOSURES.eliteTrajectory);
