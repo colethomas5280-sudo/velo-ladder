@@ -6,6 +6,7 @@ import type { VeloRange, VeloSource } from "@/lib/veloTypes";
 import { fetcher } from "@/lib/fetcher";
 import { EMPTY } from "@/lib/velo";
 import VeloSources, { ratingPill } from "./VeloSources";
+import VeloCalculator from "./VeloCalculator";
 
 /* ------------------------------------------------------------------ *
  * The velo ladder
@@ -236,6 +237,10 @@ function VeloLadderBody({ snapshotDate }: { snapshotDate: string }) {
 
       {tab === "ladder" ? (
         <>
+          {/* Mounted here, past the role check, and fed the rows this body
+              already fetched. It has no fetch of its own. */}
+          <VeloCalculator groups={grouped} sourcesBySlug={sourcesBySlug} />
+
           {grouped.map(({ category, rows }) => (
             <section className="card pad tests-card" key={category}>
               <div className="sec-h">
