@@ -367,7 +367,7 @@ console.log(JSON.stringify(await sql`
     FROM velo_ranges WHERE slug IN ('13u','juco','ncaa-d1-power-4') ORDER BY slug`));
 ```
 
-Expected: 11 sources, 25 ranges, 55 links. Re-running does not duplicate (still 25). The three spot-checked rows match the JSON exactly: 13U combined 55-75 ref 72 High; JUCO RHP 82-90 Medium; D1 Power 4 RHP 90-97 Medium.
+Expected: 11 sources, 25 ranges, 68 links (counted from the JSON: the sum of every row's `source_slugs`). Re-running does not duplicate (still 25). The three spot-checked rows match the JSON exactly: 13U combined 55-75 ref 72 High; JUCO RHP 82-90 Medium; D1 Power 4 RHP 90-97 Medium.
 
 Report what happened to the edited note. The upsert overwrites it, which is correct — Notion is the source of truth and this is how a correction there lands — but say so explicitly in your report so Cole knows editing in the database does not stick.
 
