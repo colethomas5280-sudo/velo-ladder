@@ -23,6 +23,7 @@ export default function AppHeader({ email }: { email?: string }) {
         { href: "/strength", label: "Strength" },
         { href: "/leaderboard", label: "Leaderboard" },
         { href: "/resources", label: "Resources" },
+        { href: "/velo", label: "Velo Ladder" },
       ]
     : isAthlete
       ? [

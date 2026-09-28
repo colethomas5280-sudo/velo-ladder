@@ -4128,3 +4128,28 @@ table.roster-table {
   color: var(--accent);
   margin-top: 2px;
 }
+
+/* ---------- velo ladder ---------- */
+.vl-banner {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-dim);
+  max-width: 62ch;
+}
+.vl-level {
+  text-align: left;
+  font-weight: 600;
+}
+.vl-band {
+  display: block;
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+.vl-elite {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+.vl-refonly {
+  margin-left: 8px;
+}
