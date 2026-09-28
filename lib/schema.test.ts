@@ -200,6 +200,9 @@ test("the schema applies to an empty database", async () => {
     "resources",
     "setbacks",
     "training_sessions",
+    "velo_range_sources",
+    "velo_ranges",
+    "velo_sources",
   ]);
 });
 
@@ -564,4 +567,23 @@ test("nothing in this version drops a column", () => {
   assert.ok(start > -1 && end > start, "could not isolate the v27 block");
   const v27 = sql.slice(start, end);
   assert.ok(!/DROP COLUMN/i.test(v27), "a migration dropped a column");
+});
+
+test("the velo benchmark tables and their join table exist", () => {
+  const sql = schemaFile();
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS velo_sources/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS velo_ranges/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS velo_range_sources/);
+});
+
+test("velocity columns are nullable, because four rows have no data yet", () => {
+  /*
+   * A NOT NULL with a 0 default would turn "nobody has sourced this" into
+   * "this level throws 0 mph", which the UI cannot tell apart.
+   */
+  const sql = schemaFile();
+  const table = sql.slice(sql.indexOf("CREATE TABLE IF NOT EXISTS velo_ranges"));
+  const body = table.slice(0, table.indexOf(");"));
+  for (const col of ["rhp_low", "rhp_high", "lhp_low", "lhp_high", "combined_low", "combined_high", "elite_trajectory_ref"])
+    assert.ok(!new RegExp(`${col}[^,]*NOT NULL`).test(body), `${col} is NOT NULL`);
 });

@@ -1,5 +1,6 @@
 import { seedLifts } from "./strength";
 import { ALL_SEED_RECIPES } from "./recipes";
+import { VELO_SEED_SQL } from "./veloSeed";
 
 /**
  * Canonical database schema. Run once (and after any schema change) via
@@ -7,7 +8,7 @@ import { ALL_SEED_RECIPES } from "./recipes";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 27;
+export const SCHEMA_VERSION = 28;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -486,6 +487,49 @@ ALTER TABLE lifts ADD CONSTRAINT lifts_mode_check
 ${LIFT_SEED_SQL}
 ${RECIPE_SEED_SQL}
 ${RECIPE_MEALS_SQL}
+
+-- v28: the coach-only fastball velocity benchmark ladder.
+--
+-- Notion is the source of truth; these tables hold a dated snapshot that Cole
+-- re-exports by hand. Every velocity column is nullable because four rows
+-- (Independent Pro and the three MiLB tiers) have no sourced data yet, and a
+-- 0 default would turn "nobody has looked this up" into "this level throws 0".
+CREATE TABLE IF NOT EXISTS velo_sources (
+  slug                text PRIMARY KEY,
+  title               text NOT NULL,
+  author              text NOT NULL DEFAULT '',
+  data_type           text NOT NULL DEFAULT '',
+  quality             text NOT NULL DEFAULT '',
+  published_date      date,
+  limitations_summary text NOT NULL DEFAULT '',
+  notion_url          text NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS velo_ranges (
+  slug                 text PRIMARY KEY,
+  level                text NOT NULL,
+  category             text NOT NULL,
+  row_type             text NOT NULL DEFAULT 'primary',
+  display_order        integer NOT NULL DEFAULT 0,
+  rhp_low              numeric,
+  rhp_high             numeric,
+  lhp_low              numeric,
+  lhp_high             numeric,
+  combined_low         numeric,
+  combined_high        numeric,
+  elite_trajectory_ref numeric,
+  confidence           text,
+  notes                text NOT NULL DEFAULT '',
+  last_updated         date,
+  notion_url           text NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS velo_range_sources (
+  range_slug  text NOT NULL REFERENCES velo_ranges(slug) ON DELETE CASCADE,
+  source_slug text NOT NULL REFERENCES velo_sources(slug) ON DELETE CASCADE,
+  PRIMARY KEY (range_slug, source_slug)
+);
+${VELO_SEED_SQL}
 `;
 
 /** The one real session already logged, imported so there is live data on day one. */
