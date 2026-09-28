@@ -623,7 +623,7 @@ const CATEGORY_ORDER = [
 function levelText(el: Element): string {
   return (el.textContent ?? "")
     .replace(/^[▸▾]/, "")
-    .replace(/Reference only$/, "")
+    .replace(/Reference only\s*$/, "")
     .trim();
 }
 
@@ -717,10 +717,19 @@ test("the banner and the snapshot date are both shown", () => {
 });
 
 test("an athlete never renders the ladder at all", () => {
-  // me.role === "athlete": the component renders nothing of substance
+  // me.role === "athlete": the component renders nothing of substance.
+  // The ranges and sources fallback data is deliberately the SAME fixture
+  // the coach tests use — if this were left out, a broken role gate would
+  // still pass here, because grouped would resolve to [] with no data ever
+  // supplied rather than because the gate actually stopped it. With the
+  // data genuinely available, only the role check keeps it off the page.
   render(
     withSwr(
-      { "/api/me": { role: "athlete", athleteId: "a1" } },
+      {
+        "/api/me": { role: "athlete", athleteId: "a1" },
+        "/api/velo/ranges": RANGES,
+        "/api/velo/sources": SOURCES,
+      },
       <VeloLadder snapshotDate="2026-09-28" />,
     ),
   );

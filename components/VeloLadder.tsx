@@ -97,14 +97,20 @@ function LadderRow({
           <span className="caret">{open ? "▾" : "▸"}</span>
           {r.level}
           {refOnly && <span className="pill vl-refonly">Reference only</span>}
-        </td>{" "}
+          {" "}
+        </td>
         <td>
           <Bands r={r} />
-        </td>{" "}
+          {" "}
+        </td>
         <td className="vl-elite">
           {r.eliteTrajectoryRef != null ? `${r.eliteTrajectoryRef} mph` : EMPTY}
-        </td>{" "}
-        <td>{r.confidence ? ratingPill(r.confidence) : "No data yet"}</td>{" "}
+          {" "}
+        </td>
+        <td>
+          {r.confidence ? ratingPill(r.confidence) : "No data yet"}
+          {" "}
+        </td>
         <td>
           {r.sourceSlugs.length > 0
             ? `${r.sourceSlugs.length} source${r.sourceSlugs.length === 1 ? "" : "s"}`
@@ -140,6 +146,38 @@ function LadderRow({
 
 export default function VeloLadder({ snapshotDate }: { snapshotDate: string }) {
   const { data: me, isLoading: meLoading } = useSWR<Me>("/api/me", fetcher);
+
+  if (meLoading || !me) {
+    return (
+      <div className="card pad" style={{ color: "var(--ink-dim)" }}>
+        Loading&hellip;
+      </div>
+    );
+  }
+
+  if (me.role !== "coach") {
+    return (
+      <div className="card pad empty">
+        <div className="eyebrow">Velo Ladder</div>
+        <h3>Not available</h3>
+        <p>This page is for coaches only.</p>
+      </div>
+    );
+  }
+
+  return <VeloLadderBody snapshotDate={snapshotDate} />;
+}
+
+/**
+ * The actual ladder data and its two fetches.
+ *
+ * Split out of VeloLadder so the /api/velo/ranges and /api/velo/sources
+ * requests only ever fire once a coach is already confirmed — the same
+ * shape TestsView uses for Roster/InhibitorsRoster. Fetching them
+ * unconditionally in the parent would send every athlete who lands on this
+ * page two round trips that can only ever come back 403.
+ */
+function VeloLadderBody({ snapshotDate }: { snapshotDate: string }) {
   const { data: rangesData } = useSWR<VeloRange[]>("/api/velo/ranges", fetcher);
   const { data: sourcesData } = useSWR<VeloSource[]>("/api/velo/sources", fetcher);
   const [tab, setTab] = useState<"ladder" | "sources">("ladder");
@@ -166,24 +204,6 @@ export default function VeloLadder({ snapshotDate }: { snapshotDate: string }) {
       rows: byCategory.get(category)!,
     }));
   }, [rangesData]);
-
-  if (meLoading || !me) {
-    return (
-      <div className="card pad" style={{ color: "var(--ink-dim)" }}>
-        Loading&hellip;
-      </div>
-    );
-  }
-
-  if (me.role !== "coach") {
-    return (
-      <div className="card pad empty">
-        <div className="eyebrow">Velo Ladder</div>
-        <h3>Not available</h3>
-        <p>This page is for coaches only.</p>
-      </div>
-    );
-  }
 
   return (
     <>
