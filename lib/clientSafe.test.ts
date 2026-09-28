@@ -41,9 +41,15 @@ function serverOnly(): Set<string> {
     for (const m of src.matchAll(/^import\s+(?!type\s)[^;]*?from\s+["'](?:@\/lib\/|\.\/)([\w-]+)["']/gm))
       deps.push(m[1]);
     if (/from ["']pg["']|@\/lib\/db|from ["']\.\/db["']/.test(src)) deps.push("db");
+    // velo_ranges/velo_sources are coach-only: lib/veloSeed.ts holds all 25
+    // rows in a module-scope constant, and a client component pulling a value
+    // out of it would ship every row to every browser regardless of whether
+    // veloSeed itself ever touches the database. It is a root in its own
+    // right, not just another node the "db" walk happens to reach.
+    if (/@\/lib\/veloSeed|from ["']\.\/veloSeed["']/.test(src)) deps.push("veloSeed");
     imports.set(name, deps);
   }
-  const tainted = new Set<string>(["db"]);
+  const tainted = new Set<string>(["db", "veloSeed"]);
   for (let pass = 0; pass < files.length; pass++) {
     let grew = false;
     for (const [name, deps] of imports)

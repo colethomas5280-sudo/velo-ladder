@@ -71,8 +71,36 @@ test("an apostrophe in the source text does not break the SQL", () => {
    * use apostrophes. Naive concatenation produces SQL that will not parse.
    */
   assert.ok(VELO_SEED_SQL.includes("right on track"));
-  const singles = (VELO_SEED_SQL.match(/'/g) ?? []).length;
-  assert.equal(singles % 2, 0, "an unbalanced quote means an unescaped apostrophe");
+});
+
+test("an apostrophe in a note is escaped, not passed through raw", () => {
+  /*
+   * A prior version of this test only counted total `'` characters in
+   * VELO_SEED_SQL and asserted the count was even. That passes whether or not
+   * q() escapes anything at all: the JSON has an even number of apostrophes
+   * (18), and both "each one doubled" and "each one left alone" sum to even.
+   * Deleting q()'s .replace() entirely would still have passed it.
+   *
+   * This anchors to one real row instead. gobig-tier-1's note contains
+   * "source's own prose" verbatim; the generated SQL must contain the
+   * doubled-quote form "source''s own prose" and must NOT contain the raw,
+   * single-quote form anywhere, because a raw apostrophe there terminates the
+   * string literal early and either breaks the statement or truncates it.
+   */
+  const row = veloSeedData.ranges.find((r) => r.slug === "gobig-tier-1");
+  assert.ok(row, "fixture row gobig-tier-1 is missing from the snapshot");
+  assert.ok(
+    row!.notes.includes("source's own prose"),
+    "fixture note changed underneath this test; pick a different apostrophe to anchor on",
+  );
+  assert.ok(
+    VELO_SEED_SQL.includes("source''s own prose"),
+    "the apostrophe in gobig-tier-1's note was not doubled for SQL",
+  );
+  assert.ok(
+    !VELO_SEED_SQL.includes("source's own prose"),
+    "a raw, unescaped apostrophe reached the generated SQL",
+  );
 });
 
 test("the snapshot date is exposed for the UI to show", () => {
