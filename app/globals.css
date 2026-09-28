@@ -4153,3 +4153,47 @@ table.roster-table {
 .vl-refonly {
   margin-left: 8px;
 }
+
+/* ---------- evaluation scoring guide ---------- */
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.guide h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 26px;
+  line-height: 1.1;
+  margin: 0 0 2px;
+}
+.guide h2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+  line-height: 1.1;
+  margin: 18px 0 0;
+}
+.guide h3 {
+  font-size: 15px;
+  margin: 10px 0 0;
+}
+.guide p {
+  margin: 0;
+  color: var(--ink-dim);
+}
+.guide ul {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide li {
+  color: var(--ink-dim);
+}
+.guide strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.guide table {
+  margin: 4px 0;
+}
