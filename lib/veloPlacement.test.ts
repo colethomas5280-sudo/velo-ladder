@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { bandFor, evaluate, DISCLOSURES, type Hand, type PlacementInput } from "@/lib/veloPlacement";
+import { OUTLIER_BUFFER_MPH } from "@/lib/veloConfig";
 import type { VeloRange } from "@/lib/veloTypes";
 
 /* ------------------------------------------------------------------ *
@@ -266,6 +267,30 @@ test("a NOTABLY_BEHIND result still carries the percentile caveat and the not-a-
   assert.equal(r.placement, "NOTABLY_BEHIND");
   assert.ok(r.disclosures.includes(DISCLOSURES.percentileScope));
   assert.ok(r.disclosures.includes(DISCLOSURES.belowRangeNormal));
+});
+
+test("a session that fades across the outing flags fatigue or consistency, without changing the placement", () => {
+  // 16U Combined 69-85, midpoint 77: floor 70, sitting 79 (9 mph above floor,
+  // past the 6 mph FATIGUE_GAP_FLAG_MPH line), peak 81. The gap is a flag,
+  // not a rule: the placement is driven by sitting alone and stays
+  // AVERAGE_UPPER_HALF, same as case 1's floor-74 version of this session.
+  const r = okOrThrow(session(SIXTEEN_U, undefined, 70, 79, 81));
+  assert.equal(r.placement, "AVERAGE_UPPER_HALF");
+  assert.deepEqual(r.flags, ["FATIGUE_OR_CONSISTENCY"]);
+});
+
+test("an OUTLIER_ABOVE_RANGE result discloses the adjustable buffer line", () => {
+  // JUCO RHP high 90 + buffer 3, same threshold as case 4's 93 mph check.
+  const r = okOrThrow(session(JUCO, "R", 91, 93, 95));
+  assert.equal(r.placement, "OUTLIER_ABOVE_RANGE");
+  assert.ok(r.disclosures.includes(DISCLOSURES.outlierAboveRange(OUTLIER_BUFFER_MPH)));
+});
+
+test("an OUTLIER_ELITE_TRAJECTORY result discloses the sample-skew caveat", () => {
+  // 16U at 89, same fixture as case 3.
+  const r = okOrThrow(session(SIXTEEN_U, undefined, 85, 89, 92));
+  assert.equal(r.placement, "OUTLIER_ELITE_TRAJECTORY");
+  assert.ok(r.disclosures.includes(DISCLOSURES.eliteTrajectory));
 });
 
 /* ------------------------------------------------------------------ *

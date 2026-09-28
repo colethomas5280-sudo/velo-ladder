@@ -92,7 +92,7 @@ const LABELS: Record<Placement, string> = {
   AVERAGE_UPPER_HALF: "Average, upper half",
   AVERAGE_LOWER_HALF: "Average, lower half",
   BELOW_AVERAGE: "Below average",
-  NOTABLY_BEHIND: "Notably behind",
+  NOTABLY_BEHIND: "Notably behind for level",
   NO_DATA: "No data available for this level",
 };
 
