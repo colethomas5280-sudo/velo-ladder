@@ -113,3 +113,49 @@ test("each row carries its own source slugs", async () => {
   assert.ok(row, "expected a 13u row");
   assert.equal(row.sourceSlugs.length, 7);
 });
+
+/* ------------------------------------------------------------------ *
+ * Cache-Control on every response, not just the 200
+ *
+ * The header exists so a stale cache can never hand one user's response to
+ * another after a sign-out/sign-in swap. A cached 403 played back to a coach
+ * who has since signed in properly is that same failure, even though there
+ * is no athlete data in an error body — so the header has to be on the 401
+ * and the 403 too, not only on the success path.
+ * ------------------------------------------------------------------ */
+
+test("an athlete's forbidden response from the ladder route is never cached", async () => {
+  signedInAs = ATHLETE;
+  const res = await getRanges();
+  assert.equal(res.status, 403);
+  assert.equal(res.headers.get("Cache-Control"), "private, no-store");
+});
+
+test("an athlete's forbidden response from the sources route is never cached", async () => {
+  signedInAs = ATHLETE;
+  const res = await getSources();
+  assert.equal(res.status, 403);
+  assert.equal(res.headers.get("Cache-Control"), "private, no-store");
+});
+
+test("a signed-out response from the ladder route is never cached", async () => {
+  signedInAs = null;
+  const res = await getRanges();
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get("Cache-Control"), "private, no-store");
+});
+
+test("a signed-out response from the sources route is never cached", async () => {
+  signedInAs = null;
+  const res = await getSources();
+  assert.equal(res.status, 401);
+  assert.equal(res.headers.get("Cache-Control"), "private, no-store");
+});
+
+test("a coach's successful responses are never cached either", async () => {
+  signedInAs = COACH;
+  const ranges = await getRanges();
+  const sources = await getSources();
+  assert.equal(ranges.headers.get("Cache-Control"), "private, no-store");
+  assert.equal(sources.headers.get("Cache-Control"), "private, no-store");
+});
