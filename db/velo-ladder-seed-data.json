@@ -128,6 +128,16 @@
       "limitations_summary": "No named author, date, or methodology; commercial remote-training site. Lumps D2/D3 at 85-90, which conflicts with the ladder's D3 range (78-86). Gives role splits (JV vs varsity, starter vs reliever, MLB starter 92-94 vs reliever 94-97) that the ladder does not model.",
       "notion_url": "https://app.notion.com/p/3e612f04826b81f3a9ffc281a73e4bba",
       "published_date": null
+    },
+    {
+      "slug": "rapsodo-averages-by-age-guide",
+      "title": "Rapsodo — Baseball Pitching Averages by Age (10U to Pros)",
+      "author": "Rapsodo",
+      "data_type": "Showcase/aggregate radar data",
+      "quality": "High",
+      "limitations_summary": "Manufacturer's guide (PDF), undated. States that the figures come from Rapsodo's databases but gives no sample size, collection window or definition of 'Pros'. The sample is players who use Rapsodo, so it likely skews toward programs that train with technology, and its averages sit at or above the midpoint of this ladder's band at every age (and above the top of the 11U band). Averages, not ranges. Only the four-seam fastball speed is used; the PDF also has spin, efficiency and break for eight pitch types, which are out of scope. 10U to 12U have no cutter, splitter or knuckleball data. The College figure (85.53 RHP / 83.82 LHP) matches the existing Rapsodo college anchor (85 / 83), so the two may share underlying data and should not be counted as independent.",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b81bebf76cb5ad78e4edd",
+      "published_date": null
     }
   ],
   "ranges": [
@@ -694,6 +704,216 @@
       "last_updated": "2026-09-25",
       "notion_url": "https://app.notion.com/p/3e612f04826b81eba731f764033a308c",
       "display_order": 25
+    },
+    {
+      "slug": "10u-rapsodo-avg",
+      "level": "10U (Rapsodo Measured Avg)",
+      "category": "Youth (8U-12U)",
+      "row_type": "anchor",
+      "rhp_low": 54.88,
+      "rhp_high": 54.88,
+      "lhp_low": 54.23,
+      "lhp_high": 54.23,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 10 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b81aca229d75cfe55f384",
+      "display_order": 26
+    },
+    {
+      "slug": "11u-rapsodo-avg",
+      "level": "11U (Rapsodo Measured Avg)",
+      "category": "Youth (8U-12U)",
+      "row_type": "anchor",
+      "rhp_low": 61.46,
+      "rhp_high": 61.46,
+      "lhp_low": 60.46,
+      "lhp_high": 60.46,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 11 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b8155bd77c17804978678",
+      "display_order": 27
+    },
+    {
+      "slug": "12u-rapsodo-avg",
+      "level": "12U (Rapsodo Measured Avg)",
+      "category": "Youth (8U-12U)",
+      "row_type": "anchor",
+      "rhp_low": 63.53,
+      "rhp_high": 63.53,
+      "lhp_low": 62.82,
+      "lhp_high": 62.82,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 12 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b815e9a74da0f45c96a0e",
+      "display_order": 28
+    },
+    {
+      "slug": "13u-rapsodo-avg",
+      "level": "13U (Rapsodo Measured Avg)",
+      "category": "Youth (13U-14U)",
+      "row_type": "anchor",
+      "rhp_low": 67.28,
+      "rhp_high": 67.28,
+      "lhp_low": 67.87,
+      "lhp_high": 67.87,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 13 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b817d8df5d791ac819c4a",
+      "display_order": 29
+    },
+    {
+      "slug": "14u-rapsodo-avg",
+      "level": "14U (Rapsodo Measured Avg)",
+      "category": "Youth (13U-14U)",
+      "row_type": "anchor",
+      "rhp_low": 72.45,
+      "rhp_high": 72.45,
+      "lhp_low": 71.88,
+      "lhp_high": 71.88,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 14 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b817fb42cd93fbeb8bdd1",
+      "display_order": 30
+    },
+    {
+      "slug": "15u-rapsodo-avg",
+      "level": "15U (Rapsodo Measured Avg)",
+      "category": "High School",
+      "row_type": "anchor",
+      "rhp_low": 76.26,
+      "rhp_high": 76.26,
+      "lhp_low": 75.47,
+      "lhp_high": 75.47,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 15 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b81959c96f599a68f2ab0",
+      "display_order": 31
+    },
+    {
+      "slug": "16u-rapsodo-avg",
+      "level": "16U (Rapsodo Measured Avg)",
+      "category": "High School",
+      "row_type": "anchor",
+      "rhp_low": 79.29,
+      "rhp_high": 79.29,
+      "lhp_low": 78.25,
+      "lhp_high": 78.25,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 16 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b81a1865ef7c681fa5a99",
+      "display_order": 32
+    },
+    {
+      "slug": "17u-rapsodo-avg",
+      "level": "17U (Rapsodo Measured Avg)",
+      "category": "High School",
+      "row_type": "anchor",
+      "rhp_low": 81.73,
+      "rhp_high": 81.73,
+      "lhp_low": 80.76,
+      "lhp_high": 80.76,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 17 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b8175a6ebd2dedc8a5174",
+      "display_order": 33
+    },
+    {
+      "slug": "18u-rapsodo-avg",
+      "level": "18U (Rapsodo Measured Avg)",
+      "category": "High School",
+      "row_type": "anchor",
+      "rhp_low": 84.4,
+      "rhp_high": 84.4,
+      "lhp_low": 82.7,
+      "lhp_high": 82.7,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, 18 year olds. A point value, not a range: the same number sits in Low and High. Context only, never classified against. Measured averages of Rapsodo users, so it likely skews above a typical player.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b8161aaccd4300491ec18",
+      "display_order": 34
+    },
+    {
+      "slug": "pros-rapsodo-avg",
+      "level": "Pros, level not stated (Rapsodo Measured Avg)",
+      "category": "Independent/Pro",
+      "row_type": "anchor",
+      "rhp_low": 89.7,
+      "rhp_high": 89.7,
+      "lhp_low": 88.25,
+      "lhp_high": 88.25,
+      "combined_low": null,
+      "combined_high": null,
+      "elite_trajectory_ref": null,
+      "confidence": "High",
+      "source_slugs": [
+        "rapsodo-averages-by-age-guide"
+      ],
+      "notes": "Four-seam fastball average from Rapsodo device data, labelled only 'Pros'. The PDF does not say which level (MLB, MiLB or independent), so this is not mapped onto any pro row. A point value, not a range. Context only, never classified against. Sits well below the MLB average of 94.7 in the ladder's own MLB row, which is another sign that 'Pros' here is not MLB.",
+      "last_updated": "2026-09-28",
+      "notion_url": "https://app.notion.com/p/3ea12f04826b8114a5b5ca28ef2a8419",
+      "display_order": 35
     }
   ]
 }
