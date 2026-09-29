@@ -84,6 +84,12 @@ function hasNoBand(r: VeloRange): boolean {
  * them Low, Average and High, so its refusals are shown in the form's words. */
 function inFormWords(message: string): string {
   return message
+    // The order rule arrives as a maths sentence ("... must satisfy floor <=
+    // sitting <= peak"). A coach should read it as a sentence instead.
+    .replace(
+      /floor, sitting, and peak must satisfy floor <= sitting <= peak\.?/,
+      "Low can't be higher than Average, and Average can't be higher than High.",
+    )
     .replace(/\bfloor\b/g, "Low")
     .replace(/\bsitting\b/g, "Average")
     .replace(/\bpeak\b/g, "High");

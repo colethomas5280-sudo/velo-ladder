@@ -3,7 +3,7 @@ import { test, before, after, mock } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { createElement } from "react";
 import { cleanup, render } from "@testing-library/react";
 import { withSwr } from "../components/testSwr";
@@ -64,24 +64,64 @@ const rel = (p: string) => relative(ROOT, p).split(sep).join("/");
  */
 const REQUIRED_ROOTS = ["veloSeed", "veloPlacement", "veloConfig"];
 
+/**
+ * Source with its comments removed. The roots below are pinned by reading
+ * clientSafe.test.ts as TEXT, and text matching treats a commented-out line as
+ * present: `// if (...) deps.push("veloSeed");` satisfies a search for
+ * `deps.push("veloSeed")` while doing nothing at all. Strip first, then match.
+ * Only a `//` at the start of a line or after whitespace counts, so a URL
+ * inside a string is left alone.
+ */
+function withoutComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/[^\n]*/g, "$1");
+}
+
+/** The taint walk's root set, and the modules it has a rule marking as imported. */
+function walkRoots(clientSafeSrc: string): { found: boolean; roots: string[]; pushed: string[] } {
+  const src = withoutComments(clientSafeSrc);
+  const m = /^[ \t]*const tainted = new Set<string>\(\[([^\]]*)\]\)/m.exec(src);
+  return {
+    found: m !== null,
+    roots: m ? [...m[1].matchAll(/["']([\w-]+)["']/g)].map((x) => x[1]) : [],
+    pushed: [...src.matchAll(/^[ \t]*(?:if\b[^\n]*)?\bdeps\.push\(["']([\w-]+)["']\)/gm)].map((x) => x[1]),
+  };
+}
+
+test("commented-out roots do not count as roots", () => {
+  const live = [
+    'const tainted = new Set<string>(["db", "veloSeed"]);',
+    '  if (/x/.test(src)) deps.push("veloSeed");',
+  ].join("\n");
+  assert.deepEqual(walkRoots(live), { found: true, roots: ["db", "veloSeed"], pushed: ["veloSeed"] });
+
+  // The whole set line, the push rule, one root inside the set: each commented.
+  const setOut = live.replace(/^const tainted/, "// const tainted");
+  assert.equal(walkRoots(setOut).found, false);
+  const pushOut = live.replace(/^  if/m, "  // if");
+  assert.deepEqual(walkRoots(pushOut).pushed, []);
+  const rootOut = 'const tainted = new Set<string>(["db", /* "veloSeed" */ "x"]);';
+  assert.deepEqual(walkRoots(rootOut).roots, ["db", "x"]);
+  const trailing = 'const tainted = new Set<string>(["db"]); // "veloSeed"';
+  assert.deepEqual(walkRoots(trailing).roots, ["db"]);
+});
+
 test("lib/clientSafe.test.ts still names the velo modules as roots of its walk", () => {
   const src = readFileSync(join(ROOT, "lib", "clientSafe.test.ts"), "utf8");
 
   // The set the walk starts from.
-  const m = /const tainted = new Set<string>\(\[([^\]]*)\]\)/.exec(src);
+  const { found, roots, pushed } = walkRoots(src);
   assert.ok(
-    m,
-    "could not find the walk's root set in lib/clientSafe.test.ts. If it was " +
+    found,
+    "could not find the walk's root set in lib/clientSafe.test.ts (or it is commented out). If it was " +
       "restructured, update this test to read the new shape; do not delete it.",
   );
-  const roots = [...m[1].matchAll(/["']([\w-]+)["']/g)].map((x) => x[1]);
   assert.ok(roots.includes("db"), "db is the root that taints veloData");
   for (const root of REQUIRED_ROOTS) {
     assert.ok(roots.includes(root), `${root} was removed from the walk's roots in lib/clientSafe.test.ts`);
     // A root in the set does nothing unless something pushes it into the
     // graph when a file imports it.
     assert.ok(
-      new RegExp(`deps\\.push\\(["']${root}["']\\)`).test(src),
+      pushed.includes(root),
       `nothing in lib/clientSafe.test.ts marks a file that imports ${root}`,
     );
     assert.ok(
@@ -132,6 +172,54 @@ test("the value-import detector flags what it should and ignores what is erased"
   assert.deepEqual(coachOnlyValueImports('import { fetcher } from "@/lib/fetcher";'), []);
 });
 
+/**
+ * Every file that ships to the browser, given path -> source for the
+ * candidates: the files that say "use client", plus anything they import by
+ * relative path, and so on down. A shared component with no directive of its
+ * own is bundled into the browser all the same, and selecting by the
+ * directive alone skipped it (components/VeloSources.tsx had none). A
+ * `type`-only import is erased and pulls nothing in.
+ */
+function clientClosure(sources: Map<string, string>): string[] {
+  const client = new Set(
+    [...sources].filter(([, src]) => /^\s*["']use client["']/m.test(src)).map(([f]) => f),
+  );
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of [...client]) {
+      const src = sources.get(f)!;
+      for (const m of src.matchAll(/^import\s+(?!type\s)[^;]*?from\s+["'](\.{1,2}\/[^"']+)["']/gm)) {
+        const base = resolve(dirname(f), m[1]);
+        const target = [`${base}.tsx`, `${base}.ts`, join(base, "index.tsx"), join(base, "index.ts")].find((t) =>
+          sources.has(t),
+        );
+        if (target && !client.has(target)) {
+          client.add(target);
+          grew = true;
+        }
+      }
+    }
+  }
+  return [...client];
+}
+
+test("the client closure follows relative imports, so a file with no directive cannot hide", () => {
+  const dir = join(ROOT, "components");
+  const at = (n: string) => join(dir, n);
+  const sources = new Map([
+    [at("A.tsx"), '"use client";\nimport S from "./S";\nimport type { T } from "./TypeOnly";\nimport { z } from "./sub/Deep";'],
+    [at("S.tsx"), 'import D from "./Deeper";\nexport default 1;'], // no directive
+    [at("Deeper.tsx"), "export default 2;"], // reached only through S
+    [at("TypeOnly.tsx"), "export type T = 1;"], // erased, must not count
+    [at("sub/Deep.ts"), "export const z = 1;"],
+    [at("Server.tsx"), "export default 3;"], // imported by nobody
+  ]);
+  assert.deepEqual(
+    clientClosure(sources).map((f) => relative(dir, f)).sort(),
+    ["A.tsx", "Deeper.tsx", "S.tsx", "sub/Deep.ts"],
+  );
+});
+
 test("no client file under app/ or components/ takes a value from a coach-only module", () => {
   /*
    * lib/clientSafe.test.ts walks components/ only. A "use client" file under
@@ -139,11 +227,11 @@ test("no client file under app/ or components/ takes a value from a coach-only m
    * so this covers it. (A server page under app/ may import lib/veloSeed: it
    * runs on the server, and app/velo/page.tsx does exactly that.)
    */
-  const files = [
-    ...walk(join(ROOT, "components"), (f) => /\.tsx?$/.test(f) && !f.includes(".test.")),
-    ...walk(join(ROOT, "app"), (f) => /\.tsx?$/.test(f) && !f.includes(".test.")),
-  ];
-  const client = files.filter((f) => /^\s*["']use client["']/m.test(readFileSync(f, "utf8")));
+  const sources = new Map<string, string>();
+  for (const dir of ["components", "app"])
+    for (const f of walk(join(ROOT, dir), (n) => /\.tsx?$/.test(n) && !n.includes(".test.")))
+      sources.set(f, readFileSync(f, "utf8"));
+  const client = clientClosure(sources);
 
   // Control: the search has to actually be looking at client components.
   assert.ok(
@@ -312,10 +400,19 @@ interface VeloRoute {
   handlers: { method: Method; fn: Handler }[];
 }
 
+/** Any route module Next would serve, not only the `route.ts` spelling. */
+const ROUTE_FILE = /^route\.[jt]sx?$/;
+
+test("route discovery accepts every spelling of a route file and nothing else", () => {
+  for (const n of ["route.ts", "route.tsx", "route.js", "route.jsx"]) assert.ok(ROUTE_FILE.test(n), n);
+  for (const n of ["route.test.ts", "routes.ts", "route.d.ts", "myroute.ts", "route.tsx.bak"])
+    assert.equal(ROUTE_FILE.test(n), false, n);
+});
+
 async function veloRoutes(): Promise<VeloRoute[]> {
   const base = join(ROOT, "app", "api", "velo");
   const out: VeloRoute[] = [];
-  for (const file of walk(base, (n) => n === "route.ts").sort()) {
+  for (const file of walk(base, (n) => ROUTE_FILE.test(n)).sort()) {
     const name = relative(base, file).split(sep).slice(0, -1).join("/");
     if (name.includes("[")) {
       throw new Error(

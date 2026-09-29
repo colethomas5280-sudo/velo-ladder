@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Read `node_modules/next/dist/docs/` before writing any Next.js code.** Required by `AGENTS.md`. This is not the Next.js in your training data.
-- **`npm run verify` is the gate** — lint, `tsc --noEmit`, `npm test`, `npm run build`. All four green before any commit. Chain with `&&`, never `;`.
+- **`npm run verify` is the gate** — lint, `tsc --noEmit`, `npm run build`, `npm test` (in that order: the leak test reads the built `.next/static`). All four green before any commit. Chain with `&&`, never `;`.
 - **COACH-ONLY IS THE POINT OF THIS FEATURE.** Enforced server-side on every route. Athletes and parents must never receive this data in any form: SSR props, RSC payloads, client bundles, shared API responses, exports, or links.
 - **Never import the seed JSON, `lib/veloSeed.ts`, or `lib/veloData.ts` into a client component.** `lib/clientSafe.test.ts` already walks every client component for value imports of server-only modules; it is the mechanism that enforces this.
 - **Never modify `canSeeAthlete` in `lib/scope.ts`.**

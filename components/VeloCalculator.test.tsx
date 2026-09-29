@@ -355,7 +355,19 @@ test("the low side is called notably behind for level, never an outlier", async 
 test("a peak below the average is refused with a message, not a placement", async () => {
   renderPage();
   evaluateSession("16u-hs-jv-soph", "74", "79", "77");
-  assert.match((await screen.findByRole("alert")).textContent!, /high.*(cannot|must)/i);
+  const text = (await screen.findByRole("alert")).textContent!;
+  assert.equal(text, "Low can't be higher than Average, and Average can't be higher than High.");
+  assert.equal(resultCard(), null);
+});
+
+test("the order refusal is plain words: no operator and no raw field names", async () => {
+  renderPage();
+  // Low above Average is the other way to break the order.
+  evaluateSession("16u-hs-jv-soph", "80", "79", "83");
+  const text = (await screen.findByRole("alert")).textContent!;
+  assert.doesNotMatch(text, /<=|>=|\bfloor\b|\bsitting\b|\bpeak\b/);
+  assert.doesNotMatch(text, /—|–/);
+  assert.match(text, /Low can't be higher than Average/);
   assert.equal(resultCard(), null);
 });
 

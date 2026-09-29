@@ -1,6 +1,6 @@
 import { seedLifts } from "./strength";
 import { ALL_SEED_RECIPES } from "./recipes";
-import { VELO_SEED_SQL } from "./veloSeed";
+import { VELO_SEED_SQL, veloSeedData } from "./veloSeed";
 
 /**
  * Canonical database schema. Run once (and after any schema change) via
@@ -607,6 +607,13 @@ export function seedFingerprint(): string {
       r.calories, r.proteinG, r.carbsG, r.fatG,
       r.ingredients, r.steps, r.notes,
     ]),
+    // The velo ladder's rows and sources. Its "Data snapshot" date is read from
+    // this same JSON on every request, but the rows come from the database, so
+    // a re-export that was deployed and never applied would show the new date
+    // over the old numbers. A data-only re-export bumps no schema version, so
+    // hashing the whole snapshot is what lets the setup response show whether
+    // the new export has landed.
+    veloSeedData,
   ]);
   let h = 0x811c9dc5;
   for (let i = 0; i < body.length; i++) {

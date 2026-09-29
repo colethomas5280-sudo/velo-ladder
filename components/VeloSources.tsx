@@ -1,3 +1,5 @@
+"use client";
+
 import type { VeloSource } from "@/lib/veloTypes";
 
 /* ------------------------------------------------------------------ *

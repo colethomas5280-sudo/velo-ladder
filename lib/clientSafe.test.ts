@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import { join, relative, sep } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 /* ------------------------------------------------------------------ *
  * No client component reaches a server-only module
@@ -75,15 +75,46 @@ function serverOnly(): Set<string> {
   return tainted;
 }
 
+/**
+ * Every component file that ships to the browser.
+ *
+ * Starts from the files that say `"use client"`, then adds any component
+ * file they import by relative path (`./X`, `../X`), and so on down. A shared
+ * component with no directive of its own is bundled into the browser all the
+ * same because a client component imports it, and selecting by the directive
+ * alone skipped it: components/VeloSources.tsx had no directive, and a value
+ * import of a server-only module into it would have passed this whole test.
+ * A `type`-only import is erased, so it does not pull anything in.
+ */
+function clientFiles(): string[] {
+  const files = walk(join(process.cwd(), "components"), (f) => f.endsWith(".tsx")).filter(
+    (f) => !f.includes(".test."),
+  );
+  const known = new Set(files);
+  const client = new Set(files.filter((f) => readFileSync(f, "utf8").includes('"use client"')));
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of [...client]) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/^import\s+(?!type\s)[^;]*?from\s+["'](\.{1,2}\/[^"']+)["']/gm)) {
+        const target = resolve(dirname(f), m[1]) + ".tsx";
+        if (known.has(target) && !client.has(target)) {
+          client.add(target);
+          grew = true;
+        }
+      }
+    }
+  }
+  return [...client];
+}
+
 test("no client component takes a value from a module that reaches the database", () => {
   const tainted = serverOnly();
   assert.ok(tainted.has("db") && tainted.has("data"), "the taint walk found nothing");
 
   const offenders: string[] = [];
-  for (const file of walk(join(process.cwd(), "components"), (f) => f.endsWith(".tsx"))) {
-    if (file.includes(".test.")) continue;
+  for (const file of clientFiles()) {
     const src = readFileSync(file, "utf8");
-    if (!src.includes('"use client"')) continue;
     for (const m of src.matchAll(/^import\s+(?!type\s)([^;]*?)from\s+["']@\/lib\/([\w-]+)["']/gm)) {
       // `import { type X }` inside the braces is erased too.
       const named = m[1].replace(/\{[^}]*\}/, (b) =>

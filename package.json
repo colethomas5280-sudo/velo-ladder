@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node scripts/run-tests.mjs",
-    "verify": "npm run lint && tsc --noEmit && npm test && npm run build",
+    "verify": "npm run lint && tsc --noEmit && npm run build && npm test",
     "test:raw": "node --import tsx --test --experimental-test-module-mocks \"lib/**/*.test.ts\" \"components/**/*.test.tsx\""
   },
   "dependencies": {

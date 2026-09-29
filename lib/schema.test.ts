@@ -495,6 +495,52 @@ test("it moves when a recipe's content changes, which the version does not", asy
   assert.equal(seedFingerprint(), before, "and restoring it restores the hash");
 });
 
+/*
+ * The velo ladder: the page shows the snapshot date from the JSON on disk and
+ * the numbers from the database. A data-only re-export changes the JSON and
+ * bumps no schema version, so without this the setup response is identical
+ * whether the new export has landed or not, and the date reads fresh over
+ * stale rows.
+ */
+test("it moves when the velo seed changes, whether the date, a band or a source does", async () => {
+  const { veloSeedData } = await import("@/lib/veloSeed");
+  const before = seedFingerprint();
+
+  const meta = veloSeedData.meta;
+  const range = veloSeedData.ranges[0];
+  const source = veloSeedData.sources[0];
+  const original = {
+    date: meta.snapshot_date,
+    low: range.combined_low,
+    notes: range.notes,
+    limitations: source.limitations_summary,
+  };
+  try {
+    meta.snapshot_date = "2099-01-01";
+    assert.notEqual(seedFingerprint(), before, "a new snapshot date is invisible");
+    meta.snapshot_date = original.date;
+    assert.equal(seedFingerprint(), before, "restoring the date restores the hash");
+
+    range.combined_low = (original.low ?? 0) + 1;
+    assert.notEqual(seedFingerprint(), before, "a corrected band is invisible");
+    range.combined_low = original.low;
+    assert.equal(seedFingerprint(), before, "restoring the band restores the hash");
+
+    range.notes = `${original.notes} (revised)`;
+    assert.notEqual(seedFingerprint(), before, "a revised row note is invisible");
+    range.notes = original.notes;
+
+    source.limitations_summary = `${original.limitations} (revised)`;
+    assert.notEqual(seedFingerprint(), before, "a revised source is invisible");
+  } finally {
+    meta.snapshot_date = original.date;
+    range.combined_low = original.low;
+    range.notes = original.notes;
+    source.limitations_summary = original.limitations;
+  }
+  assert.equal(seedFingerprint(), before, "and everything restored is the same hash");
+});
+
 test("it moves when the lift menu changes too", async () => {
   const { seedLifts } = await import("@/lib/strength");
   assert.ok(seedFingerprint().length === 8 && seedLifts().length > 0);
