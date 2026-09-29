@@ -1,15 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { VeloRange, VeloSource } from "@/lib/veloTypes";
-import {
-  bandFor,
-  evaluate,
-  type Hand,
-  type PlacementFlag,
-  type PlacementResult,
-} from "@/lib/veloPlacement";
-import { FATIGUE_GAP_FLAG_MPH, PEAK_GAP_FLAG_MPH } from "@/lib/veloConfig";
+import type { Hand, PlacementFlag, PlacementResult } from "@/lib/veloPlacement";
+import { api, ApiError } from "@/lib/fetcher";
 import { ratingPill } from "./VeloSources";
 
 /* ------------------------------------------------------------------ *
@@ -17,26 +11,45 @@ import { ratingPill } from "./VeloSources";
  *
  * Mounted inside VeloLadderBody, which only renders after the coach role
  * check and which already holds the rows and sources it fetched from the
- * gated routes. So this takes them as props and fetches nothing: there is no
- * second data path, and nothing here is reachable by anyone the page itself
- * is not.
+ * gated routes. So the rows come in as props.
  *
- * All of the deciding happens in lib/veloPlacement.ts. This file collects
- * three radar numbers, hands them to evaluate, and shows everything that
- * comes back: the placement always sits next to its confidence rating and
- * its disclosures, because a placement without them reads as more certain
- * than the row behind it.
+ * The placing itself does NOT happen here. It happens on the server, at
+ * POST /api/velo/evaluate, and this file only sends three radar numbers and
+ * a row slug and renders what comes back. That is deliberate: the
+ * classifier and its coaching wording (the disclosures, the labels) live in
+ * lib/veloPlacement.ts, and the coach's rule is that none of that wording
+ * may be in code the browser downloads. Every import of it below is
+ * `import type`, which is erased at compile time, and lib/clientSafe.test.ts
+ * fails the build if a value import of it ever appears in a client file.
+ *
+ * The placement always sits next to its confidence rating and its
+ * disclosures, because a placement without them reads as more certain than
+ * the row behind it.
  *
  * Nothing is saved. There is no athlete on this form.
  * ------------------------------------------------------------------ */
 
-/** What each flag says, in the coach's terms. The thresholds come from the
- * same config the classifier reads, so the wording cannot drift from them. */
+/** What each flag says, in the coach's terms. No thresholds are quoted: the
+ * numbers live with the classifier on the server, and a copy here could only
+ * drift from it. */
 const FLAG_TEXT: Record<PlacementFlag, string> = {
-  PROJECTABILITY_GAP: `Projectability gap: High is ${PEAK_GAP_FLAG_MPH} or more mph above Average. Could be untapped ceiling, or inconsistent effort or mechanics.`,
-  FATIGUE_OR_CONSISTENCY: `Fatigue or consistency: Low is ${FATIGUE_GAP_FLAG_MPH} or more mph below Average. Read it as fatigue or conditioning across the outing, not a talent signal.`,
+  PROJECTABILITY_GAP:
+    "Projectability gap: High is well above Average. Could be untapped ceiling, or inconsistent effort or mechanics.",
+  FATIGUE_OR_CONSISTENCY:
+    "Fatigue or consistency: Low is well below Average. Read it as fatigue or conditioning across the outing, not a talent signal.",
   PEAK_ABOVE_BAND: "Peak above the band: High is above the top of the band used.",
 };
+
+/** A row nobody has sourced a band for yet. Display logic only: it decides
+ * what the level list greys out, not where anyone is placed. */
+function hasNoBand(r: VeloRange): boolean {
+  const pair = (lo: number | null, hi: number | null) => lo != null && hi != null;
+  return !(
+    pair(r.combinedLow, r.combinedHigh) ||
+    pair(r.rhpLow, r.rhpHigh) ||
+    pair(r.lhpLow, r.lhpHigh)
+  );
+}
 
 /** evaluate names the three inputs floor, sitting and peak. The form calls
  * them Low, Average and High, so its refusals are shown in the form's words. */
@@ -85,7 +98,7 @@ function writeUp(o: Outcome, sourcesBySlug: Map<string, VeloSource>): string {
     `Confidence: ${result.confidence ?? "No rating"}`,
   ];
   if (range.eliteTrajectoryRef != null) {
-    lines.push(`Elite trajectory reference: ${range.eliteTrajectoryRef} mph`);
+    lines.push(`Elite ref: ${range.eliteTrajectoryRef} mph`);
   }
   if (sources.length > 0) {
     lines.push("Sources:", ...sources.map((s) => `- ${s.title} (${s.quality})`));
@@ -151,7 +164,7 @@ function ResultCard({
         </dd>
         {range.eliteTrajectoryRef != null && (
           <>
-            <dt>Elite trajectory reference</dt>
+            <dt>Elite ref</dt>
             <dd>{range.eliteTrajectoryRef} mph</dd>
           </>
         )}
@@ -220,20 +233,31 @@ export default function VeloCalculator({
   const [high, setHigh] = useState("");
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  /** Bumped by every run and every edit, so a slow answer can tell it is stale. */
+  const latest = useRef(0);
 
   const primaryGroups = groups
     .map((g) => ({ category: g.category, rows: g.rows.filter((r) => r.rowType === "primary") }))
     .filter((g) => g.rows.length > 0);
-  const range = primaryGroups.flatMap((g) => g.rows).find((r) => r.slug === slug) ?? null;
+  // Only rows with a band can be chosen, so a row with none cannot be
+  // evaluated however the form got into that state.
+  const range =
+    primaryGroups
+      .flatMap((g) => g.rows)
+      .find((r) => r.slug === slug && !hasNoBand(r)) ?? null;
 
   /* A result belongs to the numbers that produced it, so any edit retires it. */
   const edit = <T,>(set: (v: T) => void) => (v: T) => {
+    latest.current++;
     set(v);
     setOutcome(null);
     setErr(null);
+    setBusy(false);
   };
 
-  function run() {
+  async function run() {
+    const ticket = ++latest.current;
     setOutcome(null);
     if (!range) {
       setErr("Choose a level first.");
@@ -243,19 +267,31 @@ export default function VeloCalculator({
       setErr("Enter Low, Average and High from the session.");
       return;
     }
-    const res = evaluate({
-      range,
-      hand: hand ?? undefined,
-      floor: Number(low),
-      sitting: Number(avg),
-      peak: Number(high),
-    });
-    if (!res.ok) {
-      setErr(inFormWords(res.error));
-      return;
-    }
+    const sent = { range, hand, low: Number(low), avg: Number(avg), high: Number(high) };
+    setBusy(true);
     setErr(null);
-    setOutcome({ range, hand, low: Number(low), avg: Number(avg), high: Number(high), result: res });
+    try {
+      const result = await api<PlacementResult>("/api/velo/evaluate", "POST", {
+        slug: range.slug,
+        hand,
+        floor: sent.low,
+        sitting: sent.avg,
+        peak: sent.high,
+      });
+      // The form moved on while this was in flight: that answer is about
+      // numbers no longer on screen.
+      if (ticket !== latest.current) return;
+      setOutcome({ ...sent, result });
+    } catch (e) {
+      if (ticket !== latest.current) return;
+      setErr(
+        e instanceof ApiError
+          ? inFormWords(e.message)
+          : "Couldn't place that session. Check your connection.",
+      );
+    } finally {
+      if (ticket === latest.current) setBusy(false);
+    }
   }
 
   return (
@@ -274,7 +310,7 @@ export default function VeloCalculator({
               {primaryGroups.map((g) => (
                 <optgroup key={g.category} label={g.category}>
                   {g.rows.map((r) => {
-                    const empty = bandFor(r, "R") == null && bandFor(r, "L") == null;
+                    const empty = hasNoBand(r);
                     return (
                       <option key={r.slug} value={r.slug} disabled={empty}>
                         {empty ? `${r.level} (No data yet)` : r.level}
@@ -342,8 +378,8 @@ export default function VeloCalculator({
         )}
 
         <div className="vc-actions">
-          <button type="button" className="btn primary" onClick={run}>
-            Evaluate
+          <button type="button" className="btn primary" disabled={busy} onClick={run}>
+            {busy ? "Placing\u2026" : "Evaluate"}
           </button>
         </div>
       </section>

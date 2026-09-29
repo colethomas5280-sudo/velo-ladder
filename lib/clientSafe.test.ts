@@ -47,9 +47,16 @@ function serverOnly(): Set<string> {
     // veloSeed itself ever touches the database. It is a root in its own
     // right, not just another node the "db" walk happens to reach.
     if (/@\/lib\/veloSeed|from ["']\.\/veloSeed["']/.test(src)) deps.push("veloSeed");
+    // lib/veloPlacement.ts carries the coach's coaching wording word for word
+    // (the disclosures, the classification labels). The coach's rule is that
+    // none of it may be in code the browser downloads, and a value import into
+    // a client component is exactly how it would get there. So it is a root
+    // too. A type-only import is erased and is not an offender; the component
+    // check below already skips those.
+    if (/@\/lib\/veloPlacement|from ["']\.\/veloPlacement["']/.test(src)) deps.push("veloPlacement");
     imports.set(name, deps);
   }
-  const tainted = new Set<string>(["db", "veloSeed"]);
+  const tainted = new Set<string>(["db", "veloSeed", "veloPlacement"]);
   for (let pass = 0; pass < files.length; pass++) {
     let grew = false;
     for (const [name, deps] of imports)
@@ -88,6 +95,7 @@ test("the taint walk reaches through a chain, not just direct imports", () => {
   const tainted = serverOnly();
   assert.equal(tainted.has("dashboard"), true, "dashboard imports db");
   assert.equal(tainted.has("scope"), true, "scope imports db");
+  assert.equal(tainted.has("veloPlacement"), true, "veloPlacement holds the coach's wording");
   assert.equal(tainted.has("velo"), false, "velo is pure");
   assert.equal(tainted.has("screen"), false, "and so is screen");
   assert.equal(tainted.has("types"), false, "which is why the constants moved there");

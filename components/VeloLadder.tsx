@@ -252,7 +252,7 @@ function VeloLadderBody({ snapshotDate }: { snapshotDate: string }) {
                     <tr>
                       <th>Level</th>
                       <th>Band</th>
-                      <th>Elite Trajectory</th>
+                      <th>Elite Ref</th>
                       <th>Confidence</th>
                       <th>Sources</th>
                     </tr>

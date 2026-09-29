@@ -1,8 +1,9 @@
 import "./testDom";
-import { test, beforeEach } from "node:test";
+import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import type { VeloRange, VeloSource } from "@/lib/veloTypes";
+import { DISCLOSURES, evaluate } from "@/lib/veloPlacement";
 import { withSwr } from "./testSwr";
 import VeloLadder from "./VeloLadder";
 
@@ -15,9 +16,17 @@ import VeloLadder from "./VeloLadder";
  * gets that far. Fixtures copy the shape and bands of the real snapshot; no
  * import from lib/veloSeed.ts, which lib/clientSafe.test.ts would flag.
  *
- * The classification itself is tested in lib/veloPlacement.test.ts. What is
- * tested here is that the UI hands evaluate the right thing and then shows
- * everything evaluate returns, above all the confidence and the disclosures.
+ * The placing happens on the server (POST /api/velo/evaluate, tested in
+ * lib/veloRoute.test.ts) and the classification itself in
+ * lib/veloPlacement.test.ts. What is tested here is that the UI sends the
+ * server the right thing and then shows everything it sends back, above all
+ * the confidence and the disclosures.
+ *
+ * The server is stood in for by a fetch stub that runs the real `evaluate`
+ * against the fixture rows. Importing it here is fine: this is a test, not a
+ * client component, and it is the same function the route calls. The
+ * disclosures are asserted as the exact strings from DISCLOSURES rather than
+ * fragments of them, so a reworded caveat fails here instead of slipping by.
  * ------------------------------------------------------------------ */
 
 const NONE = {
@@ -145,6 +154,40 @@ const SOURCES: VeloSource[] = [
   },
 ];
 
+/** What the browser sent to the evaluate route, one entry per call. */
+let sent: Record<string, unknown>[] = [];
+const realFetch = globalThis.fetch;
+
+/**
+ * Stands in for POST /api/velo/evaluate: finds the row by slug in the
+ * fixtures and answers the way the route does, 200 with the result or 400
+ * with evaluate's own message. `hold` makes it wait, for the stale-answer test.
+ */
+function stubServer(hold?: Promise<void>) {
+  globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+    if (String(input) !== "/api/velo/evaluate" || init?.method !== "POST") {
+      throw new Error(`unexpected fetch ${String(input)}`);
+    }
+    const body = JSON.parse(String(init.body));
+    sent.push(body);
+    if (hold) await hold;
+    const range = RANGES.find((r) => r.slug === body.slug);
+    const res = range
+      ? evaluate({
+          range,
+          hand: body.hand ?? undefined,
+          floor: body.floor,
+          sitting: body.sitting,
+          peak: body.peak,
+        })
+      : ({ ok: false, error: `No such level: ${body.slug}` } as const);
+    return new Response(JSON.stringify(res.ok ? res : { error: res.error }), {
+      status: res.ok ? 200 : 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }) as typeof fetch;
+}
+
 const renderPage = (
   me: { role: "coach" | "athlete" | "none"; athleteId: string | null } = {
     role: "coach",
@@ -158,12 +201,20 @@ const renderPage = (
     ),
   );
 
-beforeEach(cleanup);
+beforeEach(() => {
+  cleanup();
+  sent = [];
+  stubServer();
+});
+afterEach(() => {
+  globalThis.fetch = realFetch;
+});
 
 const levelSelect = () => screen.getByLabelText("Level") as HTMLSelectElement;
 const option = (slug: string) => [...levelSelect().options].find((o) => o.value === slug);
 const hand = (h: "R" | "L") => screen.getByRole("button", { name: `${h} throwing hand` });
 const resultCard = () => screen.queryByRole("region", { name: "Placement result" });
+const placed = () => screen.findByRole("region", { name: "Placement result" });
 
 /** Fill the form and press Evaluate. `h` left out means no hand chosen. */
 function evaluateSession(slug: string, low: string, avg: string, high: string, h?: "R" | "L") {
@@ -193,17 +244,26 @@ test("only primary rows are selectable, and the empty ones are disabled", () => 
   assert.equal(option("16u-hs-jv-soph")!.disabled, false);
 });
 
-test("evaluating a 16U session shows the placement, the band and the confidence", () => {
+test("an empty row cannot be evaluated even if the select is forced onto it", async () => {
+  renderPage();
+  evaluateSession("milb-aaa", "74", "79", "83");
+  assert.match((await screen.findByRole("alert")).textContent!, /Choose a level/);
+  assert.equal(sent.length, 0, "nothing goes to the server for a row with no band");
+  assert.equal(resultCard(), null);
+});
+
+test("evaluating a 16U session shows the placement, the band and the confidence", async () => {
   renderPage();
   evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  const card = await placed();
   assert.match(text(), /upper half/i);
   assert.match(text(), /69/);
   assert.match(text(), /Medium/);
-  const card = resultCard()!;
   assert.match(card.textContent!, /16U \(HS JV\/Soph\)/);
   assert.match(card.textContent!, /High School/);
   assert.match(card.textContent!, /69-85 mph/);
   assert.match(card.textContent!, /midpoint 77/);
+  assert.match(card.textContent!, /Elite ref/);
   assert.match(card.textContent!, /89 mph/, "the elite reference is shown when the row has one");
   assert.match(card.textContent!, /Win Reality: Pitch Speed by Age/);
   assert.match(card.textContent!, /Eisenmann: MLB Velocity Trajectory/);
@@ -211,10 +271,19 @@ test("evaluating a 16U session shows the placement, the band and the confidence"
   assert.match(card.textContent!, /Projectability gap/);
 });
 
-test("a JUCO right-hander at 84 / 88 / 91 matches the guide's worked example", () => {
+test("the browser sends the server a slug, a hand and three numbers, and no band", async () => {
   renderPage();
   evaluateSession("juco", "84", "88", "91", "R");
-  const card = resultCard()!;
+  await placed();
+  assert.deepEqual(sent, [
+    { slug: "juco", hand: "R", floor: 84, sitting: 88, peak: 91 },
+  ]);
+});
+
+test("a JUCO right-hander at 84 / 88 / 91 matches the guide's worked example", async () => {
+  renderPage();
+  evaluateSession("juco", "84", "88", "91", "R");
+  const card = await placed();
   const label = card.querySelector(".vc-label")!.textContent!;
   assert.equal(label, "Average, upper half");
   assert.match(card.textContent!, /RHP 82-90 mph/);
@@ -223,64 +292,83 @@ test("a JUCO right-hander at 84 / 88 / 91 matches the guide's worked example", (
   assert.doesNotMatch(label, /outlier/i);
 });
 
-test("the low side is called notably behind for level, never an outlier", () => {
+test("the low side is called notably behind for level, never an outlier", async () => {
   renderPage();
   evaluateSession("juco", "70", "75", "78", "R");
-  const label = document.querySelector(".vc-label")!.textContent!;
+  const card = await placed();
+  const label = card.querySelector(".vc-label")!.textContent!;
   assert.match(label, /notably behind for level/i);
   assert.doesNotMatch(label, /outlier/i);
 });
 
-test("a peak below the average is refused with a message, not a placement", () => {
+test("a peak below the average is refused with a message, not a placement", async () => {
   renderPage();
   evaluateSession("16u-hs-jv-soph", "74", "79", "77");
-  assert.match(screen.getByRole("alert").textContent!, /high.*(cannot|must)/i);
+  assert.match((await screen.findByRole("alert")).textContent!, /high.*(cannot|must)/i);
   assert.equal(resultCard(), null);
 });
 
-test("a blank field asks for all three numbers instead of guessing zero", () => {
+test("a blank field asks for all three numbers instead of guessing zero", async () => {
   renderPage();
   evaluateSession("16u-hs-jv-soph", "74", "", "83");
-  assert.match(screen.getByRole("alert").textContent!, /Low, Average and High/);
+  assert.match((await screen.findByRole("alert")).textContent!, /Low, Average and High/);
+  assert.equal(sent.length, 0);
   assert.equal(resultCard(), null);
 });
 
-test("no level chosen asks for one", () => {
+test("no level chosen asks for one", async () => {
   renderPage();
   fireEvent.click(screen.getByRole("button", { name: "Evaluate" }));
-  assert.match(screen.getByRole("alert").textContent!, /level/i);
+  assert.match((await screen.findByRole("alert")).textContent!, /level/i);
   assert.equal(resultCard(), null);
 });
 
-test("the disclosures always appear with a result", () => {
+test("the disclosures always appear with a result, word for word", async () => {
   renderPage();
   evaluateSession("16u-hs-jv-soph", "74", "79", "83");
-  assert.match(text(), /only as certain as that rating/i);
-  assert.match(text(), /only defensible for 13U and 18U/i);
+  const card = await placed();
+  const shown = [...card.querySelectorAll(".vc-disc li")].map((li) => li.textContent);
+  assert.deepEqual(shown, [DISCLOSURES.confidence("Medium"), DISCLOSURES.percentileScope]);
 });
 
-test("the disclosures appear on the low side too, with the late-development note", () => {
+test("the disclosures appear on the low side too, with the late-development note", async () => {
   renderPage();
   evaluateSession("juco", "70", "75", "78", "R");
-  assert.match(text(), /only as certain as that rating/i);
-  assert.match(text(), /only defensible for 13U and 18U/i);
-  assert.match(text(), /late development/i);
+  const card = await placed();
+  const shown = [...card.querySelectorAll(".vc-disc li")].map((li) => li.textContent);
+  assert.deepEqual(shown, [
+    DISCLOSURES.confidence("Medium"),
+    DISCLOSURES.percentileScope,
+    DISCLOSURES.belowRangeNormal,
+  ]);
 });
 
-test("a hand-split row demands a hand", () => {
+test("a hand-split row demands a hand", async () => {
   renderPage();
   // D1 Power 4 splits by hand and no hand is chosen
   evaluateSession("ncaa-d1-power-4", "90", "93", "95");
-  assert.match(screen.getByRole("alert").textContent!, /throwing hand is required/i);
+  assert.match((await screen.findByRole("alert")).textContent!, /throwing hand is required/i);
   assert.equal(resultCard(), null);
 });
 
-test("editing an input clears a result that no longer matches it", () => {
+test("editing an input clears a result that no longer matches it", async () => {
   renderPage();
   evaluateSession("16u-hs-jv-soph", "74", "79", "83");
-  assert.ok(resultCard());
+  await placed();
   fireEvent.change(screen.getByLabelText("Average"), { target: { value: "80" } });
   assert.equal(resultCard(), null);
+});
+
+test("an answer that arrives after the form changed is dropped", async () => {
+  let release!: () => void;
+  stubServer(new Promise<void>((r) => (release = r)));
+  renderPage();
+  evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  fireEvent.change(screen.getByLabelText("Average"), { target: { value: "80" } });
+  release();
+  await waitFor(() => assert.equal(sent.length, 1));
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(resultCard(), null, "the result was for Average 79, which is no longer on screen");
 });
 
 test("the write-up copies the placement, the confidence and the disclosures", async () => {
@@ -295,12 +383,13 @@ test("the write-up copies the placement, the confidence and the disclosures", as
     },
   });
   evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  await placed();
   fireEvent.click(screen.getByRole("button", { name: "Copy write-up" }));
   await waitFor(() => assert.notEqual(copied, ""));
   assert.match(copied, /Average, upper half/);
   assert.match(copied, /Confidence: Medium/);
-  assert.match(copied, /only as certain as that rating/);
-  assert.match(copied, /only defensible for 13U and 18U/);
+  assert.ok(copied.includes(DISCLOSURES.confidence("Medium")));
+  assert.ok(copied.includes(DISCLOSURES.percentileScope));
   assert.match(copied, /69-85 mph/);
   await waitFor(() => screen.getByText("Copied"));
 });
@@ -316,10 +405,11 @@ test("a blocked clipboard leaves the write-up on screen to copy by hand", async 
     },
   });
   evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  await placed();
   fireEvent.click(screen.getByRole("button", { name: "Copy write-up" }));
   const box = (await screen.findByLabelText("Write-up")) as HTMLTextAreaElement;
   assert.match(box.value, /Confidence: Medium/);
-  assert.match(box.value, /only defensible for 13U and 18U/);
+  assert.ok(box.value.includes(DISCLOSURES.percentileScope));
   assert.match(screen.getByRole("alert").textContent!, /Couldn.t copy/);
 });
 

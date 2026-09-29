@@ -710,6 +710,13 @@ test("the anchor and secondary rows are marked reference-only", () => {
   assert.equal(juco.querySelector(".vl-refonly"), null);
 });
 
+test("the column is headed Elite Ref, not the longer name", () => {
+  renderLadder();
+  const heads = [...document.querySelectorAll("th")].map((th) => th.textContent);
+  assert.ok(heads.includes("Elite Ref"));
+  assert.doesNotMatch(document.body.textContent!, /Elite Trajectory/);
+});
+
 test("the banner and the snapshot date are both shown", () => {
   renderLadder();
   assert.match(document.body.textContent!, /check the Confidence rating/i);
