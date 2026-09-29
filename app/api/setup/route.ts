@@ -8,6 +8,7 @@ import {
 } from "@/lib/schema";
 import { missingSeedLifts, seedLifts } from "@/lib/strength";
 import { ALL_SEED_RECIPES, missingSeedRecipes } from "@/lib/recipes";
+import { hasNoBand, missingSeedVelo, veloSeedData, veloWarnings } from "@/lib/veloSeed";
 import { json } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,37 @@ async function verify() {
       }[])
     : [];
 
+  /*
+   * The velo ladder, against what the JSON says it should hold.
+   *
+   * Read from the tables, never from the seed, so it reports what is really
+   * there. `noData` is the number Cole eyeballs on /velo (the four levels that
+   * read "No data yet"), and `snapshot` is the export date, so a re-export that
+   * landed is visible here and one that did not is not.
+   */
+  const veloRanges = present.has("velo_ranges")
+    ? ((await sql`
+        SELECT slug, rhp_low, lhp_low, combined_low FROM velo_ranges
+      `) as {
+        slug: string;
+        rhp_low: unknown;
+        lhp_low: unknown;
+        combined_low: unknown;
+      }[])
+    : [];
+  const veloSources = present.has("velo_sources")
+    ? ((await sql`SELECT slug FROM velo_sources`) as { slug: string }[])
+    : [];
+  const veloLinks = present.has("velo_range_sources")
+    ? ((await sql`SELECT count(*)::int AS n FROM velo_range_sources`) as {
+        n: number;
+      }[])[0].n
+    : 0;
+  const veloMissing = missingSeedVelo(
+    veloRanges.map((r) => r.slug),
+    veloSources.map((s) => s.slug),
+  );
+
   return {
     ...meta,
     tables: Object.fromEntries(
@@ -84,6 +116,28 @@ async function verify() {
       live: menu.filter((r) => !r.archived).length,
       archived: menu.filter((r) => r.archived).length,
       missingSeed: missingSeedLifts(menu.map((r) => r.key)),
+    },
+    velo: {
+      snapshot: veloSeedData.meta.snapshot_date,
+      ranges: {
+        live: veloRanges.length,
+        expected: veloSeedData.ranges.length,
+        // A null band stays null through pg; a numeric one arrives as a string.
+        noData: veloRanges.filter(
+          (r) => r.rhp_low === null && r.lhp_low === null && r.combined_low === null,
+        ).length,
+        expectedNoData: veloSeedData.ranges.filter(hasNoBand).length,
+        missingSeed: veloMissing.ranges,
+      },
+      sources: {
+        live: veloSources.length,
+        expected: veloSeedData.sources.length,
+        missingSeed: veloMissing.sources,
+      },
+      links: {
+        live: veloLinks,
+        expected: veloSeedData.ranges.reduce((n, r) => n + r.source_slugs.length, 0),
+      },
     },
     recipes: {
       live: library.filter((r) => !r.archived).length,
@@ -187,7 +241,9 @@ export async function GET(request: Request) {
       seed,
       // Named rather than left in the numbers: a lift that failed to insert
       // is a lift athletes cannot log, and a standard with nothing to bind to.
-      ...(state.lifts.missingSeed.length || state.recipes.missingSeed.length
+      ...(state.lifts.missingSeed.length ||
+      state.recipes.missingSeed.length ||
+      veloWarnings(state.velo).length
         ? {
             warning: [
               state.lifts.missingSeed.length &&
@@ -196,6 +252,7 @@ export async function GET(request: Request) {
               state.recipes.missingSeed.length &&
                 `${state.recipes.missingSeed.length} seed recipe(s) are missing: ` +
                   `${state.recipes.missingSeed.join(", ")}.`,
+              ...veloWarnings(state.velo),
               state.recipes.unsorted &&
                 `${state.recipes.unsorted} recipe(s) belong to no meal, so the ` +
                   `breakfast, lunch and dinner filters will find nothing. ` +

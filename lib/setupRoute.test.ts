@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { seedLifts } from "@/lib/strength";
 import { ALL_SEED_RECIPES } from "@/lib/recipes";
+import { veloSeedData } from "@/lib/veloSeed";
 
 /* ------------------------------------------------------------------ *
  * What /api/setup can actually tell Cole
@@ -36,6 +37,12 @@ type Body = {
   missing: string[];
   lifts: { live: number; archived: number; missingSeed: string[] };
   recipes: { live: number; archived: number; missingSeed: string[]; unsorted: number };
+  velo: {
+    snapshot: string;
+    ranges: { live: number; expected: number; noData: number; expectedNoData: number; missingSeed: string[] };
+    sources: { live: number; expected: number; missingSeed: string[] };
+    links: { live: number; expected: number };
+  };
 };
 
 let route: typeof import("../app/api/setup/route");
@@ -254,4 +261,78 @@ test("the response names the deployment that answered it", async () => {
   const body = (await run()) as unknown as { commit?: string; seedHash?: string };
   assert.equal(body.commit, "local", "no VERCEL_GIT_COMMIT_SHA outside a build");
   assert.match(body.seedHash!, /^[0-9a-f]{8}$/);
+});
+
+
+/* ------------------------------------------------------------------ *
+ * The velo benchmark seed
+ *
+ * The ladder's rows are upserted from a JSON snapshot. "The three tables
+ * exist" was all the response could say, so a re-export that failed to land
+ * looked identical to one that had, which is the same trap the lift menu and
+ * the recipe library each fell into once.
+ * ------------------------------------------------------------------ */
+
+const EXPECTED_NO_DATA = veloSeedData.ranges.filter(
+  (r) =>
+    r.rhp_low === null && r.lhp_low === null && r.combined_low === null,
+).length;
+const EXPECTED_LINKS = veloSeedData.ranges.reduce(
+  (n, r) => n + r.source_slugs.length,
+  0,
+);
+
+test("a clean run reports the whole velo seed against what it expects", async () => {
+  const body = await run();
+  assert.equal(body.ok, true, body.error);
+  assert.equal(body.velo.snapshot, veloSeedData.meta.snapshot_date);
+  assert.equal(body.velo.ranges.live, veloSeedData.ranges.length);
+  assert.equal(body.velo.ranges.expected, veloSeedData.ranges.length);
+  assert.equal(body.velo.sources.live, veloSeedData.sources.length);
+  assert.equal(body.velo.sources.expected, veloSeedData.sources.length);
+  assert.equal(body.velo.links.live, EXPECTED_LINKS);
+  assert.equal(body.velo.links.expected, EXPECTED_LINKS);
+  assert.deepEqual(body.velo.ranges.missingSeed, []);
+  assert.deepEqual(body.velo.sources.missingSeed, []);
+  assert.equal(body.warning, undefined);
+});
+
+test("the count of levels with no data is reported, and is the four the page shows", async () => {
+  /*
+   * The number Cole actually eyeballs on /velo: Independent Pro and the three
+   * MiLB tiers read "No data yet". Reported from the DATABASE and compared
+   * with what the seed says it should be, so a band that failed to land as a
+   * number, or one that landed as a zero, moves it.
+   */
+  const body = await run();
+  assert.equal(EXPECTED_NO_DATA, 4, "the seed itself has four empty levels");
+  assert.equal(body.velo.ranges.noData, EXPECTED_NO_DATA);
+  assert.equal(body.velo.ranges.expectedNoData, EXPECTED_NO_DATA);
+});
+
+test("a velo level missing from the ladder is put back, and named nowhere once it is", async () => {
+  const { sql } = await import("@/lib/db");
+  await sql`DELETE FROM velo_ranges WHERE slug = 'juco'`;
+  const [gone] = (await sql`SELECT count(*)::int AS n FROM velo_ranges WHERE slug = 'juco'`) as { n: number }[];
+  assert.equal(gone.n, 0, "removed, so the repair is a real one");
+
+  const body = await run();
+  assert.deepEqual(body.velo.ranges.missingSeed, [], "back on the ladder");
+  assert.equal(body.velo.ranges.live, veloSeedData.ranges.length);
+  // Its source links are part of the row's meaning: cascade removed them, and
+  // the seed must have restored them, or the count below is short.
+  assert.equal(body.velo.links.live, EXPECTED_LINKS);
+});
+
+test("a value edited in the database is overwritten by the next run, which is by design", async () => {
+  /*
+   * Notion is the source of truth and the upsert is how a correction there
+   * lands. The flip side is that an edit made in the database does not stick,
+   * which Cole should be able to see is deliberate rather than discover.
+   */
+  const { sql } = await import("@/lib/db");
+  await sql`UPDATE velo_ranges SET notes = 'EDITED IN THE DATABASE' WHERE slug = '13u'`;
+  await run();
+  const [row] = (await sql`SELECT notes FROM velo_ranges WHERE slug = '13u'`) as { notes: string }[];
+  assert.notEqual(row.notes, "EDITED IN THE DATABASE");
 });

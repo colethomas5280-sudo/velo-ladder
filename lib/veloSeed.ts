@@ -90,3 +90,86 @@ const joinRows = veloSeedData.ranges
   .join("\n");
 
 export const VELO_SEED_SQL = [sourceRows, rangeRows, joinRows].join("\n");
+
+/**
+ * Which seeded rows are absent from the database, by slug.
+ *
+ * The seed upserts and never deletes, so nothing here ever leaves a table:
+ * a slug named is one that genuinely failed to land. Same idea as the lift
+ * menu's and the recipe library's missing-seed checks, and for the same
+ * reason: "the tables exist" was all the setup response could say, which
+ * looks identical whether a re-export landed or not.
+ */
+export function missingSeedVelo(
+  rangeSlugs: readonly string[],
+  sourceSlugs: readonly string[],
+): { ranges: string[]; sources: string[] } {
+  const haveRanges = new Set(rangeSlugs);
+  const haveSources = new Set(sourceSlugs);
+  return {
+    ranges: veloSeedData.ranges
+      .filter((r) => !haveRanges.has(r.slug))
+      .map((r) => r.slug),
+    sources: veloSeedData.sources
+      .filter((s) => !haveSources.has(s.slug))
+      .map((s) => s.slug),
+  };
+}
+
+/** A level with no band of any kind: what the ladder renders as "No data yet". */
+export function hasNoBand(r: {
+  rhp_low: number | null;
+  lhp_low: number | null;
+  combined_low: number | null;
+}): boolean {
+  return r.rhp_low === null && r.lhp_low === null && r.combined_low === null;
+}
+
+/** What /api/setup reads back about the ladder, against what the seed expects. */
+export interface VeloSetupState {
+  ranges: {
+    live: number;
+    expected: number;
+    noData: number;
+    expectedNoData: number;
+    missingSeed: string[];
+  };
+  sources: { live: number; expected: number; missingSeed: string[] };
+  links: { live: number; expected: number };
+}
+
+/**
+ * The sentences setup adds to its response when the ladder is short.
+ *
+ * A pure function of the state so every branch can be tested on its own. The
+ * seed repairs a missing row before the check ever reads the table, which means
+ * a real shortfall cannot be staged through the database: without this, a
+ * branch like "only 60 of 68 links landed" would have no test that could ever
+ * reach it.
+ *
+ * Empty when nothing is wrong, so a clean run carries no warning at all.
+ */
+export function veloWarnings(v: VeloSetupState): string[] {
+  const out: string[] = [];
+  if (v.ranges.missingSeed.length)
+    out.push(
+      `${v.ranges.missingSeed.length} velo level(s) are missing: ` +
+        `${v.ranges.missingSeed.join(", ")}.`,
+    );
+  if (v.sources.missingSeed.length)
+    out.push(
+      `${v.sources.missingSeed.length} velo source(s) are missing: ` +
+        `${v.sources.missingSeed.join(", ")}.`,
+    );
+  if (v.links.live < v.links.expected)
+    out.push(
+      `Only ${v.links.live} of ${v.links.expected} velo source links landed, ` +
+        `so some levels will show fewer sources than they cite.`,
+    );
+  if (v.ranges.noData !== v.ranges.expectedNoData)
+    out.push(
+      `${v.ranges.noData} velo level(s) read "No data yet" but the seed says ` +
+        `${v.ranges.expectedNoData}.`,
+    );
+  return out;
+}
