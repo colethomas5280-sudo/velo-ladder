@@ -62,7 +62,9 @@ export function veloSnapshotDate(): string {
 }
 
 /** Single-quote escaping for a SQL literal, or NULL. */
-const q = (v: string | null): string =>
+// Exported so the escaping can be tested directly, not only through whatever
+// happens to be in a note this month.
+export const q = (v: string | null): string =>
   v === null ? "NULL" : `'${v.replace(/'/g, "''")}'`;
 const n = (v: number | null): string => (v === null ? "NULL" : String(v));
 

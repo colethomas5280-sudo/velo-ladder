@@ -297,17 +297,17 @@ test("a clean run reports the whole velo seed against what it expects", async ()
   assert.equal(body.warning, undefined);
 });
 
-test("the count of levels with no data is reported, and is the four the page shows", async () => {
+test("the count of levels with no data is reported, and agrees with the seed", async () => {
   /*
-   * The number Cole actually eyeballs on /velo: Independent Pro and the three
-   * MiLB tiers read "No data yet". Reported from the DATABASE and compared
-   * with what the seed says it should be, so a band that failed to land as a
-   * number, or one that landed as a zero, moves it.
+   * The number Cole eyeballs on /velo: the levels that read "No data yet".
+   * Reported from the DATABASE and compared with what the seed says it should
+   * be, so a band that failed to land as a number, or one that landed as a
+   * zero, moves it. Not pinned to any particular number: it is four today and
+   * falls the day he sources pro-level data.
    */
   const body = await run();
-  assert.equal(EXPECTED_NO_DATA, 4, "the seed itself has four empty levels");
-  assert.equal(body.velo.ranges.noData, EXPECTED_NO_DATA);
   assert.equal(body.velo.ranges.expectedNoData, EXPECTED_NO_DATA);
+  assert.equal(body.velo.ranges.noData, EXPECTED_NO_DATA);
 });
 
 test("a velo level missing from the ladder is put back, and named nowhere once it is", async () => {

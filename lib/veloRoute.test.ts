@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DISCLOSURES } from "@/lib/veloPlacement";
+import { veloSeedData } from "@/lib/veloSeed";
 
 /* ------------------------------------------------------------------ *
  * The coach-only velo ladder routes
@@ -74,48 +75,98 @@ test("a signed-out request is refused before anything is read", async () => {
   assert.equal(res.status, 401);
 });
 
-test("a coach gets all 25 rows in display order", async () => {
+test("a coach gets every row the snapshot holds, in display order", async () => {
   signedInAs = COACH;
   const res = await getRanges();
   const rows = await res.json();
   assert.equal(res.status, 200, JSON.stringify(rows));
-  assert.equal(rows.length, 25);
+  // Against the snapshot, not a literal: the data is the coach's and grows.
+  assert.equal(rows.length, veloSeedData.ranges.length);
   assert.deepEqual(
     [...rows].sort((a, b) => a.displayOrder - b.displayOrder),
     rows,
   );
 });
 
-test("a coach gets all 11 sources", async () => {
+test("a coach gets every source the snapshot holds", async () => {
   signedInAs = COACH;
   const res = await getSources();
   const rows = await res.json();
   assert.equal(res.status, 200, JSON.stringify(rows));
-  assert.equal(rows.length, 11);
+  assert.equal(rows.length, veloSeedData.sources.length);
 });
 
-test("a row with no data comes back with nulls, not zeros", async () => {
-  signedInAs = COACH;
-  const res = await getRanges();
-  const rows = await res.json();
-  const row = rows.find((r: { slug: string }) => r.slug === "milb-aaa");
-  assert.ok(row, "expected a milb-aaa row");
+test("every level arrives exactly as the snapshot has it: nulls stay null, numbers are numbers", async () => {
   /*
-   * The UI must be able to render "No data yet". A 0 would render as a real
-   * benchmark of zero miles an hour.
+   * Row by row against the file, so it holds for whatever the file contains.
+   * pg hands a numeric column back as a STRING, and a null must not become a 0
+   * on the way, or "No data yet" turns into a benchmark of zero miles an hour.
    */
-  assert.equal(row.combinedLow, null);
-  assert.equal(row.rhpLow, null);
-  assert.equal(row.confidence, null);
+  signedInAs = COACH;
+  const rows = (await (await getRanges()).json()) as Record<string, unknown>[];
+  const bySlug = new Map(rows.map((r) => [r.slug as string, r]));
+  const band = (v: number | null) => (v === null ? null : Number(v));
+  for (const s of veloSeedData.ranges) {
+    const got = bySlug.get(s.slug);
+    assert.ok(got, `${s.slug} is in the snapshot but not in the response`);
+    assert.equal(got.level, s.level, s.slug);
+    assert.equal(got.category, s.category, s.slug);
+    assert.equal(got.rowType, s.row_type, s.slug);
+    assert.equal(got.rhpLow, band(s.rhp_low), `${s.slug} rhpLow`);
+    assert.equal(got.rhpHigh, band(s.rhp_high), `${s.slug} rhpHigh`);
+    assert.equal(got.lhpLow, band(s.lhp_low), `${s.slug} lhpLow`);
+    assert.equal(got.lhpHigh, band(s.lhp_high), `${s.slug} lhpHigh`);
+    assert.equal(got.combinedLow, band(s.combined_low), `${s.slug} combinedLow`);
+    assert.equal(got.combinedHigh, band(s.combined_high), `${s.slug} combinedHigh`);
+    assert.equal(got.eliteTrajectoryRef, band(s.elite_trajectory_ref), `${s.slug} elite ref`);
+    assert.equal(got.confidence, s.confidence, `${s.slug} confidence`);
+  }
 });
 
-test("each row carries its own source slugs", async () => {
+test("a level with no data at all comes back with nulls, not zeros", async () => {
+  /*
+   * Built here rather than borrowed from the snapshot. Which levels are empty
+   * is the coach's business and shrinks the day he sources pro-level data, so
+   * a test that named a MiLB row would fail on exactly the change he is hoping
+   * to make, and one that took whichever row was empty would silently check
+   * nothing once none were.
+   */
   signedInAs = COACH;
-  const res = await getRanges();
-  const rows = await res.json();
-  const row = rows.find((r: { slug: string }) => r.slug === "13u");
-  assert.ok(row, "expected a 13u row");
-  assert.equal(row.sourceSlugs.length, 7);
+  const { sql } = await import("@/lib/db");
+  await sql`
+    INSERT INTO velo_ranges (slug, level, category, row_type, display_order)
+    VALUES ('zz-empty-fixture', 'Fixture', 'Fixture', 'primary', 999999)
+  `;
+  try {
+    const rows = (await (await getRanges()).json()) as Record<string, unknown>[];
+    const row = rows.find((r) => r.slug === "zz-empty-fixture");
+    assert.ok(row, "the fixture row did not come back at all");
+    for (const k of [
+      "rhpLow", "rhpHigh", "lhpLow", "lhpHigh",
+      "combinedLow", "combinedHigh", "eliteTrajectoryRef", "confidence",
+    ])
+      assert.equal(row[k], null, `${k} became ${String(row[k])} instead of null`);
+  } finally {
+    await sql`DELETE FROM velo_ranges WHERE slug = 'zz-empty-fixture'`;
+  }
+});
+
+test("every level carries exactly its own source slugs", async () => {
+  signedInAs = COACH;
+  const rows = (await (await getRanges()).json()) as {
+    slug: string;
+    sourceSlugs: string[];
+  }[];
+  const bySlug = new Map(rows.map((r) => [r.slug, r]));
+  for (const s of veloSeedData.ranges) {
+    const got = bySlug.get(s.slug);
+    assert.ok(got, `${s.slug} missing from the response`);
+    assert.deepEqual(
+      [...got.sourceSlugs].sort(),
+      [...s.source_slugs].sort(),
+      `${s.slug} cites a different set of sources than the snapshot`,
+    );
+  }
 });
 
 /* ------------------------------------------------------------------ *

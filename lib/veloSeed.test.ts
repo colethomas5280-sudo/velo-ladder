@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   VELO_SEED_SQL,
   hasNoBand,
+  q,
   veloWarnings,
   missingSeedVelo,
   veloSeedData,
@@ -16,29 +17,33 @@ import {
  * idempotent upsert by slug, so re-running with a newer export updates rows
  * in place rather than duplicating them.
  *
- * These tests pin the SHAPE and the counts, never the values. The values are
- * Cole's and are not code's to assert.
+ * These tests pin the SHAPE and the invariants, never the values and never the
+ * totals. The data is Cole's and grows: a re-export that adds a source or fills
+ * in a MiLB row is a good change, and a test that fails on it is a test that
+ * teaches him to distrust the suite.
  * ------------------------------------------------------------------ */
 
-test("the snapshot holds every source and range the spec counted", () => {
-  assert.equal(veloSeedData.sources.length, 11);
-  assert.equal(veloSeedData.ranges.length, 25);
+test("the snapshot holds sources and ranges, each with a unique slug", () => {
+  assert.ok(veloSeedData.sources.length > 0, "no sources in the snapshot");
+  assert.ok(veloSeedData.ranges.length > 0, "no ranges in the snapshot");
+  // Not a count: a slug seen twice is two rows fighting over one primary key,
+  // and the upsert would silently keep whichever came last.
+  const dupes = (xs: string[]) => xs.filter((x, i) => xs.indexOf(x) !== i);
+  assert.deepEqual(dupes(veloSeedData.sources.map((s) => s.slug)), []);
+  assert.deepEqual(dupes(veloSeedData.ranges.map((r) => r.slug)), []);
 });
 
-test("four rows have no data yet, and they are the pro tiers", () => {
+test("a row with no band of any kind has no confidence either", () => {
   /*
-   * Independent Pro and the three MiLB rows. These must render "No data yet",
-   * never 0 and never blank, so the loader has to be able to tell a missing
-   * band from a zero one.
+   * Not WHICH rows, and not how many. Today it is Independent Pro and the three
+   * MiLB tiers; the day Cole sources pro-level data that list shrinks, and that
+   * must not fail a build. What has to hold is the rule the loader and the page
+   * lean on: a level with no band reads "No data yet", and a level that reads
+   * "No data yet" claims no confidence, so it cannot look sourced.
    */
-  const empty = veloSeedData.ranges.filter(
-    (r) => r.combined_low === null && r.rhp_low === null && r.lhp_low === null,
-  );
-  assert.deepEqual(
-    empty.map((r) => r.slug).sort(),
-    ["independent-pro", "milb-aaa", "milb-high-a-aa", "milb-rookie-low-a"],
-  );
-  for (const r of empty) assert.equal(r.confidence, null);
+  const empty = veloSeedData.ranges.filter(hasNoBand);
+  for (const r of empty)
+    assert.equal(r.confidence, null, `${r.slug} has no band but carries a confidence`);
 });
 
 test("every range's sources exist", () => {
@@ -48,9 +53,12 @@ test("every range's sources exist", () => {
       assert.ok(known.has(slug), `${r.slug} cites '${slug}', which is not a source`);
 });
 
-test("display order is unique and complete", () => {
-  const orders = veloSeedData.ranges.map((r) => r.display_order).sort((a, b) => a - b);
-  assert.deepEqual(orders, Array.from({ length: 25 }, (_, i) => i + 1));
+test("display order is unique, so the ladder has one order and not a tie", () => {
+  const orders = veloSeedData.ranges.map((r) => r.display_order);
+  for (const o of orders)
+    assert.ok(Number.isInteger(o) && o > 0, `display_order ${o} is not a positive integer`);
+  // Unique, not gap-free: new rows are appended after the last, and a gap harms nothing.
+  assert.equal(new Set(orders).size, orders.length, "two rows share a display_order");
 });
 
 test("row types are only the three the spec defines", () => {
@@ -72,42 +80,43 @@ test("the seed deletes nothing", () => {
   assert.ok(!/DELETE FROM velo_/i.test(VELO_SEED_SQL));
 });
 
-test("an apostrophe in the source text does not break the SQL", () => {
+test("the escaper doubles every apostrophe and quotes plainly", () => {
   /*
-   * The notes contain "50-55 is right on track" with quotes, and several rows
-   * use apostrophes. Naive concatenation produces SQL that will not parse.
+   * Tested directly. The earlier versions of this were anchored to one note's
+   * wording, so a re-export that reworded that note would fail a test that had
+   * nothing to say about the change, and a version that counted quote marks
+   * passed with the escaping deleted entirely.
    */
-  assert.ok(VELO_SEED_SQL.includes("right on track"));
+  assert.equal(q("it's"), "'it''s'");
+  assert.equal(q("a'b'c"), "'a''b''c'");
+  assert.equal(q("no quote"), "'no quote'");
+  assert.equal(q(""), "''");
+  assert.equal(q(null), "NULL");
+  // A string of nothing but apostrophes is the case a sloppy replace gets wrong.
+  assert.equal(q("''"), "''''''");
 });
 
-test("an apostrophe in a note is escaped, not passed through raw", () => {
+test("every apostrophe in the real snapshot reaches the SQL escaped", () => {
   /*
-   * A prior version of this test only counted total `'` characters in
-   * VELO_SEED_SQL and asserted the count was even. That passes whether or not
-   * q() escapes anything at all: the JSON has an even number of apostrophes
-   * (18), and both "each one doubled" and "each one left alone" sum to even.
-   * Deleting q()'s .replace() entirely would still have passed it.
-   *
-   * This anchors to one real row instead. gobig-tier-1's note contains
-   * "source's own prose" verbatim; the generated SQL must contain the
-   * doubled-quote form "source''s own prose" and must NOT contain the raw,
-   * single-quote form anywhere, because a raw apostrophe there terminates the
-   * string literal early and either breaks the statement or truncates it.
+   * The data-driven half: whatever text is in the file today, wherever an
+   * apostrophe appears, the generated SQL holds the doubled form and never the
+   * raw one. A window of a few characters either side, so it cannot be
+   * satisfied by an unrelated apostrophe elsewhere. Visits zero fields if the
+   * snapshot ever has no apostrophes, which is fine: the direct test above
+   * still holds the escaper to account.
    */
-  const row = veloSeedData.ranges.find((r) => r.slug === "gobig-tier-1");
-  assert.ok(row, "fixture row gobig-tier-1 is missing from the snapshot");
-  assert.ok(
-    row!.notes.includes("source's own prose"),
-    "fixture note changed underneath this test; pick a different apostrophe to anchor on",
-  );
-  assert.ok(
-    VELO_SEED_SQL.includes("source''s own prose"),
-    "the apostrophe in gobig-tier-1's note was not doubled for SQL",
-  );
-  assert.ok(
-    !VELO_SEED_SQL.includes("source's own prose"),
-    "a raw, unescaped apostrophe reached the generated SQL",
-  );
+  const texts: string[] = [];
+  for (const r of veloSeedData.ranges) texts.push(r.level, r.category, r.notes);
+  for (const s of veloSeedData.sources)
+    texts.push(s.title, s.author, s.data_type, s.limitations_summary);
+  for (const text of texts) {
+    const i = text.indexOf("'");
+    if (i < 0) continue;
+    const raw = text.slice(Math.max(0, i - 4), i + 5);
+    const escaped = raw.replace(/'/g, "''");
+    assert.ok(VELO_SEED_SQL.includes(escaped), `apostrophe not doubled near "${raw}"`);
+    assert.ok(!VELO_SEED_SQL.includes(raw), `a raw apostrophe reached the SQL near "${raw}"`);
+  }
 });
 
 test("the snapshot date is exposed for the UI to show", () => {
