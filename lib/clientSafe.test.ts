@@ -54,9 +54,15 @@ function serverOnly(): Set<string> {
     // too. A type-only import is erased and is not an offender; the component
     // check below already skips those.
     if (/@\/lib\/veloPlacement|from ["']\.\/veloPlacement["']/.test(src)) deps.push("veloPlacement");
+    // lib/veloConfig.ts holds the classifier's thresholds. It is not wording,
+    // but the coach's rule is that the classifier stays on the server, and the
+    // component was deliberately moved off this import. Nothing enforced that
+    // until it was a root: a future edit could put the import back and every
+    // other test would stay green.
+    if (/@\/lib\/veloConfig|from ["']\.\/veloConfig["']/.test(src)) deps.push("veloConfig");
     imports.set(name, deps);
   }
-  const tainted = new Set<string>(["db", "veloSeed", "veloPlacement"]);
+  const tainted = new Set<string>(["db", "veloSeed", "veloPlacement", "veloConfig"]);
   for (let pass = 0; pass < files.length; pass++) {
     let grew = false;
     for (const [name, deps] of imports)
@@ -96,6 +102,7 @@ test("the taint walk reaches through a chain, not just direct imports", () => {
   assert.equal(tainted.has("dashboard"), true, "dashboard imports db");
   assert.equal(tainted.has("scope"), true, "scope imports db");
   assert.equal(tainted.has("veloPlacement"), true, "veloPlacement holds the coach's wording");
+  assert.equal(tainted.has("veloConfig"), true, "veloConfig holds the classifier's thresholds");
   assert.equal(tainted.has("velo"), false, "velo is pure");
   assert.equal(tainted.has("screen"), false, "and so is screen");
   assert.equal(tainted.has("types"), false, "which is why the constants moved there");

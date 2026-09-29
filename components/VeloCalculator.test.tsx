@@ -271,6 +271,57 @@ test("evaluating a 16U session shows the placement, the band and the confidence"
   assert.match(card.textContent!, /Projectability gap/);
 });
 
+test("the flags quote the actual gaps from the session, not a threshold", async () => {
+  renderPage();
+  // guide example: 83 is 4 above 79
+  evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  const flags = () => [...(resultCard()?.querySelectorAll(".vc-flags li") ?? [])].map((li) => li.textContent);
+  await placed();
+  assert.equal(flags().length, 1);
+  assert.match(flags()[0]!, /High is 4 mph above Average/);
+
+  // a 0.1 step reads as one, and floating point does not leak into the text
+  evaluateSession("16u-hs-jv-soph", "74", "79.5", "84");
+  await placed();
+  assert.match(flags()[0]!, /High is 4\.5 mph above Average/);
+
+  // fatigue: 88 is 9 above 79; peak 91 is 1 above the JUCO top of 90, 3 above 88
+  evaluateSession("juco", "79", "88", "91", "R");
+  await placed();
+  const text = flags().join(" | ");
+  assert.match(text, /Average is 9 mph above Low/);
+  assert.match(text, /High is 1 mph above the top of the band used \(90\)/);
+  assert.doesNotMatch(text, /Projectability/);
+  assert.doesNotMatch(text, /outlier/i);
+});
+
+test("the copied write-up carries the same gap numbers", async () => {
+  renderPage();
+  let copied = "";
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: async (t: string) => void (copied = t) },
+  });
+  evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  await placed();
+  fireEvent.click(screen.getByRole("button", { name: "Copy write-up" }));
+  await waitFor(() => assert.notEqual(copied, ""));
+  assert.match(copied, /High is 4 mph above Average/);
+});
+
+test("an answer without the expected shape shows an error line, not a crash", async () => {
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+  renderPage();
+  evaluateSession("16u-hs-jv-soph", "74", "79", "83");
+  assert.match((await screen.findByRole("alert")).textContent!, /Couldn.t read/);
+  assert.equal(resultCard(), null);
+  assert.ok(screen.getByRole("button", { name: "Evaluate" }), "the form is still there");
+});
+
 test("the browser sends the server a slug, a hand and three numbers, and no band", async () => {
   renderPage();
   evaluateSession("juco", "84", "88", "91", "R");

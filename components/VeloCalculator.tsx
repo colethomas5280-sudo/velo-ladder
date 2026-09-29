@@ -29,16 +29,45 @@ import { ratingPill } from "./VeloSources";
  * Nothing is saved. There is no athlete on this form.
  * ------------------------------------------------------------------ */
 
-/** What each flag says, in the coach's terms. No thresholds are quoted: the
- * numbers live with the classifier on the server, and a copy here could only
- * drift from it. */
-const FLAG_TEXT: Record<PlacementFlag, string> = {
-  PROJECTABILITY_GAP:
-    "Projectability gap: High is well above Average. Could be untapped ceiling, or inconsistent effort or mechanics.",
-  FATIGUE_OR_CONSISTENCY:
-    "Fatigue or consistency: Low is well below Average. Read it as fatigue or conditioning across the outing, not a talent signal.",
-  PEAK_ABOVE_BAND: "Peak above the band: High is above the top of the band used.",
-};
+/** Whole numbers stay whole and a 0.1 step reads as one: 4, 4.5, 9. */
+function mph(n: number): string {
+  return String(Math.round(n * 10) / 10);
+}
+
+/**
+ * What each flag says, in the coach's terms, with the gap that actually
+ * tripped it. The numbers come from the session and the band the server
+ * returned, so there is no threshold copied here to drift from the
+ * classifier's, and "4 mph above Average" is the sentence a coach says to a
+ * parent.
+ */
+function flagText(flag: PlacementFlag, o: Outcome): string {
+  switch (flag) {
+    case "PROJECTABILITY_GAP":
+      return `Projectability gap: High is ${mph(o.high - o.avg)} mph above Average. Could be untapped ceiling, or inconsistent effort or mechanics.`;
+    case "FATIGUE_OR_CONSISTENCY":
+      return `Fatigue or consistency: Average is ${mph(o.avg - o.low)} mph above Low. Read it as fatigue or conditioning across the outing, not a talent signal.`;
+    case "PEAK_ABOVE_BAND": {
+      const top = o.result.band?.high;
+      return top == null
+        ? "Peak above the band: High is above the top of the band used."
+        : `Peak above the band: High is ${mph(o.high - top)} mph above the top of the band used (${top}).`;
+    }
+  }
+}
+
+/** The answer has to have the shape the card reads before the card reads it. */
+function isUsable(r: unknown): r is PlacementResult {
+  const x = r as Partial<PlacementResult> | null;
+  return (
+    !!x &&
+    typeof x === "object" &&
+    typeof x.label === "string" &&
+    Array.isArray(x.flags) &&
+    Array.isArray(x.notes) &&
+    Array.isArray(x.disclosures)
+  );
+}
 
 /** A row nobody has sourced a band for yet. Display logic only: it decides
  * what the level list greys out, not where anyone is placed. */
@@ -104,7 +133,7 @@ function writeUp(o: Outcome, sourcesBySlug: Map<string, VeloSource>): string {
     lines.push("Sources:", ...sources.map((s) => `- ${s.title} (${s.quality})`));
   }
   if (result.flags.length > 0) {
-    lines.push("Flags:", ...result.flags.map((f) => `- ${FLAG_TEXT[f]}`));
+    lines.push("Flags:", ...result.flags.map((f) => `- ${flagText(f, o)}`));
   }
   if (result.notes.length > 0) {
     lines.push("Notes:", ...result.notes.map((n) => `- ${n}`));
@@ -173,7 +202,7 @@ function ResultCard({
       {result.flags.length > 0 && (
         <ul className="vc-list vc-flags">
           {result.flags.map((f) => (
-            <li key={f}>{FLAG_TEXT[f]}</li>
+            <li key={f}>{flagText(f, outcome)}</li>
           ))}
         </ul>
       )}
@@ -281,6 +310,10 @@ export default function VeloCalculator({
       // The form moved on while this was in flight: that answer is about
       // numbers no longer on screen.
       if (ticket !== latest.current) return;
+      if (!isUsable(result)) {
+        setErr("Couldn't read the server's answer. Try again.");
+        return;
+      }
       setOutcome({ ...sent, result });
     } catch (e) {
       if (ticket !== latest.current) return;
