@@ -200,6 +200,9 @@ test("the schema applies to an empty database", async () => {
     "resources",
     "setbacks",
     "training_sessions",
+    "velo_range_sources",
+    "velo_ranges",
+    "velo_sources",
   ]);
 });
 
@@ -492,6 +495,52 @@ test("it moves when a recipe's content changes, which the version does not", asy
   assert.equal(seedFingerprint(), before, "and restoring it restores the hash");
 });
 
+/*
+ * The velo ladder: the page shows the snapshot date from the JSON on disk and
+ * the numbers from the database. A data-only re-export changes the JSON and
+ * bumps no schema version, so without this the setup response is identical
+ * whether the new export has landed or not, and the date reads fresh over
+ * stale rows.
+ */
+test("it moves when the velo seed changes, whether the date, a band or a source does", async () => {
+  const { veloSeedData } = await import("@/lib/veloSeed");
+  const before = seedFingerprint();
+
+  const meta = veloSeedData.meta;
+  const range = veloSeedData.ranges[0];
+  const source = veloSeedData.sources[0];
+  const original = {
+    date: meta.snapshot_date,
+    low: range.combined_low,
+    notes: range.notes,
+    limitations: source.limitations_summary,
+  };
+  try {
+    meta.snapshot_date = "2099-01-01";
+    assert.notEqual(seedFingerprint(), before, "a new snapshot date is invisible");
+    meta.snapshot_date = original.date;
+    assert.equal(seedFingerprint(), before, "restoring the date restores the hash");
+
+    range.combined_low = (original.low ?? 0) + 1;
+    assert.notEqual(seedFingerprint(), before, "a corrected band is invisible");
+    range.combined_low = original.low;
+    assert.equal(seedFingerprint(), before, "restoring the band restores the hash");
+
+    range.notes = `${original.notes} (revised)`;
+    assert.notEqual(seedFingerprint(), before, "a revised row note is invisible");
+    range.notes = original.notes;
+
+    source.limitations_summary = `${original.limitations} (revised)`;
+    assert.notEqual(seedFingerprint(), before, "a revised source is invisible");
+  } finally {
+    meta.snapshot_date = original.date;
+    range.combined_low = original.low;
+    range.notes = original.notes;
+    source.limitations_summary = original.limitations;
+  }
+  assert.equal(seedFingerprint(), before, "and everything restored is the same hash");
+});
+
 test("it moves when the lift menu changes too", async () => {
   const { seedLifts } = await import("@/lib/strength");
   assert.ok(seedFingerprint().length === 8 && seedLifts().length > 0);
@@ -564,4 +613,23 @@ test("nothing in this version drops a column", () => {
   assert.ok(start > -1 && end > start, "could not isolate the v27 block");
   const v27 = sql.slice(start, end);
   assert.ok(!/DROP COLUMN/i.test(v27), "a migration dropped a column");
+});
+
+test("the velo benchmark tables and their join table exist", () => {
+  const sql = schemaFile();
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS velo_sources/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS velo_ranges/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS velo_range_sources/);
+});
+
+test("velocity columns are nullable, because four rows have no data yet", () => {
+  /*
+   * A NOT NULL with a 0 default would turn "nobody has sourced this" into
+   * "this level throws 0 mph", which the UI cannot tell apart.
+   */
+  const sql = schemaFile();
+  const table = sql.slice(sql.indexOf("CREATE TABLE IF NOT EXISTS velo_ranges"));
+  const body = table.slice(0, table.indexOf(");"));
+  for (const col of ["rhp_low", "rhp_high", "lhp_low", "lhp_high", "combined_low", "combined_high", "elite_trajectory_ref"])
+    assert.ok(!new RegExp(`${col}[^,]*NOT NULL`).test(body), `${col} is NOT NULL`);
 });
