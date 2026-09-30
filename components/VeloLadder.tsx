@@ -125,10 +125,10 @@ function LadderRow({
               {r.notes || "No notes on this row."}
             </div>
             {rowSources.length > 0 ? (
-              <div className="mini">
+              <div className="vl-sources">
                 {rowSources.map((s) => (
                   <div key={s.slug}>
-                    {ratingPill(s.quality)}{" "}
+                    {ratingPill(s.quality)}
                     <a href={s.notionUrl} target="_blank" rel="noreferrer">
                       {s.title}
                     </a>

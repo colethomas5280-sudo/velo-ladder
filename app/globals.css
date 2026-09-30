@@ -806,6 +806,32 @@ td .v {
   font-size: 12.5px;
   color: var(--ink-dim);
 }
+/* .roster-table td (below) sets nowrap and, coming later at equal
+   specificity, beat .detail > td above. Re-assert normal for the expanded row
+   inside a roster table, or its notes run off the edge as one long line. */
+.roster-table .detail > td {
+  white-space: normal;
+}
+/* The velo ladder's sources for one level: a title is a full sentence, too
+   long for .mini's 150px grid cells, so they get a line each. */
+.vl-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 9px;
+  font-size: 12.5px;
+}
+.vl-sources .pill {
+  margin-left: 0;
+  flex: none;
+}
+.vl-sources > div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .caret {
   display: inline-block;
   width: 0;
