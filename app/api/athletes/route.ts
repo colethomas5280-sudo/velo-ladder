@@ -1,6 +1,7 @@
 import { getScope } from "@/lib/scope";
 import { listAthletes, createAthlete } from "@/lib/data";
 import { visibleProfile } from "@/lib/profile";
+import { normalizePhone } from "@/lib/sms";
 import { json, unauthorized, forbidden, badRequest } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -46,6 +47,16 @@ export async function POST(request: Request) {
   if (password && !inviteEmail)
     return badRequest("An athlete needs an email to log in with a password");
 
-  const athlete = await createAthlete({ name, hand, inviteEmail, password });
+  /*
+   * A phone typed here is stored normalised, which is what later lets the
+   * invite route confirm a text is going to this athlete's own number rather
+   * than to anything a caller cares to name.
+   */
+  const rawPhone = typeof body?.phone === "string" ? body.phone.trim() : "";
+  const phone = rawPhone ? normalizePhone(rawPhone) : null;
+  if (rawPhone && !phone)
+    return badRequest("That phone number doesn't look right");
+
+  const athlete = await createAthlete({ name, hand, inviteEmail, password, phone });
   return json(athlete, 201);
 }

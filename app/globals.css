@@ -4302,3 +4302,50 @@ table.roster-table {
 .guide table {
   margin: 4px 0;
 }
+
+/* ---------- text invite ---------- */
+.who-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.who-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+  cursor: pointer;
+}
+.who-opt:hover {
+  border-color: var(--accent);
+}
+.who-opt.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.who-opt input {
+  flex: none;
+}
+.who-opt b {
+  display: block;
+  font-size: 14px;
+}
+.who-opt em {
+  display: block;
+  font-style: normal;
+  font-family: var(--font-mono), monospace;
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+/* The handoff button is an anchor, so it needs the button box explicitly. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}

@@ -124,6 +124,8 @@ export async function createAthlete(input: {
   hand?: string;
   inviteEmail?: string | null;
   password?: string | null;
+  /** Already normalised to E.164 by the route. */
+  phone?: string | null;
 }): Promise<Athlete> {
   const id = crypto.randomUUID();
   const email = input.inviteEmail?.trim().toLowerCase() || null;
@@ -133,8 +135,8 @@ export async function createAthlete(input: {
   const { first, last } = splitName(input.name);
   const name = joinName(first, last) || input.name.trim();
   const rows = (await sql`
-    INSERT INTO athletes (id, name, hand, invite_email, password_hash, first_name, last_name)
-    VALUES (${id}, ${name}, ${input.hand || ""}, ${email}, ${hash}, ${first}, ${last})
+    INSERT INTO athletes (id, name, hand, invite_email, password_hash, first_name, last_name, phone)
+    VALUES (${id}, ${name}, ${input.hand || ""}, ${email}, ${hash}, ${first}, ${last}, ${input.phone ?? null})
     RETURNING *
   `) as Record<string, unknown>[];
   return toAthlete(rows[0]);

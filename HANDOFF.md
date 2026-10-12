@@ -83,6 +83,7 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/athletes/[id]/recovery` | GET / POST (upsert by date) / DELETE `?date=`. Athlete-scoped. |
 | `/api/sessions/[id]` | PATCH / DELETE. |
 | `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); DELETE cancels one. |
+| `/api/sms` | GET - whether automated texting is configured. Coach-only, boolean only. |
 | `/api/join/[token]` | Public. GET reveals only the invited athlete's name/email; POST spends the invite. |
 | `/api/leaderboard?tracker=&oz=` | GET — the record boards. `coach` + `athlete`; `none` → 403. Never touches `canSeeAthlete`. |
 | `/api/setup?key=…&seed=1` | One-time (idempotent) schema + seed. `SETUP_KEY`-guarded. |
@@ -613,6 +614,40 @@ place. Required: `firstName`, `lastName`, `birthDate`, `level`, `heightIn`,
 `weightLb`, `school`, `phone` — plus `guardianName` and `guardianPhone` for anyone
 under 18. Optional fields never count: if `bats` or a grad year did, every row would
 be marked forever, which is the same as marking none of them.
+
+## Texting invites (`lib/sms.ts`)
+
+Two send paths, because the automated one has a carrier gate in front of it.
+
+**Handoff (no setup).** `smsHref()` builds an `sms:` URL and the coach's own
+Messages app opens pre-written. Free, instant, and the text arrives from the
+number families already have saved. The `?&body=` spelling is deliberate: iOS
+historically wanted `&body=`, Android wants `?body=`, and `?&body=` is what both
+have always accepted.
+
+**Twilio (needs `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM`).**
+The server sends it. US traffic also needs A2P 10DLC registration; without it
+carriers filter the message and Twilio returns error 30034. That wording is
+surfaced to the coach verbatim, and the UI falls back to the handoff - **a failed
+text never costs the caller the invite link**, which is why `sendSms` returns
+failures as values and never throws.
+
+`smsConfigured()` is the single branch point; `GET /api/sms` exposes it as a
+boolean so the roster can label its button before anyone clicks.
+
+**The destination is checked against the athlete's own profile.** `POST
+/api/athletes/[id]/invite` accepts `to`, but refuses anything that is not
+`athletes.phone` or `athletes.guardian_phone` for that row (compared after
+normalising, so spelling does not matter). Without that the endpoint is an open
+SMS relay on the facility's Twilio account with one shared coach password in
+front of it. `lib/inviteSmsRoute.test.ts` pins this down.
+
+Invite copy is plain ASCII on purpose: one em dash or curly quote pushes the
+message out of GSM-7 into UCS-2, cutting the segment from 160 characters to 70
+and doubling the cost of every send.
+
+`defaultRecipient()` preselects the guardian for a **Youth** athlete who has one
+on file, and the athlete otherwise. The coach can always override.
 
 ## Local development
 

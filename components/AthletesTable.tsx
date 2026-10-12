@@ -9,6 +9,7 @@ import { LEVELS } from "@/lib/leaderboard";
 import { EMPTY, fmtDate } from "@/lib/velo";
 import GroupSession from "./GroupSession";
 import InviteAthleteModal from "./InviteAthleteModal";
+import TextInvite, { type InviteTarget } from "./TextInvite";
 
 export default function AthletesTable() {
   const { data, mutate, isLoading } = useSWR<AthleteOverview[]>(
@@ -25,6 +26,10 @@ export default function AthletesTable() {
   const [sessionIds, setSessionIds] = useState<string[] | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [textFor, setTextFor] = useState<InviteTarget | null>(null);
+  // Whether automated texting is wired up, so the menu can say which it is.
+  const { data: smsCfg } = useSWR<{ configured: boolean }>("/api/sms", fetcher);
+  const smsOn = smsCfg?.configured === true;
 
   const show = (m: string) => {
     setToast(m);
@@ -264,6 +269,14 @@ export default function AthletesTable() {
                         onChange={(e) => {
                           const action = e.target.value;
                           if (action === "invite") invite(a);
+                          else if (action === "text")
+                            setTextFor({
+                              id: a.id,
+                              name: a.name,
+                              phone: a.phone,
+                              guardianPhone: a.guardianPhone,
+                              level: a.level,
+                            });
                           else if (action === "password") {
                             setResetFor(a.id);
                             setResetPw("");
@@ -278,6 +291,9 @@ export default function AthletesTable() {
                               : a.hasInvite
                                 ? "invite sent"
                                 : "set password"}
+                        </option>
+                        <option value="text">
+                          {smsOn ? "Text invite" : "Text invite (opens Messages)"}
                         </option>
                         <option value="invite">
                           {a.hasPassword
@@ -351,6 +367,15 @@ export default function AthletesTable() {
             Log a session for {checked.size} →
           </button>
         </div>
+      )}
+
+      {textFor && (
+        <TextInvite
+          athlete={textFor}
+          smsConfigured={smsOn}
+          onClose={() => setTextFor(null)}
+          onSent={() => mutate()}
+        />
       )}
 
       {inviteOpen && (
