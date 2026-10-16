@@ -88,3 +88,78 @@ test("clearing removes only that athlete's draft for that test type", () => {
   assert.equal(hasTestDraft("screen", "a1"), false);
   assert.equal(hasTestDraft("delivery", "a1"), true);
 });
+
+/* ------------------------------------------------------------------ *
+ * Only real answers survive loading: a screen reading is a non-empty
+ * string, a delivery flaw is `true`. Anything else in storage is dropped so
+ * the forms can trust the type.
+ * ------------------------------------------------------------------ */
+
+const store = (value: unknown) =>
+  window.localStorage.setItem(
+    "veloladder:testdraft:screen:a1",
+    JSON.stringify(value),
+  );
+
+test("stored data that is an array is no draft", () => {
+  store({ date: OLD, notes: "", data: ["x"] });
+  assert.equal(loadTestDraft("screen", "a1"), null);
+});
+
+test("stored data whose values are all objects is no draft", () => {
+  store({ date: OLD, notes: "", data: { a: { b: 1 } } });
+  assert.equal(loadTestDraft("screen", "a1"), null);
+});
+
+test("entries that are not answers are dropped and real ones kept", () => {
+  store({ date: OLD, notes: "", data: { a: null, b: "normal", c: "", d: 3, e: false, f: true } });
+  assert.deepEqual(loadTestDraft("screen", "a1")!.data, { b: "normal", f: true });
+});
+
+test("false is not an answer", () => {
+  store({ date: OLD, notes: "", data: { a: false } });
+  assert.equal(loadTestDraft("screen", "a1"), null);
+});
+
+test("a date that is not a calendar-shaped date falls back to today and the answers survive", () => {
+  store({ date: "tomorrow", notes: "n", data: { b: "normal" } });
+  const d = loadTestDraft("screen", "a1")!;
+  assert.equal(d.date, TODAY);
+  assert.deepEqual(d.data, { b: "normal" });
+});
+
+/* ------------------------------------------------------------------ *
+ * Saving an empty state removes the draft instead of leaving an entry
+ * behind. A form must therefore restore before it saves, so it never
+ * clobbers a stored draft by saving its empty initial state on mount.
+ * ------------------------------------------------------------------ */
+
+test("saving a draft with no answers leaves nothing in storage", () => {
+  saveTestDraft("screen", "a1", draft({ data: {} }));
+  assert.equal(window.localStorage.getItem("veloladder:testdraft:screen:a1"), null);
+});
+
+test("saving a draft whose answers are all invalid leaves nothing in storage", () => {
+  saveTestDraft("screen", "a1", draft({ data: { a: false, b: "" } }));
+  assert.equal(window.localStorage.getItem("veloladder:testdraft:screen:a1"), null);
+});
+
+test("saving an empty draft over a good one removes it", () => {
+  saveTestDraft("screen", "a1", draft());
+  assert.equal(hasTestDraft("screen", "a1"), true);
+  saveTestDraft("screen", "a1", draft({ data: {} }));
+  assert.equal(window.localStorage.getItem("veloladder:testdraft:screen:a1"), null);
+  assert.equal(hasTestDraft("screen", "a1"), false);
+});
+
+test("an empty save of one athlete does not touch another's draft", () => {
+  saveTestDraft("screen", "a2", draft());
+  saveTestDraft("screen", "a1", draft({ data: {} }));
+  assert.equal(hasTestDraft("screen", "a2"), true);
+});
+
+test("saving stores only the real answers, not blanks or false flags", () => {
+  saveTestDraft("screen", "a1", draft({ data: { a: "normal", b: "", c: false, d: true } }));
+  const raw = JSON.parse(window.localStorage.getItem("veloladder:testdraft:screen:a1")!);
+  assert.deepEqual(raw.data, { a: "normal", d: true });
+});
