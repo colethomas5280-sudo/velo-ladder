@@ -17,17 +17,38 @@ export function emptyDraft(): Draft {
 const key = (athleteId: string, tracker: TrackerId) =>
   `veloladder:draft:${athleteId}:${tracker}`;
 
+/** True when any box holds something, even a 0. Blank and whitespace do not count. */
+function hasNumbers(throws: Draft["throws"]): boolean {
+  return Object.values(throws).some((boxes) =>
+    boxes.some((v) => String(v ?? "").trim() !== ""),
+  );
+}
+
+/**
+ * Restore the unfinished entry for this athlete and tracker.
+ *
+ * A draft comes back with the date it was saved under, which made a new
+ * session open on a past day: pressing Save with nothing entered leaves an
+ * empty draft behind, and it sat in the browser dating every later session
+ * (the coach saw September 16 and October 5 on October 16). So an entry with
+ * no numbers in it always starts on today. One WITH numbers keeps its date,
+ * so unsaved numbers are never silently saved under the wrong day, and so does
+ * an entry editing an existing session, whose date belongs to that session.
+ */
 export function loadDraft(athleteId: string, tracker: TrackerId): Draft {
   if (typeof window === "undefined") return emptyDraft();
   try {
     const raw = window.localStorage.getItem(key(athleteId, tracker));
     if (raw) {
       const d = JSON.parse(raw) as Draft;
+      const throws = d.throws || {};
+      const editingId = d.editingId ?? null;
+      const keepsOwnDate = editingId !== null || hasNumbers(throws);
       return {
-        date: d.date || todayISO(),
+        date: keepsOwnDate ? d.date || todayISO() : todayISO(),
         notes: d.notes || "",
-        throws: d.throws || {},
-        editingId: d.editingId ?? null,
+        throws,
+        editingId,
       };
     }
   } catch {
