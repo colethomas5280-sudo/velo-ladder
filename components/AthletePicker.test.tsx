@@ -73,7 +73,7 @@ test("select all picks what is showing, and clear empties everything", () => {
   fireEvent.click(screen.getByRole("button", { name: /select all/i }));
   assert.ok(screen.queryByText("2 selected") !== null);
   fireEvent.click(screen.getByRole("button", { name: /^clear/i }));
-  assert.ok(screen.queryByText(/selected/) === null || screen.queryByText("0 selected") !== null);
+  assert.ok(screen.queryByText("0 selected") !== null);
   assert.equal(start().disabled, true);
 });
 
@@ -94,4 +94,113 @@ test("Escape closes it", () => {
   open({ onClose: () => (closed += 1) });
   fireEvent.keyDown(document, { key: "Escape" });
   assert.equal(closed, 1);
+});
+
+const search = () => screen.getByPlaceholderText(/search/i);
+
+test("Clear empties every pick, including ones hidden by the search", () => {
+  const started = open();
+  fireEvent.click(box("Jake Bell"));
+  fireEvent.change(search(), { target: { value: "hale" } });
+  fireEvent.click(screen.getByRole("button", { name: /select all/i }));
+  assert.ok(screen.queryByText("3 selected") !== null);
+  fireEvent.click(screen.getByRole("button", { name: /^clear/i }));
+  assert.ok(screen.queryByText("0 selected") !== null);
+  fireEvent.change(search(), { target: { value: "" } });
+  assert.equal(box("Jake Bell").checked, false, "Jake was hidden but must be cleared too");
+  assert.equal(start().disabled, true);
+  assert.deepEqual(started, []);
+});
+
+test("a roster that shrinks under a pick drops that pick from count, label and Start", () => {
+  const started: string[][] = [];
+  const props = {
+    title: "Who is in this session?",
+    startLabel: (n: number) => `Start with ${n}`,
+    onStart: (ids: string[]) => started.push(ids),
+    onClose: () => {},
+  };
+  const { rerender } = render(<AthletePicker {...props} people={PEOPLE} />);
+  fireEvent.click(box("Jake Bell"));
+  assert.ok(screen.queryByText("1 selected") !== null);
+  rerender(<AthletePicker {...props} people={PEOPLE.slice(1)} />);
+  assert.ok(screen.queryByText("0 selected") !== null);
+  assert.equal(start().textContent, "Start with 0");
+  assert.equal(start().disabled, true);
+  assert.deepEqual(started, []);
+});
+
+test("two athletes with the same name are picked independently by id", () => {
+  const started = open({
+    people: [
+      { id: "a1", name: "Sam Lee" },
+      { id: "a2", name: "Sam Lee" },
+    ],
+  });
+  const boxes = screen.getAllByRole("checkbox", { name: "Sam Lee" }) as HTMLInputElement[];
+  assert.equal(boxes.length, 2);
+  fireEvent.click(boxes[1]);
+  assert.equal(boxes[0].checked, false);
+  assert.equal(boxes[1].checked, true);
+  fireEvent.click(start());
+  assert.deepEqual(started, [["a2"]]);
+});
+
+test("Enter in the search box neither starts nor closes", () => {
+  let closed = 0;
+  const started = open({ onClose: () => (closed += 1) });
+  fireEvent.click(box("Jake Bell"));
+  fireEvent.keyDown(search(), { key: "Enter" });
+  assert.deepEqual(started, []);
+  assert.equal(closed, 0);
+});
+
+test("the picker's buttons are type=button, safe inside a form", () => {
+  open();
+  for (const name of [/select all/i, /^clear/i, /^start/i, /^close/i]) {
+    assert.equal(screen.getByRole("button", { name }).getAttribute("type"), "button");
+  }
+});
+
+test("Select all keeps picks already held out of view", () => {
+  const started = open();
+  fireEvent.click(box("Jake Bell"));
+  fireEvent.change(search(), { target: { value: "hale" } });
+  fireEvent.click(screen.getByRole("button", { name: /select all/i }));
+  assert.ok(screen.queryByText("3 selected") !== null);
+  fireEvent.click(start());
+  assert.deepEqual(started, [["a1", "a2", "a3"]]);
+});
+
+test("the x button closes", () => {
+  let closed = 0;
+  open({ onClose: () => (closed += 1) });
+  fireEvent.click(screen.getByRole("button", { name: "Close" }));
+  assert.equal(closed, 1);
+});
+
+test("clicking the backdrop closes, clicking inside the panel does not", () => {
+  let closed = 0;
+  open({ onClose: () => (closed += 1) });
+  fireEvent.click(screen.getByRole("dialog"));
+  fireEvent.click(box("Jake Bell"));
+  assert.equal(closed, 0);
+  fireEvent.click(screen.getByRole("dialog").parentElement as HTMLElement);
+  assert.equal(closed, 1);
+});
+
+test("the page does not scroll behind it, and scrolling comes back on unmount", () => {
+  document.body.style.overflow = "";
+  const { unmount } = render(
+    <AthletePicker
+      title="t"
+      startLabel={(n) => `Start ${n}`}
+      people={PEOPLE}
+      onStart={() => {}}
+      onClose={() => {}}
+    />,
+  );
+  assert.equal(document.body.style.overflow, "hidden");
+  unmount();
+  assert.equal(document.body.style.overflow, "");
 });
