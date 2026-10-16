@@ -36,7 +36,7 @@ public. Three things follow, and the design is mostly about them:
 | Token storage | New columns, token stored **hashed** | Cole chose this over reusing the invite columns. A reset request must not cancel a pending invite, a database copy must not contain working links, and a reset wants a 1-hour life, not 14 days. |
 | Lifetime | 1 hour, single use | Short enough that an old email in an inbox is not a standing key. |
 | Cooldown | 1 email per athlete per 10 minutes | Bounds the flooding of one inbox. |
-| App-wide cap | 20 reset emails per rolling hour | Bounds abuse of the Resend allowance. Over the cap, the response is unchanged and nothing is sent. |
+| App-wide cap | 30 reset emails per rolling 24 hours, counted from a small send log | Resend's free plan allows about 100 emails a day, and invites share it. This leaves at least 70 a day for them. Over the cap, the response is unchanged and nothing is sent. The number is one constant if Cole wants it changed. |
 | Response to the request form | Identical for known, unknown, cooled-down and capped | No roster enumeration. |
 | After resetting | Signed straight in | Same as redeeming an invite. The link already proved control of the email. |
 | New-password rule | Minimum 6 characters, as `join` | Reset and invite should not disagree. Raising the rule is a separate decision. |
@@ -52,11 +52,13 @@ public. Three things follow, and the design is mostly about them:
 3. **The request route** (public) normalises the email (trim, lowercase), then in the
    background (`after()`, so response time does not reveal whether an athlete exists):
    - finds one active athlete whose `invite_email` matches;
+   - checks the app-wide cap (fewer than 30 rows in the send log in the last 24 hours);
    - in **one statement**, claims a reset: writes `reset_token_hash`, `reset_expires`
      (now + 1 hour) and `reset_requested_at` (now), only if that athlete's last request
-     is older than 10 minutes AND fewer than 20 requests happened app-wide in the last
-     hour;
-   - if the claim succeeded, emails the link to the athlete's **stored** address.
+     is older than 10 minutes (the row lock makes the cooldown atomic, so two
+     simultaneous requests cannot both pass it);
+   - if the claim succeeded, records one row in the send log and emails the link to the
+     athlete's **stored** address.
    The raw token exists only in memory, long enough to put it in the email.
 4. **The email** is in the invite's voice: from Coach Cole at FAST Performance, subject
    "Reset your Velo Ladder password", one link to `/reset-password/<token>`, "works once
@@ -73,14 +75,22 @@ public. Three things follow, and the design is mostly about them:
 
 ## Data
 
-Schema **v29**, three nullable columns on `athletes`, added with
-`ADD COLUMN IF NOT EXISTS`:
+Schema **v29**: three nullable columns on `athletes`, added with
+`ADD COLUMN IF NOT EXISTS`, and one small table.
 
 | Column | Type | Meaning |
 |---|---|---|
 | `reset_token_hash` | `text` | SHA-256 (hex) of the raw token. Unique index where not null. |
 | `reset_expires` | `timestamptz` | When the link stops working. |
-| `reset_requested_at` | `timestamptz` | When a reset email was last issued. Drives both the per-athlete cooldown and the app-wide count. |
+| `reset_requested_at` | `timestamptz` | When a reset email was last issued to this athlete. Drives the per-athlete cooldown. |
+
+`password_reset_sends(id, sent_at timestamptz default now())` holds one row per reset
+email issued and **nothing else** (no athlete id, no address), so it cannot leak anything.
+It exists only to count emails app-wide. A column on `athletes` cannot do that: it keeps
+only each athlete's latest request, so it undercounts repeats. Rows older than two days
+are deleted whenever a new one is written. The cap can overshoot by a request or two
+under heavy concurrency; that is acceptable for a limit whose job is to protect an email
+allowance, not to enforce an exact number.
 
 SHA-256 rather than bcrypt is correct here: the token is 32 random bytes, so there is
 nothing to brute-force, and the lookup has to be by exact hash.
@@ -127,8 +137,9 @@ Written test-first, then each assertion proven by breaking the code on purpose.
 - **Delivery:** an unknown address sends nothing; the email goes only to the athlete's
   stored address, never one from the request; the raw token never appears in any
   response.
-- **Limits:** a second request inside 10 minutes sends nothing; the 21st request in an
-  hour sends nothing; both recover after the window.
+- **Limits:** a second request inside 10 minutes sends nothing; the 31st email inside
+  24 hours sends nothing; both recover once their window passes. Old send-log rows are
+  pruned.
 - **Token:** works once, fails after use, fails after expiry, fails for an archived
   athlete, fails for a hash-looking string (the stored hash is not itself a token).
   Two simultaneous confirms: exactly one succeeds.
@@ -139,6 +150,9 @@ Written test-first, then each assertion proven by breaking the code on purpose.
   columns are null.
 - **Serialisers:** the three columns appear in no athlete payload, including the roster
   overview and the athlete's own profile.
+- **The cap does not strand a real athlete:** with the cap exhausted by other requests,
+  the next legitimate request still gets the normal response, and works again after the
+  window.
 - **UI:** the forms, the always-same confirmation, the invalid-link page, the
   not-configured page, and the sign-in after success.
 - Full gate (`npm run verify`) green from a clean build.
