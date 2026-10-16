@@ -82,6 +82,14 @@ today's date; one with answers keeps the date it was started under**, so nothing
 under the wrong day by accident. A draft restores over today's saved record when it has
 answers. Closing the group screen with unsaved answers is therefore safe.
 
+**What counts as "has answers".** A movement screen with any reading answered, or a
+Pitching Inhibitors assessment with any flaw marked. Save all covers exactly those athletes,
+and its button shows the count ("Save all (2)"). A Pitching Inhibitors assessment with
+nothing marked is a real record too ("I looked and found nothing"), so it is saved with
+that athlete's own **Save**, never swept up by Save all, which would otherwise record a
+clean assessment for anyone whose tab was merely opened. A draft is kept only while it has
+answers; typing notes alone does not create one.
+
 **Saving.** No API or schema change. Each save is the same POST the single forms make.
 Save all saves sequentially and reports per athlete; one failure leaves that athlete's
 tab open with its error and its draft intact, and does not stop the others.
