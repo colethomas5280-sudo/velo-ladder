@@ -8,7 +8,7 @@ import { VELO_SEED_SQL, veloSeedData } from "./veloSeed";
  * `db/schema.sql` is a human-readable copy of this.
  */
 /** Bump when SCHEMA_SQL changes; surfaced by /api/setup to spot a stale deploy. */
-export const SCHEMA_VERSION = 28;
+export const SCHEMA_VERSION = 29;
 
 /** Single-quote a value for inline SQL. Only ever sees our own constants. */
 const q = (v: string) => `'${v.replace(/'/g, "''")}'`;
@@ -529,6 +529,29 @@ CREATE TABLE IF NOT EXISTS velo_range_sources (
   source_slug text NOT NULL REFERENCES velo_sources(slug) ON DELETE CASCADE,
   PRIMARY KEY (range_slug, source_slug)
 );
+
+-- v29: self-service password reset.
+--
+-- The token is stored hashed (SHA-256), never raw, so a copy of the database
+-- holds no working reset link. These are separate columns from the invite
+-- token on purpose: a reset request is public and must not be able to cancel a
+-- pending invite. reset_requested_at is the per-athlete cooldown, and it stays
+-- set after a reset completes, which is what makes it a cooldown.
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS reset_token_hash text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS reset_expires timestamptz;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS reset_requested_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS athletes_reset_token_hash_idx
+  ON athletes(reset_token_hash) WHERE reset_token_hash IS NOT NULL;
+
+-- One row per reset email issued, and nothing else: no athlete, no address.
+-- It exists only so the app-wide daily cap can count emails. A column on
+-- athletes cannot, because it keeps only each athlete's latest request.
+CREATE TABLE IF NOT EXISTS password_reset_sends (
+  id      bigserial PRIMARY KEY,
+  sent_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS password_reset_sends_sent_at_idx
+  ON password_reset_sends(sent_at);
 ${VELO_SEED_SQL}
 `;
 

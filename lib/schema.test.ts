@@ -195,6 +195,7 @@ test("the schema applies to an empty database", async () => {
     "lift_sessions",
     "lifts",
     "movement_screens",
+    "password_reset_sends",
     "recipes",
     "recovery_entries",
     "resources",
@@ -632,4 +633,57 @@ test("velocity columns are nullable, because four rows have no data yet", () => 
   const body = table.slice(0, table.indexOf(");"));
   for (const col of ["rhp_low", "rhp_high", "lhp_low", "lhp_high", "combined_low", "combined_high", "elite_trajectory_ref"])
     assert.ok(!new RegExp(`${col}[^,]*NOT NULL`).test(body), `${col} is NOT NULL`);
+});
+
+/*
+ * v29 added self-service password reset. The only proof that matters is the
+ * upgrade: a database that is already at v28, holding an athlete with a
+ * pending invite and a password, has to come through untouched and gain the new
+ * columns. A fresh database proves nothing about that.
+ */
+test("v29 upgrades a v28 database, keeps its athletes and invites, and a second run changes nothing", async () => {
+  const marker = SCHEMA_SQL.indexOf("-- v29:");
+  assert.ok(marker > -1, "could not find the v29 block");
+  const v28 = SCHEMA_SQL.slice(0, marker);
+
+  const db = await freshDb();
+  await applyAsProduction(db, v28);
+  const before = await db.query(
+    "SELECT column_name FROM information_schema.columns WHERE table_name = 'athletes' AND column_name LIKE 'reset_%'",
+  );
+  assert.equal(before.rows.length, 0, "the stand-in v28 database must not already have the columns");
+
+  await db.query(`
+    INSERT INTO athletes (id, name, invite_email, password_hash, invite_token, invite_expires)
+    VALUES ('a1', 'Reset Athlete', 'kid@x.test', 'hash-xyz', 'tok-pending', now() + interval '3 days')
+  `);
+
+  await applyAsProduction(db, SCHEMA_SQL);
+  await applyAsProduction(db, SCHEMA_SQL);
+
+  const r = await db.query(
+    "SELECT invite_token, password_hash, reset_token_hash, reset_expires, reset_requested_at FROM athletes WHERE id = 'a1'",
+  );
+  assert.equal(r.rows.length, 1);
+  assert.equal(r.rows[0].invite_token, "tok-pending", "the pending invite survived");
+  assert.equal(r.rows[0].password_hash, "hash-xyz", "the password survived");
+  assert.equal(r.rows[0].reset_token_hash, null);
+  assert.equal(r.rows[0].reset_expires, null);
+  assert.equal(r.rows[0].reset_requested_at, null);
+
+  const log = await db.query("SELECT count(*)::int AS n FROM password_reset_sends");
+  assert.equal(log.rows[0].n, 0);
+});
+
+test("two athletes cannot hold the same reset token hash, but any number can hold none", async () => {
+  const db = await freshDb();
+  await applyAsProduction(db, SCHEMA_SQL);
+  await db.query("INSERT INTO athletes (id, name) VALUES ('a1', 'One'), ('a2', 'Two'), ('a3', 'Three')");
+  // Several NULLs are fine: the index is partial.
+  await db.query("UPDATE athletes SET reset_token_hash = NULL");
+  await db.query("UPDATE athletes SET reset_token_hash = 'same-hash' WHERE id = 'a1'");
+  await assert.rejects(
+    db.query("UPDATE athletes SET reset_token_hash = 'same-hash' WHERE id = 'a2'"),
+    /duplicate key|unique/i,
+  );
 });

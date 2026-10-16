@@ -1,4 +1,4 @@
--- Generated from lib/schema.ts (SCHEMA_VERSION 28). Do not edit by hand.
+-- Generated from lib/schema.ts (SCHEMA_VERSION 29). Do not edit by hand.
 -- Applied by GET /api/setup?key=SETUP_KEY
 
 CREATE TABLE IF NOT EXISTS athletes (
@@ -574,6 +574,29 @@ CREATE TABLE IF NOT EXISTS velo_range_sources (
   source_slug text NOT NULL REFERENCES velo_sources(slug) ON DELETE CASCADE,
   PRIMARY KEY (range_slug, source_slug)
 );
+
+-- v29: self-service password reset.
+--
+-- The token is stored hashed (SHA-256), never raw, so a copy of the database
+-- holds no working reset link. These are separate columns from the invite
+-- token on purpose: a reset request is public and must not be able to cancel a
+-- pending invite. reset_requested_at is the per-athlete cooldown, and it stays
+-- set after a reset completes, which is what makes it a cooldown.
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS reset_token_hash text;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS reset_expires timestamptz;
+ALTER TABLE athletes ADD COLUMN IF NOT EXISTS reset_requested_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS athletes_reset_token_hash_idx
+  ON athletes(reset_token_hash) WHERE reset_token_hash IS NOT NULL;
+
+-- One row per reset email issued, and nothing else: no athlete, no address.
+-- It exists only so the app-wide daily cap can count emails. A column on
+-- athletes cannot, because it keeps only each athlete's latest request.
+CREATE TABLE IF NOT EXISTS password_reset_sends (
+  id      bigserial PRIMARY KEY,
+  sent_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS password_reset_sends_sent_at_idx
+  ON password_reset_sends(sent_at);
 INSERT INTO velo_sources (slug, title, author, data_type, quality, published_date, limitations_summary, notion_url) VALUES ('nextcommit-standards-screenshot', 'Next Commit — Pitcher Velocity Standards (Fastball MPH)', 'Next Commit', 'Aggregator database (PG/PBR)', 'Low', NULL, 'Screenshot of an infographic with no methodology or sample size on the graphic. A later named-author NextCommit article says these are the same benchmarks as its standards page and cites Prep Baseball Report and Perfect Game showcase data as lineage (not linked, not independently verifiable). That later page merges NAIA and JUCO into one row, unlike this screenshot.', 'https://app.notion.com/p/3e612f04826b81ad8e50e8dc11d4fec8') ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, author = EXCLUDED.author, data_type = EXCLUDED.data_type, quality = EXCLUDED.quality, published_date = EXCLUDED.published_date, limitations_summary = EXCLUDED.limitations_summary, notion_url = EXCLUDED.notion_url;
 INSERT INTO velo_sources (slug, title, author, data_type, quality, published_date, limitations_summary, notion_url) VALUES ('topvelocity-recruiting', 'TopVelocity — What Velocity to Get Recruited (College Standards)', 'TopVelocity', 'Aggregator database (PG/PBR)', 'Low', NULL, 'Content marketing for a $99/mo training program. Says its table is synthesized from NCSA guidelines and unnamed analytics services, with no link or methodology. Incentive to make the velocity gap look large. Also cites Sakurai et al. 2024 (JSCR) on jump power vs velocity, which is not part of the ladder.', 'https://app.notion.com/p/3e612f04826b815f918ffbcf252cf1e2') ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, author = EXCLUDED.author, data_type = EXCLUDED.data_type, quality = EXCLUDED.quality, published_date = EXCLUDED.published_date, limitations_summary = EXCLUDED.limitations_summary, notion_url = EXCLUDED.notion_url;
 INSERT INTO velo_sources (slug, title, author, data_type, quality, published_date, limitations_summary, notion_url) VALUES ('win-reality-age', 'WIN Reality — Pitching Velocity by Age: Average Fastball Benchmarks from Youth Baseball to MLB', 'Andrew Don — WIN Reality', 'Aggregator database (PG/PBR)', 'Medium', '2026-08-05'::date, 'Commercial (VR hitting trainer). Named author and date, and it flags that showcase data skews high. Youth age bands are credited to TopVelocity, so they are not independent of that source. HS and college numbers are an unspecified blend. The MLB average trend (94.7 mph in 2026, 91.9 in 2008) is widely corroborated.', 'https://app.notion.com/p/3e612f04826b81ad9e06f382855e7450') ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, author = EXCLUDED.author, data_type = EXCLUDED.data_type, quality = EXCLUDED.quality, published_date = EXCLUDED.published_date, limitations_summary = EXCLUDED.limitations_summary, notion_url = EXCLUDED.notion_url;
