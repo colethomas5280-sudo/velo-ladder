@@ -3,34 +3,35 @@
 import { useEffect, useState } from "react";
 import type { Athlete } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
-import { normalizePhone, formatPhone, inviteMessage, smsHref } from "@/lib/sms";
 
 /**
  * Create an athlete and get their invite to them in one go — the normal way a
  * new athlete gets added.
  *
- * A phone number turns this into a text. When Twilio is configured the server
- * sends it; otherwise the coach gets a button that opens their own Messages
- * app pre-written. Leave the phone blank and it behaves as it always did, with
- * the link shown as well as copied so a blocked clipboard never loses it.
+ * With email configured the server sends the invite to the login email just
+ * entered, and this says so. Without it the form behaves as it always did: the
+ * link is copied and shown. Either way the link is on screen, so a failed send
+ * or a blocked clipboard never loses it.
  */
 export default function InviteAthleteModal({
+  emailConfigured,
   onClose,
   onCreated,
 }: {
+  emailConfigured: boolean;
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [sent, setSent] = useState<string | null>(null);
-  /** Set when a text was wanted but the server could not send it itself. */
-  const [handoff, setHandoff] = useState<{ to: string; body: string } | null>(null);
+  /** Set once the server has emailed the invite. */
+  const [emailedTo, setEmailedTo] = useState<string | null>(null);
+  /** Set when an email was wanted but the server could not send it. */
+  const [sendErr, setSendErr] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -42,34 +43,28 @@ export default function InviteAthleteModal({
     };
   }, [onClose]);
 
-  const wantsText = phone.trim().length > 0;
-  const phoneOk = !wantsText || normalizePhone(phone) != null;
-  const canSubmit = name.trim() && email.trim() && phoneOk && !busy;
+  const canSubmit = name.trim() && email.trim() && !busy;
 
   async function create() {
     if (!canSubmit) return;
     setBusy(true);
     setErr(null);
     try {
-      const to = normalizePhone(phone);
       const a = await api<Athlete>("/api/athletes", "POST", {
         name: name.trim(),
         inviteEmail: email.trim(),
-        // Stored on the athlete first, which is also what lets the invite
-        // route confirm the text is going to a number on their own profile.
-        phone: to,
       });
       const inv = await api<{
         url: string;
-        sms: { sent: boolean } | null;
-      }>(`/api/athletes/${a.id}/invite`, "POST", to ? { to } : {});
+        email: { sent: boolean; to?: string; detail?: string; reason?: string } | null;
+      }>(`/api/athletes/${a.id}/invite`, "POST", emailConfigured ? { channel: "email" } : {});
       onCreated();
       setLink(inv.url);
 
-      if (to && inv.sms?.sent) {
-        setSent(to);
-      } else if (to) {
-        setHandoff({ to, body: inviteMessage(name.trim(), inv.url) });
+      if (inv.email?.sent) {
+        setEmailedTo(inv.email.to ?? email.trim());
+      } else if (inv.email) {
+        setSendErr(inv.email.detail ?? "The email could not be sent.");
       } else {
         try {
           await navigator.clipboard.writeText(inv.url);
@@ -97,6 +92,8 @@ export default function InviteAthleteModal({
     }
   }
 
+  const sent = emailedTo !== null;
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
@@ -107,7 +104,7 @@ export default function InviteAthleteModal({
       >
         <div className="modal-head">
           <span className="modal-title">
-            {sent ? "Invite texted" : link ? "Invite ready" : "Invite an athlete"}
+            {sent ? "Invite emailed" : link ? "Invite ready" : "Invite an athlete"}
           </span>
           <span className="modal-sub" />
           <button className="modal-x" onClick={onClose} aria-label="Close">
@@ -119,25 +116,9 @@ export default function InviteAthleteModal({
           {sent ? (
             <>
               <p className="type-pick-q">
-                Texted to <b>{formatPhone(sent)}</b>. {name.trim()} sets their
-                own password from the link; it works once and expires in 14 days.
+                Emailed to <b>{emailedTo}</b>. {name.trim()} sets their own
+                password from the link; it works once and expires in 14 days.
               </p>
-              <button className="btn primary" onClick={onClose}>
-                Done
-              </button>
-            </>
-          ) : handoff ? (
-            <>
-              <p className="type-pick-q">
-                Tap below and your Messages app opens with it written out to{" "}
-                <b>{formatPhone(handoff.to)}</b>.
-              </p>
-              <a
-                className="btn primary"
-                href={smsHref(handoff.to, handoff.body)}
-              >
-                Open Messages
-              </a>
               <details className="roster-d">
                 <summary>Or copy the link</summary>
                 <input
@@ -147,16 +128,29 @@ export default function InviteAthleteModal({
                   onFocus={(e) => e.currentTarget.select()}
                 />
               </details>
-              <button className="btn ghost" onClick={onClose}>
+              <button className="btn primary" onClick={onClose}>
                 Done
               </button>
             </>
           ) : link ? (
             <>
-              <p className="type-pick-q">
-                Send <b>{name.trim()}</b> this link. They&rsquo;ll set their own
-                password and be signed in. It works once and expires in 14 days.
-              </p>
+              {sendErr ? (
+                <>
+                  <p className="type-pick-q">
+                    The athlete was added, but Velo Ladder couldn&rsquo;t email
+                    the invite. Send <b>{name.trim()}</b> this link yourself:
+                  </p>
+                  <p className="form-error" role="alert">
+                    {sendErr}
+                  </p>
+                </>
+              ) : (
+                <p className="type-pick-q">
+                  Send <b>{name.trim()}</b> this link. They&rsquo;ll set their
+                  own password and be signed in. It works once and expires in 14
+                  days.
+                </p>
+              )}
               <input
                 className="tin invite-link"
                 readOnly
@@ -195,24 +189,6 @@ export default function InviteAthleteModal({
                   onKeyDown={(e) => e.key === "Enter" && create()}
                 />
               </label>
-              <label className="field">
-                <span>Mobile number (optional)</span>
-                <input
-                  className="tin"
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="(555) 123-4567"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && create()}
-                />
-              </label>
-              {wantsText && !phoneOk && (
-                <p className="form-error">
-                  That number doesn&rsquo;t look right. 10 digits, or leave it
-                  blank to copy the link instead.
-                </p>
-              )}
               {err && (
                 <p className="form-error" role="alert">
                   {err}
@@ -225,13 +201,14 @@ export default function InviteAthleteModal({
               >
                 {busy
                   ? "Creating…"
-                  : wantsText
-                    ? "Create & text the invite"
+                  : emailConfigured
+                    ? "Create & email the invite"
                     : "Create & copy invite link"}
               </button>
               <p className="type-pick-note">
-                No password needed. They choose their own from the link. A
-                number here texts it to them; leave it blank to copy instead.
+                {emailConfigured
+                  ? "No password needed. The invite goes straight to that email and they choose their own from the link."
+                  : "No password needed. They choose their own from the link. Email isn't set up yet, so the link is copied for you to send."}
               </p>
             </>
           )}

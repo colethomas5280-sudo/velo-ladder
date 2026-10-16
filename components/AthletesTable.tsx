@@ -9,6 +9,7 @@ import { LEVELS } from "@/lib/leaderboard";
 import { EMPTY, fmtDate } from "@/lib/velo";
 import GroupSession from "./GroupSession";
 import InviteAthleteModal from "./InviteAthleteModal";
+import { emailInviteOutcome, type InviteReply } from "@/lib/inviteOutcome";
 import TextInvite, { type InviteTarget } from "./TextInvite";
 
 export default function AthletesTable() {
@@ -30,6 +31,9 @@ export default function AthletesTable() {
   // Whether automated texting is wired up, so the menu can say which it is.
   const { data: smsCfg } = useSWR<{ configured: boolean }>("/api/sms", fetcher);
   const smsOn = smsCfg?.configured === true;
+  // Same for email, which is the default way an invite goes out.
+  const { data: emailCfg } = useSWR<{ configured: boolean }>("/api/email", fetcher);
+  const emailOn = emailCfg?.configured === true;
 
   const show = (m: string) => {
     setToast(m);
@@ -101,6 +105,43 @@ export default function AthletesTable() {
       await mutate();
       if (copied)
         show(`Invite link copied. Good for ${res.expiresInDays} days`);
+      else window.prompt("Copy this invite link and send it:", res.url);
+    } catch (e) {
+      errMsg(e);
+    } finally {
+      setInviting(null);
+    }
+  };
+
+  /**
+   * Email the athlete a fresh invite at their stored login email. A failed
+   * send falls back to copying the link, so the coach is never left empty
+   * handed. Each click mints a new token, revoking any link already sent.
+   */
+  const emailInvite = async (a: AthleteOverview) => {
+    if (!a.inviteEmail) {
+      show("Add a login email for this athlete first");
+      return;
+    }
+    setInviting(a.id);
+    try {
+      const res = await api<InviteReply>(
+        `/api/athletes/${a.id}/invite`,
+        "POST",
+        { channel: "email" },
+      );
+      const outcome = emailInviteOutcome(res);
+      let copied = !outcome.copyLink;
+      if (outcome.copyLink) {
+        try {
+          await navigator.clipboard.writeText(res.url);
+          copied = true;
+        } catch {
+          /* clipboard blocked — fall back to showing the link */
+        }
+      }
+      await mutate();
+      if (copied) show(outcome.message);
       else window.prompt("Copy this invite link and send it:", res.url);
     } catch (e) {
       errMsg(e);
@@ -269,6 +310,7 @@ export default function AthletesTable() {
                         onChange={(e) => {
                           const action = e.target.value;
                           if (action === "invite") invite(a);
+                          else if (action === "email") emailInvite(a);
                           else if (action === "text")
                             setTextFor({
                               id: a.id,
@@ -292,6 +334,9 @@ export default function AthletesTable() {
                                 ? "invite sent"
                                 : "set password"}
                         </option>
+                        {emailOn && (
+                          <option value="email">Email invite</option>
+                        )}
                         <option value="text">
                           {smsOn ? "Text invite" : "Text invite (opens Messages)"}
                         </option>
@@ -380,6 +425,7 @@ export default function AthletesTable() {
 
       {inviteOpen && (
         <InviteAthleteModal
+          emailConfigured={emailOn}
           onClose={() => setInviteOpen(false)}
           onCreated={() => mutate()}
         />

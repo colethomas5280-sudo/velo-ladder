@@ -13,6 +13,7 @@ import {
   smsConfigured,
   type SendResult,
 } from "@/lib/sms";
+import { sendInviteEmail, emailConfigured, type EmailResult } from "@/lib/email";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
 
 export const runtime = "nodejs";
@@ -28,9 +29,11 @@ function origin(request: Request): string {
 /**
  * POST /api/athletes/[id]/invite — issue a fresh single-use invite link.
  *
- * With `to`, also text it. The link comes back either way: a text that fails
- * to send must not take the invite with it, because the coach standing in
- * front of the athlete still needs something to hand over.
+ * With `to`, also text it. With `channel: "email"`, email it to the athlete's
+ * own stored login address (never an address from the request). The link comes
+ * back either way: a message that fails to send must not take the invite with
+ * it, because the coach standing in front of the athlete still needs something
+ * to hand over.
  */
 export async function POST(
   request: Request,
@@ -41,8 +44,12 @@ export async function POST(
   if (!scope) return unauthorized();
   if (scope.role !== "coach") return forbidden();
 
-  const body = (await request.json().catch(() => ({}))) as { to?: unknown };
+  const body = (await request.json().catch(() => ({}))) as {
+    to?: unknown;
+    channel?: unknown;
+  };
   const requested = typeof body.to === "string" ? body.to.trim() : "";
+  const wantsEmail = body.channel === "email";
 
   const athlete = await getAthlete(id);
   if (!athlete || athlete.archived) return notFound();
@@ -74,12 +81,19 @@ export async function POST(
   let sms: SendResult | null = null;
   if (to) sms = await sendSms(to, inviteMessage(athlete.name, url));
 
+  // The address comes from the athlete's row and from nowhere else.
+  let email: EmailResult | null = null;
+  if (wantsEmail)
+    email = await sendInviteEmail(athlete.inviteEmail ?? "", athlete.name, url);
+
   return json({
     url,
     expiresInDays: INVITE_TTL_DAYS,
     // What the client needs to decide between "sent" and "open Messages".
     sms,
     smsConfigured: smsConfigured(),
+    email,
+    emailConfigured: emailConfigured(),
   });
 }
 

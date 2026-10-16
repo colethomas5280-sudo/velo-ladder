@@ -34,8 +34,9 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
    Reset database password**) — use a letters-and-numbers-only password, put the exact
    same string in Supabase and in `DATABASE_URL`, wait ~2 min for the pooler to
    propagate, then redeploy.
-2. **Delete the dead `EMAIL_*` env vars** in Vercel (`EMAIL_HOST/PORT/USER/PASS/FROM`).
-   The app no longer sends email — login is password-based.
+2. **Delete the dead `EMAIL_HOST/PORT/USER/PASS` env vars** in Vercel. They were for
+   an abandoned SMTP login. (`EMAIL_FROM` is live again, now for Resend: see
+   **Emailing invites**.) Login itself is still password-based.
 3. **Re-run DB setup after any schema change:**
    `https://velo-ladder.vercel.app/api/setup?key=<SETUP_KEY>&seed=1` — idempotent,
    safe to hit anytime. Check `schemaVersion` in the response matches
@@ -82,7 +83,8 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/setbacks/[id]` | PATCH marks a flag reviewed. **Coach-only** — the human checkpoint. |
 | `/api/athletes/[id]/recovery` | GET / POST (upsert by date) / DELETE `?date=`. Athlete-scoped. |
 | `/api/sessions/[id]` | PATCH / DELETE. |
-| `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); DELETE cancels one. |
+| `/api/athletes/[id]/invite` | POST issues a single-use invite link (coach only); body `{ channel: "email" }` also emails it to the athlete's stored login email, `{ to }` texts it; DELETE cancels one. |
+| `/api/email` | GET - whether emailing invites is configured. Coach-only, boolean only. |
 | `/api/sms` | GET - whether automated texting is configured. Coach-only, boolean only. |
 | `/api/join/[token]` | Public. GET reveals only the invited athlete's name/email; POST spends the invite. |
 | `/api/leaderboard?tracker=&oz=` | GET — the record boards. `coach` + `athlete`; `none` → 403. Never touches `canSeeAthlete`. |
@@ -615,6 +617,33 @@ place. Required: `firstName`, `lastName`, `birthDate`, `level`, `heightIn`,
 under 18. Optional fields never count: if `bats` or a grad year did, every row would
 be marked forever, which is the same as marking none of them.
 
+## Emailing invites (`lib/email.ts`)
+
+The default way an invite goes out. Resend over its plain HTTP API, no package.
+
+**Needs `RESEND_API_KEY` and `EMAIL_FROM`** (an address on a domain verified in
+Resend, currently `Velo Ladder <invites@powerpitcherpathway.com>`). With either
+missing, `emailConfigured()` is false and everything behaves as before: the form
+copies the link, no email option appears. Setting them flips it on with no code
+change; Vercel env changes need a redeploy.
+
+**The recipient is the athlete's stored `invite_email`, never anything in the
+request.** `POST /api/athletes/[id]/invite` with `{ channel: "email" }` reads the
+address off the athlete row, so the endpoint cannot be used to send mail from the
+facility's domain to an address of someone's choosing. `lib/inviteEmailRoute.test.ts`
+pins that, including a request that tries to supply its own.
+
+**A failed send never costs the caller the link.** `sendInviteEmail` returns
+failures as values (`not_configured`, `bad_address`, `send_failed` with Resend's own
+wording, such as "domain is not verified"). The form then shows the reason and the
+link; the roster action copies the link. `lib/inviteOutcome.ts` holds the wording.
+
+Replies go to the first `COACH_EMAILS` address. `GET /api/email` exposes
+`{ configured }` so the roster can show the action only when it will work.
+
+The text path below is still in place and still reachable from the roster ("Text
+invite"); it just is not the default any more.
+
 ## Texting invites (`lib/sms.ts`)
 
 Two send paths, because the automated one has a carrier gate in front of it.
@@ -714,8 +743,9 @@ npm run dev
   `DATABASE_URL` must exactly match what was set in Supabase. Letters+numbers only
   avoids URL-encoding pain.
 - **Email login was abandoned** — Google Workspace (`fastcolorado.com`, which Cole
-  doesn't administer) blocks app passwords, and Resend needs a domain Cole can't add
-  DNS to. Password auth replaced it entirely.
+  doesn't administer) blocks app passwords, and Resend couldn't verify that domain.
+  Password auth replaced it. Emailing *invites* is a different thing and is built
+  on `powerpitcherpathway.com`, which Cole does control (see **Emailing invites**).
 - **`next-auth` is on a beta** (`5.0.0-beta.32`). Credentials + JWT, no adapter.
 - **In-progress entry is saved to `localStorage`** keyed
   `veloladder:draft:<athleteId>:<tracker>` — this is what makes tab-switching in the
@@ -726,8 +756,9 @@ npm run dev
 ## Onboarding an athlete
 
 Click **+ Invite athlete** (top right of the roster), enter a name and login email,
-and it creates the athlete and copies their invite link in one step. For someone
-already on the roster, **Copy invite link** in their Access column does the same. They set their own password and land on
+and it creates the athlete and emails them their invite in one step (or copies the
+link, if email isn't set up). For someone already on the roster, **Email invite**
+in their Access column re-sends it, and **Copy invite link** hands you the link. They set their own password and land on
 their profile. Links are single-use and expire after `INVITE_TTL_DAYS` (14).
 Re-issuing revokes the previous link, which is how you fix one sent to the wrong
 person. The raw token is returned only from the POST that mints it and never
