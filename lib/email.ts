@@ -7,9 +7,9 @@
  * fails comes back as a value so the caller still has the invite link to
  * hand over. Same contract as `lib/sms.ts`, on purpose.
  *
- * The recipient is never taken from a request. The invite route passes the
- * athlete's own stored login email, so this cannot be used to send mail from
- * the facility's domain to an address of someone's choosing.
+ * The recipient is never taken from a request. The invite and reset routes both
+ * pass the athlete's own stored login email, so this cannot be used to send
+ * mail from the facility's domain to an address of someone's choosing.
  */
 
 export type EmailResult =
