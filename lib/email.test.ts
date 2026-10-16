@@ -5,6 +5,8 @@ import {
   isEmailAddress,
   inviteEmailContent,
   sendInviteEmail,
+  resetEmailContent,
+  sendResetEmail,
 } from "@/lib/email";
 
 /* ------------------------------------------------------------------ *
@@ -186,4 +188,56 @@ test("the API key never appears in anything returned", async () => {
   respond = () => new Response(JSON.stringify({ message: "nope" }), { status: 401 });
   const r = await sendInviteEmail("kid@school.org", "Jake", "https://velo.test/join/t");
   assert.ok(!JSON.stringify(r).includes("re_secret_key"));
+});
+
+test("the reset email names the coach, says it expires in an hour, and is safe to ignore", () => {
+  const url = "https://velo.test/reset-password/tok";
+  const r = resetEmailContent("Jake Bell", url);
+  assert.equal(r.subject, "Reset your Velo Ladder password");
+  for (const part of [r.text, r.html]) {
+    assert.ok(part.includes("Jake"), "first name");
+    assert.ok(part.includes("1 hour"), "expiry");
+    assert.match(part, /ignore this email/i);
+    assert.match(part, /password hasn.{1,8}t changed/i);
+    assert.match(part, /FAST Performance/);
+  }
+  assert.ok(!r.text.includes("Bell"), "first name only");
+  assert.equal(r.text.split(url).length - 1, 1, "link once in the text");
+  assert.equal(r.html.split(url).length - 1, 2, "one anchor in the html");
+  assert.ok(r.text.endsWith("Coach Cole\nFAST Performance, Denver"));
+  assert.ok(!/[—–]/.test(r.text + r.html), "no em or en dashes");
+});
+
+test("a name cannot inject markup into the reset email", () => {
+  const r = resetEmailContent('<script>alert(1)</script>', "https://x.test/r?a=1&b=2");
+  assert.ok(!r.html.includes("<script>"));
+  assert.ok(r.html.includes("a=1&amp;b=2"));
+});
+
+test("sendResetEmail posts the reset to Resend at the address it was given", async () => {
+  const r = await sendResetEmail("kid@school.org", "Jake Bell", "https://velo.test/reset-password/t0k");
+  assert.deepEqual(r, { sent: true, to: "kid@school.org" });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://api.resend.com/emails");
+  assert.equal(calls[0].body.subject, "Reset your Velo Ladder password");
+  assert.deepEqual(calls[0].body.to, ["kid@school.org"]);
+  assert.equal(calls[0].body.reply_to, "cole@fastcolorado.com");
+  assert.ok(String(calls[0].body.text).includes("https://velo.test/reset-password/t0k"));
+});
+
+test("sendResetEmail is a value when not configured, refuses a bad address, and reports Resend's reason", async () => {
+  delete process.env.RESEND_API_KEY;
+  assert.deepEqual(await sendResetEmail("kid@school.org", "J", "https://x.test/r"), {
+    sent: false,
+    reason: "not_configured",
+  });
+  process.env.RESEND_API_KEY = "re_secret_key";
+  assert.deepEqual(await sendResetEmail("nope", "J", "https://x.test/r"), {
+    sent: false,
+    reason: "bad_address",
+  });
+  respond = () => new Response(JSON.stringify({ message: "domain is not verified" }), { status: 403 });
+  const r = await sendResetEmail("kid@school.org", "J", "https://x.test/r");
+  assert.ok(!r.sent && r.reason === "send_failed");
+  assert.match(!r.sent ? (r.detail ?? "") : "", /domain is not verified/);
 });

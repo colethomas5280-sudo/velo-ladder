@@ -14,17 +14,11 @@ import {
   type SendResult,
 } from "@/lib/sms";
 import { sendInviteEmail, emailConfigured, type EmailResult } from "@/lib/email";
+import { appOrigin } from "@/lib/origin";
 import { json, unauthorized, forbidden, notFound, badRequest } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Base URL for links we hand out. AUTH_URL is authoritative in production. */
-function origin(request: Request): string {
-  const configured = process.env.AUTH_URL?.replace(/\/$/, "");
-  if (configured) return configured;
-  return new URL(request.url).origin;
-}
 
 /**
  * POST /api/athletes/[id]/invite — issue a fresh single-use invite link.
@@ -76,7 +70,7 @@ export async function POST(
 
   const token = await createInvite(id);
   if (!token) return notFound();
-  const url = `${origin(request)}/join/${token}`;
+  const url = `${appOrigin(request)}/join/${token}`;
 
   let sms: SendResult | null = null;
   if (to) sms = await sendSms(to, inviteMessage(athlete.name, url));

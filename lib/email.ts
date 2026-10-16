@@ -1,5 +1,5 @@
 /*
- * Emailing invite links.
+ * Emailing invite and password-reset links.
  *
  * Resend, over its plain HTTP API, from a domain Cole controls
  * (powerpitcherpathway.com). Nothing here throws when it is not set up:
@@ -79,26 +79,44 @@ export function inviteEmailContent(name: string, url: string) {
   return { subject: "Set up your Velo Ladder login", text, html };
 }
 
+/** First name only. Says what happened, how long it lasts, and that ignoring it is safe. */
+export function resetEmailContent(name: string, url: string) {
+  const first = name.trim().split(/\s+/)[0] || "there";
+  const text =
+    `Hi ${first},\n\n` +
+    `Someone asked to reset the password on your Velo Ladder account. ` +
+    `If that was you, choose a new one here:\n\n${url}\n\n` +
+    `The link works once and expires in 1 hour.\n\n` +
+    `If it wasn't you, ignore this email and nothing will happen. ` +
+    `Your password hasn't changed.\n\n` +
+    SIGNATURE.join("\n");
+  const html =
+    `<p>Hi ${esc(first)},</p>` +
+    `<p>Someone asked to reset the password on your Velo Ladder account. ` +
+    `If that was you, choose a new one here:</p>` +
+    `<p><a href="${esc(url)}">${esc(url)}</a></p>` +
+    `<p>The link works once and expires in 1 hour.</p>` +
+    `<p>If it wasn&rsquo;t you, ignore this email and nothing will happen. ` +
+    `Your password hasn&rsquo;t changed.</p>` +
+    `<p>${SIGNATURE.map(esc).join("<br>")}</p>`;
+  return { subject: "Reset your Velo Ladder password", text, html };
+}
+
 /** Replies go to the first coach address, if there is one. */
 function replyTo(): string | null {
   const first = process.env.COACH_EMAILS?.split(",")[0]?.trim();
   return first && isEmailAddress(first) ? first : null;
 }
 
-/**
- * Send one invite. Never throws: a failed email must not cost the caller the
- * link it was carrying.
- */
-export async function sendInviteEmail(
+/** Everything both emails share: the gate, the address check and the Resend call. */
+async function deliver(
   to: string,
-  name: string,
-  url: string,
+  content: { subject: string; text: string; html: string },
 ): Promise<EmailResult> {
   const c = creds();
   if (!c) return { sent: false, reason: "not_configured" };
   if (!isEmailAddress(to)) return { sent: false, reason: "bad_address" };
 
-  const content = inviteEmailContent(name, url);
   const reply = replyTo();
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -137,4 +155,13 @@ export async function sendInviteEmail(
       detail: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+/** Never throws: a failed email must not cost the caller the link it carried. */
+export function sendInviteEmail(to: string, name: string, url: string): Promise<EmailResult> {
+  return deliver(to, inviteEmailContent(name, url));
+}
+
+export function sendResetEmail(to: string, name: string, url: string): Promise<EmailResult> {
+  return deliver(to, resetEmailContent(name, url));
 }
