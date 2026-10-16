@@ -1,7 +1,7 @@
 # Self-service password reset — design
 
 **Date:** 2026-10-16
-**Status:** open question closed; awaiting Cole's approval
+**Status:** implemented
 **Builds on:** the invite email (`lib/email.ts`, commit `a267493`), the invite/join
 flow (`lib/data.ts` `createInvite` / `consumeInvite`, `app/join/[token]`)
 

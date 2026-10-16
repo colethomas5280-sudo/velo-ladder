@@ -71,6 +71,8 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/profile` | The athlete's own profile — "My profile" in the nav. Same `ProfileSummary` the coach sees as a section of `/athletes/[id]`, behind an `auth()`-only server component that resolves the athlete id client-side via `/api/me`. The edit modal opens by itself while anything required is blank. See **## Athlete profile**. |
 | `/login` | Email + password. |
 | `/join/[token]` | Public. An invited athlete sets their own password and is signed straight in. |
+| `/forgot-password` | Public. An athlete enters their login email to get a reset link. Shows an unavailable notice (ask the coach for a new invite) when email is not configured. |
+| `/reset-password/[token]` | Public. A server component that checks the link, then an athlete sets a new password and is signed straight in. Never cached; sends `referrer: no-referrer`. |
 | `/leaderboard` | Facility + level velocity record boards. Coach and athlete both. See **## Leaderboard**. |
 | `/api/me` | `{ role, email, athleteId }` for the signed-in user. |
 | `/api/resources` | GET any signed-in user; POST coach-only. `/[id]` PATCH + DELETE (soft) coach-only. |
@@ -87,6 +89,8 @@ boxes each. Confirm the repo on GitHub is at the latest commit before starting.
 | `/api/email` | GET - whether emailing invites is configured. Coach-only, boolean only. |
 | `/api/sms` | GET - whether automated texting is configured. Coach-only, boolean only. |
 | `/api/join/[token]` | Public. GET reveals only the invited athlete's name/email; POST spends the invite. |
+| `/api/password-reset/request` | Public POST. Always answers {"ok":true}. Emails a reset link to the athlete's stored login email after the response. |
+| `/api/password-reset/confirm` | Public POST. Spends a reset link and sets the password. |
 | `/api/leaderboard?tracker=&oz=` | GET — the record boards. `coach` + `athlete`; `none` → 403. Never touches `canSeeAthlete`. |
 | `/api/setup?key=…&seed=1` | One-time (idempotent) schema + seed. `SETUP_KEY`-guarded. |
 | `/api/auth/*` | Auth.js. |
@@ -643,6 +647,33 @@ Replies go to the first `COACH_EMAILS` address. `GET /api/email` exposes
 
 The text path below is still in place and still reachable from the roster ("Text
 invite"); it just is not the default any more.
+
+## Password reset (`lib/passwordReset.ts`)
+
+Self-service: **Forgot password?** on the login page, an email with a link, a new
+password, signed straight in. Athletes only; coach sign-in is one shared
+`COACH_PASSWORD` with nothing per person to reset.
+
+**Schema v29** (needs one `/api/setup` run): `athletes.reset_token_hash`,
+`reset_expires`, `reset_requested_at`, and a `password_reset_sends` log. The token
+is stored as a SHA-256 hash, never raw, and is separate from the invite token so a
+public reset request can never cancel a pending invite.
+
+**What protects it.** One answer for every request, so the form cannot reveal who is
+on the roster. The lookup and email run after the response (`after()` from
+`next/server`), so timing does not either. Links last 60 minutes and work once (the
+consume is one UPDATE). The confirm route looks the token up (`getResetTarget`, one
+indexed query) before it spends it (`consumeReset`), so a junk token costs a lookup
+and not a bcrypt hash. One email per athlete per 10 minutes, and no more than 30
+reset emails per rolling 24 hours app-wide (`RESET_DAILY_CAP`), counted from
+`password_reset_sends`, so abuse cannot use up Resend's free allowance and block real
+invites. Completing a reset also clears any unused invite. The reset page is a
+server component, sends `referrer: no-referrer` and is never cached.
+
+**Known limits, deliberate.** A reset does not sign other devices out (sessions are
+stateless). Nothing limits wrong-password attempts at the sign-in box; that is a
+separate gap. Needs email configured (`RESEND_API_KEY`, `EMAIL_FROM`); without it the
+forgot page shows an unavailable notice that says to ask the coach for a new invite.
 
 ## Texting invites (`lib/sms.ts`)
 

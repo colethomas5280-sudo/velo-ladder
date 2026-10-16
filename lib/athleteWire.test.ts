@@ -75,6 +75,8 @@ interface Seeded {
   resourceId: string;
   inviteToken: string;
   passwordHash: string;
+  resetToken: string;
+  resetHash: string;
 }
 
 async function seed(): Promise<Seeded> {
@@ -165,6 +167,14 @@ async function seed(): Promise<Seeded> {
     SELECT password_hash FROM athletes WHERE id = ${athlete.id}
   `) as { password_hash: string }[];
 
+  // A live reset claim for the athlete, so the sweep has a real token and a
+  // real stored hash to look for on the wire.
+  const pr = await import("@/lib/passwordReset");
+  const claim = await pr.requestReset(ATHLETE_EMAIL);
+  const [reset] = (await sql`
+    SELECT reset_token_hash FROM athletes WHERE id = ${athlete.id}
+  `) as { reset_token_hash: string }[];
+
   return {
     athleteId: athlete.id,
     otherId: other.id,
@@ -173,6 +183,8 @@ async function seed(): Promise<Seeded> {
     resourceId: resource.id,
     inviteToken: token,
     passwordHash: row.password_hash,
+    resetToken: claim!.token,
+    resetHash: reset.reset_token_hash,
   };
 }
 
@@ -389,6 +401,16 @@ test("no password hash or invite token reaches anyone", () => {
       r.body.includes(seeded.inviteToken),
       false,
       `${r.file} (${r.status}) put a live invite token on the wire`,
+    );
+    assert.equal(
+      r.body.includes(seeded.resetToken),
+      false,
+      `${r.file} (${r.status}) put a live reset token on the wire`,
+    );
+    assert.equal(
+      r.body.includes(seeded.resetHash),
+      false,
+      `${r.file} (${r.status}) put a reset token hash on the wire`,
     );
   }
 });
