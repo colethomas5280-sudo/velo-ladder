@@ -76,6 +76,36 @@ test("the invite email carries the link, the first name and the expiry", () => {
   assert.ok(!c.text.includes("Bell"), "first name only");
 });
 
+test("the invite email says who it is from and why they are getting it", () => {
+  const c = inviteEmailContent("Jake Bell", "https://velo.test/join/abc123");
+  for (const part of [c.text, c.html]) {
+    assert.ok(part.includes("FAST Performance"), "names the facility");
+    assert.match(part, /Coach Cole/, "signed by the coach");
+    assert.match(part, /velocity and recovery/i, "says what the app is for");
+  }
+});
+
+test("the email ends with a signature in both parts", () => {
+  const c = inviteEmailContent("Jake", "https://velo.test/join/abc123");
+  assert.ok(c.text.endsWith("Coach Cole\nFAST Performance, Denver"), "plain text sign-off");
+  assert.ok(c.html.endsWith("Coach Cole<br>FAST Performance, Denver</p>"), "html sign-off");
+});
+
+test("it tells a surprised recipient they can ignore it", () => {
+  const c = inviteEmailContent("Jake", "https://velo.test/join/abc123");
+  for (const part of [c.text, c.html])
+    assert.match(part, /weren.{1,8}t expecting this/i);
+  assert.match(c.text, /ignore this email/i);
+});
+
+test("the link appears exactly once, so the email is not link-stuffed", () => {
+  const url = "https://velo.test/join/abc123";
+  const c = inviteEmailContent("Jake", url);
+  assert.equal(c.text.split(url).length - 1, 1, "once in the text part");
+  // Once as the href and once as the visible text of the same anchor.
+  assert.equal(c.html.split(url).length - 1, 2, "one anchor in the html part");
+});
+
 test("the invite email copes with an empty name", () => {
   assert.ok(inviteEmailContent("   ", "https://x.test/j").text.startsWith("Hi there,"));
 });
