@@ -1,7 +1,7 @@
 # Self-service password reset — design
 
 **Date:** 2026-10-16
-**Status:** awaiting Cole's review
+**Status:** open question closed; awaiting Cole's approval
 **Builds on:** the invite email (`lib/email.ts`, commit `a267493`), the invite/join
 flow (`lib/data.ts` `createInvite` / `consumeInvite`, `app/join/[token]`)
 
@@ -115,11 +115,11 @@ default. Nothing needs to be opened up.
 
 ## Behaviour worth stating exactly
 
-- **Same email, two athletes.** `invite_email` is not unique, so siblings could share a
-  parent's address. Sign-in already takes whichever row comes first. Reset targets
-  exactly one athlete, chosen `ORDER BY created_at, id`, and sign-in is left alone. If
-  two athletes share an address, the one reset reaches may not be the one the parent
-  meant. **This is flagged, not solved**; see Open questions.
+- **Same email, two athletes.** Not expected: Cole confirmed every athlete logs in as
+  themselves. `invite_email` is not unique in the database, though, so reset targets
+  exactly one athlete, chosen `ORDER BY created_at, id`, and sign-in is left alone.
+  That keeps the behaviour deterministic if a duplicate ever appears; it does not try to
+  serve both.
 - **An athlete invited but who never set a password** can use reset to set one. It works
   as a self-serve invite.
 - **A request for a coach address, or any address with no athlete,** does nothing and
@@ -174,7 +174,7 @@ new password, sign in with it. Resend is already live and verified.
 
 ## Open questions
 
-1. **Do any two athletes share a login email today?** If yes, reset can only ever reach
-   one of them. The clean fix is a uniqueness rule on active athletes' emails, which is a
-   larger decision than this feature. Cole can check the roster. The design above is safe
-   either way; it just may not reach the right sibling.
+None. The one raised in review was settled by Cole: every athlete has their own
+profile and logs in as themselves, so login emails are not expected to be shared. The
+`ORDER BY created_at, id` tie-break stays anyway, so that if two rows ever did share an
+address the choice is deterministic rather than arbitrary, and it is covered by a test.
