@@ -5,10 +5,12 @@ import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/re
 
 const signInCalls: unknown[][] = [];
 let signInResult: { error: string | null } = { error: null };
+let signInThrows = false;
 mock.module("next-auth/react", {
   exports: {
     signIn: async (...args: unknown[]) => {
       signInCalls.push(args);
+      if (signInThrows) throw new Error("network dropped");
       return signInResult;
     },
   },
@@ -30,6 +32,7 @@ beforeEach(() => {
   redirects.length = 0;
   signInCalls.length = 0;
   signInResult = { error: null };
+  signInThrows = false;
   reply = { status: 200, body: { email: "jake@school.org" } };
   globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
     if (init?.method === "POST") {
@@ -91,4 +94,33 @@ test("if the password was set but sign-in fails, they are sent to the login page
   fill("longenough", "longenough");
   fireEvent.click(button());
   await waitFor(() => assert.deepEqual(redirects, ["/login"]));
+});
+
+test("if sign-in throws after the password was set, they go to the login page with no error", async () => {
+  signInThrows = true;
+  open();
+  fill("longenough", "longenough");
+  fireEvent.click(button());
+  await waitFor(() => assert.deepEqual(redirects, ["/login"]));
+  assert.equal(posted.length, 1, "the password was set once");
+  assert.ok(screen.queryByRole("alert") === null, "a sign-in failure must not read as a failed reset");
+});
+
+test("submitting the form with a too-short password posts nothing", async () => {
+  const { container } = open();
+  fill("short", "short");
+  const form = container.querySelector("form")!;
+  fireEvent.submit(form);
+  fireEvent.keyDown(screen.getByLabelText(/confirm/i), { key: "Enter" });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(posted.length, 0);
+  assert.deepEqual(redirects, []);
+});
+
+test("submitting the form with a valid password posts it once", async () => {
+  const { container } = open();
+  fill("longenough", "longenough");
+  fireEvent.submit(container.querySelector("form")!);
+  await waitFor(() => assert.deepEqual(redirects, ["/"]));
+  assert.equal(posted.length, 1);
 });

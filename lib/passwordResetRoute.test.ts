@@ -52,8 +52,8 @@ const realFetch = globalThis.fetch;
 let route: typeof import("../app/api/password-reset/request/route");
 let pr: typeof import("@/lib/passwordReset");
 let sql: typeof import("@/lib/db").sql;
-let kid = { id: "", email: "kid@reset.test" };
-let archivedEmail = "gone@reset.test";
+const kid = { id: "", email: "kid@reset.test" };
+const archivedEmail = "gone@reset.test";
 
 before(async () => {
   const db = await import("@/lib/db");

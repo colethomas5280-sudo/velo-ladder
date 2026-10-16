@@ -38,7 +38,7 @@ test("the send button waits for an email", () => {
   assert.equal(btn.disabled, false);
 });
 
-test("submitting posts the trimmed email and shows the fixed confirmation", async () => {
+test("submitting posts the email and shows the fixed confirmation", async () => {
   render(<ForgotPasswordForm available />);
   submit("  jake@school.org ");
   await waitFor(() => screen.getByText(CONFIRM));

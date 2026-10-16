@@ -30,30 +30,19 @@ export default function ResetPasswordForm({
   const mismatch = pw2.length > 0 && pw !== pw2;
   const canSubmit = pw.length >= 6 && pw === pw2 && !busy;
 
-  async function submit() {
+  async function submit(ev?: React.FormEvent) {
+    ev?.preventDefault();
     if (!canSubmit) return;
     setBusy(true);
     setErr(null);
+    let email: string | null;
     try {
       const res = await api<{ email: string | null }>(
         "/api/password-reset/confirm",
         "POST",
         { token, password: pw },
       );
-      // The link already proved they control the email, so sign them straight
-      // in rather than making them type what they just chose.
-      if (res.email) {
-        const r = await signIn("credentials", {
-          email: res.email,
-          password: pw,
-          redirect: false,
-        });
-        if (!r?.error) {
-          redirect("/");
-          return;
-        }
-      }
-      redirect("/login");
+      email = res.email;
     } catch (e) {
       setErr(
         e instanceof ApiError
@@ -61,11 +50,32 @@ export default function ResetPasswordForm({
           : "Couldn't set your password. Check your connection and try again.",
       );
       setBusy(false);
+      return;
     }
+    // The password is set from here on. Nothing below may report a failure to
+    // set it: a retry would only say the link was already used.
+    // The link already proved they control the email, so sign them straight
+    // in rather than making them type what they just chose.
+    if (email) {
+      try {
+        const r = await signIn("credentials", {
+          email,
+          password: pw,
+          redirect: false,
+        });
+        if (!r?.error) {
+          redirect("/");
+          return;
+        }
+      } catch {
+        // fall through to the login page
+      }
+    }
+    redirect("/login");
   }
 
   return (
-    <div className="card pad login-card">
+    <form className="card pad login-card" onSubmit={submit}>
       <div className="eyebrow">Password reset</div>
       <h3>Choose a new password</h3>
 
@@ -86,7 +96,6 @@ export default function ResetPasswordForm({
           autoComplete="new-password"
           value={pw2}
           onChange={(e) => setPw2(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
         />
       </label>
 
@@ -101,9 +110,9 @@ export default function ResetPasswordForm({
         </p>
       )}
 
-      <button className="btn primary" disabled={!canSubmit} onClick={submit}>
+      <button className="btn primary" type="submit" disabled={!canSubmit}>
         {busy ? "Saving…" : "Set new password"}
       </button>
-    </div>
+    </form>
   );
 }
