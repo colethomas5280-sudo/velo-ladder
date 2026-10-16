@@ -51,6 +51,17 @@ const MARK_LABEL: Record<TestMark, string> = {
   alert: "Painful",
 };
 
+/**
+ * What "unchanged" is compared as. Key order must not matter: clearing a
+ * reading and answering it again moves its key to the end of the object.
+ */
+function stable(results: Results, notes: string): string {
+  const sorted = Object.fromEntries(
+    Object.entries(results).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  );
+  return JSON.stringify({ results: sorted, notes });
+}
+
 export default function ScreenForm({
   athleteId,
   initial,
@@ -77,9 +88,16 @@ export default function ScreenForm({
   draft?: TestDraft | null;
   /** Keep a draft in the browser while there are unsaved answers. */
   persist?: boolean;
-  /** Told whenever "has unsaved changes" flips. */
+  /**
+   * Told whenever "has unsaved changes" flips. Called from an effect, so keep
+   * it cheap and idempotent.
+   */
   onDirty?: (dirty: boolean) => void;
-  /** Gives a parent a way to trigger Save; resolves true on success. */
+  /**
+   * Gives a parent a way to trigger Save; resolves true on success. It is
+   * called after EVERY render with the latest closure, so a parent must keep
+   * the function in a ref, never in state (that would loop).
+   */
   register?: (save: () => Promise<boolean>) => void;
 }) {
   /*
@@ -88,16 +106,21 @@ export default function ScreenForm({
    * on today's screen must not be a dead end for someone entering Saturday's
    * on Monday, hence "record a different date" below.
    */
-  const [existing, setExisting] = useState<MovementScreen | null>(initial);
-  const [date, setDate] = useState(draft?.date ?? initial?.date ?? todayISO());
-  const [results, setResults] = useState<Results>(
-    (draft?.data as Results | undefined) ?? initial?.results ?? {},
+  // The saved record is only the one being edited if the draft (when there is
+  // one) is for the same date. A draft for another date is a new screen.
+  const [editing] = useState(() =>
+    initial && initial.date === (draft?.date ?? initial.date) ? initial : null,
   );
-  const [notes, setNotes] = useState(draft ? draft.notes : (initial?.notes ?? ""));
+  const [existing, setExisting] = useState<MovementScreen | null>(editing);
+  const [date, setDate] = useState(draft?.date ?? editing?.date ?? todayISO());
+  const [results, setResults] = useState<Results>(
+    (draft?.data as Results | undefined) ?? editing?.results ?? {},
+  );
+  const [notes, setNotes] = useState(draft ? draft.notes : (editing?.notes ?? ""));
   const [justSaved, setJustSaved] = useState(false);
   // What "unchanged" means: the saved record (or blank), moved forward after each save.
   const [baseline, setBaseline] = useState(() =>
-    JSON.stringify({ results: initial?.results ?? {}, notes: initial?.notes ?? "" }),
+    stable(editing?.results ?? {}, editing?.notes ?? ""),
   );
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -167,7 +190,7 @@ export default function ScreenForm({
       return next;
     });
 
-  const dirty = JSON.stringify({ results, notes }) !== baseline;
+  const dirty = stable(results, notes) !== baseline;
 
   useEffect(() => {
     onDirty?.(dirty);
@@ -195,7 +218,7 @@ export default function ScreenForm({
       });
       const updating = !!existing || justSaved;
       setJustSaved(true);
-      setBaseline(JSON.stringify({ results, notes }));
+      setBaseline(stable(results, notes));
       setBusy(false);
       onSaved(updating ? "Screen updated" : "Screen saved");
       return true;
@@ -251,18 +274,25 @@ export default function ScreenForm({
       {existing && (
         <p className="ms-note">
           Editing the screen from {fmtDate(existing.date)}. The date is what
-          identifies it. To move a screen, delete it and record it again.{" "}
-          <button
-            className="linkish"
-            onClick={() => {
-              setExisting(null);
-              setResults({});
-              setNotes("");
-              setConfirmDelete(false);
-            }}
-          >
-            Record a different date instead
-          </button>
+          identifies it.
+          {/* Group mode has no Delete and a reset would leave a blank form over a saved screen. */}
+          {!group && (
+            <>
+              {" "}
+              To move a screen, delete it and record it again.{" "}
+              <button
+                className="linkish"
+                onClick={() => {
+                  setExisting(null);
+                  setResults({});
+                  setNotes("");
+                  setConfirmDelete(false);
+                }}
+              >
+                Record a different date instead
+              </button>
+            </>
+          )}
         </p>
       )}
       {threw.count > 0 && (

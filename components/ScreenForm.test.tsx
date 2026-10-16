@@ -99,7 +99,7 @@ test("a saved screen opened untouched is not dirty", () => {
   assert.equal(seen[seen.length - 1], false);
 });
 
-test("with persist on, answering writes a draft and returning to blank removes it", async () => {
+test("with persist on, answering writes a draft", async () => {
   form({ persist: true });
   assert.equal(loadTestDraft("screen", ID), null);
   markRestNormal();
@@ -216,4 +216,64 @@ test("after a save the form stops warning that the date already holds a screen",
   } finally {
     api.restore();
   }
+});
+
+test("group mode keeps the editing note but offers no way to leave the record or delete it", () => {
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results: { x: "normal" }, notes: "" } as unknown as MovementScreen;
+  form({ initial: saved, group: true });
+  assert.ok(screen.queryByText(/editing the screen from/i) !== null, "the note still shows");
+  assert.ok(screen.queryByRole("button", { name: /record a different date/i }) === null);
+  const note = document.querySelector(".ms-note")!.textContent ?? "";
+  assert.ok(!/delete/i.test(note), `the note must not point at a Delete that is hidden: ${note}`);
+});
+
+test("outside group mode the note still offers the different date and mentions delete", () => {
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results: { x: "normal" }, notes: "" } as unknown as MovementScreen;
+  form({ initial: saved });
+  assert.ok(screen.queryByRole("button", { name: /record a different date/i }) !== null);
+  assert.ok(/delete/i.test(document.querySelector(".ms-note")!.textContent ?? ""));
+});
+
+test("a draft dated differently from the saved screen is a new screen, not an edit", () => {
+  const results = fillNormal({}, [SCREEN_TESTS[0]]);
+  // Same readings and notes as the draft, so only a wrong baseline could make it read clean.
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results, notes: "" } as unknown as MovementScreen;
+  const seen: boolean[] = [];
+  form({ initial: saved, draft: { date: "2026-09-16", notes: "", data: results }, onDirty: (d) => seen.push(d) });
+  assert.ok(screen.queryByRole("button", { name: "Save screen" }) !== null);
+  assert.ok(screen.queryByRole("button", { name: "Update screen" }) === null);
+  const dateInput = screen.getByLabelText("Date") as HTMLInputElement;
+  assert.equal(dateInput.value, "2026-09-16");
+  assert.equal(dateInput.disabled, false);
+  assert.ok(screen.queryByText(/editing the screen from/i) === null);
+  assert.equal((screen.getByPlaceholderText(/guarding on the left/i) as HTMLTextAreaElement).value, "");
+  assert.equal(seen[seen.length - 1], true);
+});
+
+test("a draft on the saved screen's own date is an edit that starts dirty", () => {
+  const first = SCREEN_TESTS[0];
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results: fillNormal({}, [first]), notes: "" } as unknown as MovementScreen;
+  const seen: boolean[] = [];
+  form({ initial: saved, draft: { date: TODAY, notes: "more", data: saved.results }, onDirty: (d) => seen.push(d) });
+  assert.ok(screen.queryByRole("button", { name: "Update screen" }) !== null);
+  assert.equal(seen[seen.length - 1], true, "the draft differs from the saved notes");
+});
+
+test("clearing a reading and re-answering it the same leaves the form clean, whatever the key order", async () => {
+  const results = fillNormal({}, [SCREEN_TESTS[0]]);
+  const keys = Object.keys(results);
+  assert.ok(keys.length >= 2, "setup: needs two readings so order can differ");
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results, notes: "" } as unknown as MovementScreen;
+  const seen: boolean[] = [];
+  form({ initial: saved, persist: true, onDirty: (d) => seen.push(d) });
+  fireEvent.click(document.querySelector(".ms-test-toggle")!);
+  const first = () => document.querySelector<HTMLSelectElement>(".ms-select")!;
+  const original = first().value;
+  assert.ok(original !== "", "setup: the first select holds a reading");
+  fireEvent.change(first(), { target: { value: "" } });
+  await waitFor(() => assert.equal(seen[seen.length - 1], true));
+  await waitFor(() => assert.ok(loadTestDraft("screen", ID) !== null, "draft while changed"));
+  fireEvent.change(first(), { target: { value: original } });
+  await waitFor(() => assert.equal(seen[seen.length - 1], false));
+  await waitFor(() => assert.equal(loadTestDraft("screen", ID), null));
 });
