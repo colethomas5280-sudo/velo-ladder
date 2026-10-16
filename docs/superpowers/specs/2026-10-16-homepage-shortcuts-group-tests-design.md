@@ -47,8 +47,9 @@ checkboxes on the Athletes page, which are left alone.
 
 **The group test screen.** A header naming the test, a tab per picked athlete (the same
 look as the velocity group screen), and the athlete's own form beneath, exactly as the
-single-athlete form looks today. Tab marks: a dot when that athlete has unsaved answers, a
-tick once saved in this sitting. Per athlete: **Save** (saves that athlete, ticks the tab,
+single-athlete form looks today. Tab marks: a dot when that athlete has unsaved answers (read from the
+live form, or from the saved draft for an athlete whose tab has not been opened since a
+reload), a tick once saved in this sitting. Per athlete: **Save** (saves that athlete, ticks the tab,
 stays on the screen) and the form's own "mark the rest normal". At the bottom: **Save all**
 (saves everyone who has answers). An athlete who already has a record for today opens on
 it, as the athlete page does now; the date, the "already exists for this date" warning and
@@ -111,7 +112,7 @@ Test-first, then each assertion proven by breaking the code on purpose.
 - **Drafts:** answers survive a simulated reload; an empty leftover from an earlier day
   starts on today; one with answers keeps its date; a successful save removes the draft;
   keys are per athlete and per test type.
-- **Dirty marks:** the dot appears with answers and disappears after saving.
+- **Dirty marks:** the dot appears with answers and disappears after saving, and shows after a reload for an athlete with a saved draft whose tab was never reopened.
 - Full gate (`npm run verify`) green from a clean build.
 
 ## Deploy
