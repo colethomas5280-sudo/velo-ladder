@@ -263,6 +263,16 @@ export async function updateAthlete(
   if (patch.cnsThresholdPct !== undefined)
     set("cns_threshold_pct", patch.cnsThresholdPct);
   if (patch.password) set("password_hash", await hashPassword(patch.password));
+  /*
+   * A reset link mailed to the old address, or issued before the coach chose a
+   * password, must not survive either change: it would still work for up to an
+   * hour and overwrite what was just set. reset_requested_at is left alone so
+   * the cooldown holds.
+   */
+  if (patch.password || patch.inviteEmail !== undefined) {
+    set("reset_token_hash", null);
+    set("reset_expires", null);
+  }
 
   vals.push(id);
   const rows = (
@@ -394,6 +404,7 @@ export async function consumeInvite(
   const rows = (await sql`
     UPDATE athletes
     SET password_hash = ${hash}, invite_token = NULL, invite_expires = NULL,
+        reset_token_hash = NULL, reset_expires = NULL,
         level = COALESCE(${level}::text, level),
         birth_date = COALESCE(${birthDate}::date, birth_date)
     WHERE invite_token = ${token}

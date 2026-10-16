@@ -668,7 +668,23 @@ and not a bcrypt hash. One email per athlete per 10 minutes, and no more than 30
 reset emails per rolling 24 hours app-wide (`RESET_DAILY_CAP`), counted from
 `password_reset_sends`, so abuse cannot use up Resend's free allowance and block real
 invites. Completing a reset also clears any unused invite. The reset page is a
-server component, sends `referrer: no-referrer` and is never cached.
+server component; `next.config.ts` sends real `Referrer-Policy: no-referrer` and
+`Cache-Control: no-store` response headers for it (the page keeps its `<meta>` too).
+In production the request route does nothing when `AUTH_URL` is unset, so the emailed
+link can never be built from the request's Host header.
+
+**A live link is cancelled by** the athlete's login email or password being changed
+(`updateAthlete`) and by an invite being redeemed (`consumeInvite`), so a link mailed
+to an old address cannot overwrite what was set since. An unrelated edit leaves it
+alone, and the 10-minute cooldown stamp is kept either way.
+
+**The daily cap is a bound, not a wall.** The count and the claim are separate
+statements, so a burst of concurrent requests for different athletes can overshoot
+the 30. Someone who knows K roster addresses can get about K emails through once;
+after that the cap holds for 24 hours.
+
+**Logs.** Vercel request logs record `/reset-password/<token>` paths, as they do for
+`/join/<token>`. Acceptable because links are single-use and expire in 1 hour.
 
 **Known limits, deliberate.** A reset does not sign other devices out (sessions are
 stateless). Nothing limits wrong-password attempts at the sign-in box; that is a

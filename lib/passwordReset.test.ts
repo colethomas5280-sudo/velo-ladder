@@ -231,3 +231,52 @@ test("two simultaneous consumes: exactly one wins", async () => {
   ]);
   assert.equal(results.filter(Boolean).length, 1);
 });
+
+/* ------------------------------------------------------------------ *
+ * A live link must not outlive the thing it was mailed for. If the login email
+ * changes, a coach sets a password, or an invite is redeemed, a link already
+ * sitting in the old inbox would otherwise still work for up to an hour and
+ * overwrite the new password. The cooldown stamp must survive all of it.
+ * ------------------------------------------------------------------ */
+
+async function liveLink() {
+  const a = await athlete();
+  const claim = await pr.requestReset(a.email);
+  assert.ok(claim);
+  assert.ok(await pr.getResetTarget(claim.token), "the link is live to start with");
+  return { a, token: claim.token };
+}
+async function cooldownStillSet(id: string) {
+  assert.ok((await row(id)).reset_requested_at, "the cooldown stamp must survive");
+}
+
+test("a coach-set password cancels a live reset link", async () => {
+  const { a, token } = await liveLink();
+  await data.updateAthlete(a.id, { password: "coach-chose-this-pw" });
+  assert.equal(await pr.getResetTarget(token), null);
+  assert.equal(await pr.consumeReset(token, "attacker-pw-1234"), null);
+  await cooldownStillSet(a.id);
+});
+
+test("changing the login email cancels a live reset link", async () => {
+  const { a, token } = await liveLink();
+  await data.updateAthlete(a.id, { inviteEmail: `moved${a.id}@reset.test` });
+  assert.equal(await pr.getResetTarget(token), null);
+  await cooldownStillSet(a.id);
+});
+
+test("redeeming an invite cancels a live reset link", async () => {
+  const { a, token } = await liveLink();
+  const invite = await data.createInvite(a.id);
+  assert.ok(invite);
+  assert.ok(await data.consumeInvite(invite, "invited-pw-1234", null, null));
+  assert.equal(await pr.getResetTarget(token), null);
+  await cooldownStillSet(a.id);
+});
+
+test("an unrelated edit leaves a live reset link working", async () => {
+  const { a, token } = await liveLink();
+  await data.updateAthlete(a.id, { coachNotes: "x" });
+  await data.updateAthlete(a.id, { name: "Renamed Kid" });
+  assert.ok(await pr.getResetTarget(token));
+});

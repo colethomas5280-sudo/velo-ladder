@@ -162,6 +162,7 @@ export function sendInviteEmail(to: string, name: string, url: string): Promise<
   return deliver(to, inviteEmailContent(name, url));
 }
 
+/** Never throws: a failed email must not cost the caller the answer it owes. */
 export function sendResetEmail(to: string, name: string, url: string): Promise<EmailResult> {
   return deliver(to, resetEmailContent(name, url));
 }

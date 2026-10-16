@@ -224,3 +224,31 @@ test("an error inside the deferred work is caught and logged, never thrown", asy
   assert.equal(sent.length, 0);
   assert.ok(logged.every((l) => !/[A-Za-z0-9_-]{43}/.test(l)), "no log line may contain a token");
 });
+
+test("in production with no AUTH_URL nothing is claimed or sent, and the answer is unchanged", async () => {
+  const env = process.env as Record<string, string | undefined>;
+  const savedNodeEnv = env.NODE_ENV;
+  const savedAuthUrl = env.AUTH_URL;
+  try {
+    const normal = await snapshot(await post({ email: kid.email }));
+    deferred = [];
+    await sql`UPDATE athletes SET reset_token_hash = NULL, reset_expires = NULL, reset_requested_at = NULL`;
+
+    env.NODE_ENV = "production";
+    delete env.AUTH_URL;
+    const res = await post({ email: kid.email });
+    await flush();
+    assert.deepEqual(await snapshot(res), normal, "the answer must not reveal the misconfiguration");
+    assert.equal(sent.length, 0, "no email may be built from the request's Host header");
+    const [r] = (await sql`
+      SELECT reset_token_hash, reset_requested_at FROM athletes WHERE id = ${kid.id}
+    `) as { reset_token_hash: string | null; reset_requested_at: unknown }[];
+    assert.equal(r.reset_requested_at, null, "no claim, so no cooldown burned");
+    assert.equal(r.reset_token_hash, null);
+  } finally {
+    if (savedNodeEnv === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = savedNodeEnv;
+    if (savedAuthUrl === undefined) delete env.AUTH_URL;
+    else env.AUTH_URL = savedAuthUrl;
+  }
+});

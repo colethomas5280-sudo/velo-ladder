@@ -21,9 +21,17 @@ export async function POST(request: Request) {
   const email = typeof body?.email === "string" ? body.email : "";
   const origin = appOrigin(request);
 
+  /*
+   * In production the link's origin must come from AUTH_URL. Without it
+   * appOrigin falls back to the request's Host header, which a caller controls,
+   * so a missing AUTH_URL would let anyone mail a poisoned link. Skip the work
+   * entirely and answer the same as ever.
+   */
+  const originTrusted = process.env.NODE_ENV !== "production" || !!process.env.AUTH_URL;
+
   // Not configured means no claim at all, so no cooldown is burned for an
   // email that was never going to be sent.
-  if (email.trim() && emailConfigured()) {
+  if (email.trim() && emailConfigured() && originTrusted) {
     after(async () => {
       try {
         const claim = await requestReset(email);
