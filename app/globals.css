@@ -1000,6 +1000,14 @@ tr.sess.open .caret {
 .login-card input {
   width: 100%;
 }
+.login-help {
+  margin: 12px 0 0;
+  font-size: 13px;
+  text-align: center;
+}
+.login-help a {
+  color: var(--ink-dim);
+}
 
 /* ---------- header nav ---------- */
 .appbar .mark {

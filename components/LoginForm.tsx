@@ -70,6 +70,9 @@ export default function LoginForm() {
         </button>
         {error && <p style={{ color: "var(--bad)", margin: 0 }}>{error}</p>}
       </form>
+      <p className="login-help">
+        <a href="/forgot-password">Forgot password?</a>
+      </p>
     </div>
   );
 }
