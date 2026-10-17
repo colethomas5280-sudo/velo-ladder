@@ -9,6 +9,7 @@ import type { DeliveryScreen, MovementScreen } from "@/lib/types";
 import { loadTestDraft, saveTestDraft } from "@/lib/testDraft";
 import { withSwr } from "./testSwr";
 import GroupTest from "./GroupTest";
+import ScreenModal from "./ScreenModal";
 
 const TODAY = "2026-10-16";
 const PEOPLE = [
@@ -774,4 +775,114 @@ test("after Save all the first athlete who failed is brought to the front so the
   } finally {
     api.restore();
   }
+});
+
+test("a leftover group draft does not come back over a screen saved on the athlete's own page", async () => {
+  // D is today: that is the date a group test opens a record on when no draft says otherwise.
+  const D = TODAY;
+  const api = mockApi();
+  try {
+    // A group test left a partial draft for Alex, dated D.
+    saveTestDraft("screen", "a", { date: D, notes: "", data: fillNormal({}, [SCREEN_TESTS[0]]) });
+
+    // Alex's own page then completes and saves the screen on D.
+    render(
+      withSwr(
+        { "/api/athletes/a/sessions": [] },
+        <ScreenModal
+          athleteId="a"
+          athleteName="Alex Adams"
+          initial={null}
+          takenDates={[]}
+          isCoach
+          onClose={() => {}}
+          onSaved={() => {}}
+        />,
+      ),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /mark \d+ remaining tests? normal/i }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save screen" }));
+    });
+    assert.equal(api.calls.length, 1);
+    assert.equal(api.calls[0].body.date, D);
+    const full = api.calls[0].body.results as Record<string, string>;
+    cleanup();
+
+    // The next group test finds the complete record, not the stale draft.
+    const rec = { id: "s1", athleteId: "a", date: D, results: full, notes: "" } as unknown as MovementScreen;
+    group({ ids: ["a"], screens: { a: [rec] } });
+    await settle();
+    assert.equal(tabText("Alex"), "Alex", "no dot from a stale draft");
+    assert.equal(saveAllButton().textContent, "Save all (0)");
+    assert.ok(inPanel("a").queryByRole("button", { name: "Update screen" }) !== null);
+    assert.equal(
+      panel("a").querySelector<HTMLInputElement>('input[type="date"]')!.value,
+      D,
+    );
+    assert.ok(progress("a").startsWith(`${Object.keys(full).length} of `), progress("a"));
+  } finally {
+    api.restore();
+  }
+});
+
+test("Pitching Inhibitors: a stored draft restores with its dot, count and ticked flaw", async () => {
+  saveTestDraft("delivery", "b", { date: TODAY, notes: "", data: { [FLAW]: true } });
+  group({ type: "delivery" });
+  await waitFor(() => assert.equal(tabText("Blake"), "Blake ●"));
+  assert.equal(tabText("Alex"), "Alex");
+  await waitFor(() => assert.equal(saveAllButton().textContent, "Save all (1)"));
+  await click(tab("Blake"));
+  const box = panel("b").querySelector<HTMLInputElement>(`input[name="flaw:${FLAW}"]`)!;
+  assert.equal(box.checked, true);
+  assert.ok(loadTestDraft("delivery", "b") !== null, "mounting did not clobber the draft");
+});
+
+test("a screen answered in the real form comes back after the whole group test is closed and reopened", async () => {
+  group();
+  markRestNormal("a");
+  const answered = progress("a");
+  assert.ok(!answered.startsWith("0 of "), answered);
+  await waitFor(() => assert.equal(tabText("Alex"), "Alex ●"));
+  await waitFor(() => assert.ok(loadTestDraft("screen", "a") !== null));
+  cleanup();
+
+  group();
+  await waitFor(() => assert.equal(tabText("Alex"), "Alex ●"));
+  await waitFor(() => assert.equal(saveAllButton().textContent, "Save all (1)"));
+  assert.equal(progress("a"), answered);
+});
+
+test("a Pitching Inhibitors mark made in the real form comes back after the group test is closed and reopened", async () => {
+  group({ type: "delivery" });
+  tick("a");
+  await waitFor(() => assert.equal(tabText("Alex"), "Alex ●"));
+  await waitFor(() => assert.ok(loadTestDraft("delivery", "a") !== null));
+  cleanup();
+
+  group({ type: "delivery" });
+  await waitFor(() => assert.equal(tabText("Alex"), "Alex ●"));
+  await waitFor(() => assert.equal(saveAllButton().textContent, "Save all (1)"));
+  assert.equal(
+    panel("a").querySelector<HTMLInputElement>(`input[name="flaw:${FLAW}"]`)!.checked,
+    true,
+  );
+});
+
+test("a fallback active panel stays mounted when the coach switches away and back", async () => {
+  const r = group({ ids: ["a", "b", "c"] });
+  r.rerender(element({ ids: ["a", "b", "c"], people: PEOPLE.filter((p) => p.id !== "a") }));
+  await settle();
+  assert.ok(tab("Blake").classList.contains("on"), "B became active by fallback");
+  const note = () => panel("b").querySelector<HTMLTextAreaElement>("textarea")!;
+  fireEvent.change(note(), { target: { value: "typed on the fallback panel" } });
+  markRestNormal("b");
+  const answered = progress("b");
+
+  await click(tab("Casey"));
+  assert.ok(panel("b") !== null, "B's form is still mounted, only hidden");
+  assert.equal(panel("b").hidden, true);
+  await click(tab("Blake"));
+  assert.equal(note().value, "typed on the fallback panel", "a note is not in any draft, so only a mounted form keeps it");
+  assert.equal(progress("b"), answered);
 });

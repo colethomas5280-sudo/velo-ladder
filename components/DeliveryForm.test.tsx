@@ -362,3 +362,44 @@ test("marking one more flaw on a saved assessment reports unsaved answers", asyn
   tick(OTHER);
   await waitFor(() => assert.equal(seen[seen.length - 1], true));
 });
+
+/* ---- persist off: a save on the athlete's own page clears a leftover group draft ---- */
+
+const stored = (date: string) => {
+  window.localStorage.setItem(
+    `veloladder:testdraft:delivery:${ID}`,
+    JSON.stringify({ date, notes: "", data: { [FLAW]: true } }),
+  );
+};
+
+async function saveFromOwnPage(opts: { status?: number } = {}) {
+  const api = mockApi(opts.status ?? 200);
+  try {
+    form();
+    tick(OTHER);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save assessment" }));
+    });
+    return api.calls.length;
+  } finally {
+    api.restore();
+  }
+}
+
+test("persist off: a successful save clears a stored draft for the same date", async () => {
+  stored(TODAY);
+  assert.equal(await saveFromOwnPage(), 1);
+  assert.equal(loadTestDraft("delivery", ID), null);
+});
+
+test("persist off: a stored draft for a different date survives a save", async () => {
+  stored("2026-09-16");
+  assert.equal(await saveFromOwnPage(), 1);
+  assert.equal(loadTestDraft("delivery", ID)!.date, "2026-09-16");
+});
+
+test("persist off: a failed save leaves the stored draft alone", async () => {
+  stored(TODAY);
+  assert.equal(await saveFromOwnPage({ status: 500 }), 1);
+  assert.ok(loadTestDraft("delivery", ID) !== null);
+});

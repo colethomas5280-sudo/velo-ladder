@@ -771,10 +771,37 @@ tests come from is one athlete per device).
   `DeliveryForm`. The form logic lives in the forms, and the single-athlete modal and
   `GroupTest` share it.
 
+Rules to keep when changing this:
+
+- **Drafts belong to the group test only.** The single-athlete modals never read or
+  write them. The one exception: a successful save on an athlete's own page clears a
+  stored draft for the SAME date as the screen just saved (a draft for another date is
+  a different screen and stays). Without that, a leftover group draft came back over
+  the complete record and Save all posted the partial answers over it. The clear is in
+  `ScreenForm` and `DeliveryForm`, only when `persist` is false. With `persist` on, the
+  persist effect clears the draft once the baseline moves, and clearing in the save
+  closure would lose answers typed while the request is in flight.
+- **Which record a form opens on.** An existing record on today's date, or on the
+  draft's date when there is a draft, opens as an edit with the date locked. A draft
+  whose date has no record is a new entry on that date.
+- **Records load once.** `AthletePanel` waits for the athlete's records, works out the
+  draft and `initial` once, and must never re-derive them on revalidation, or the form
+  the coach is typing in would reset. `register` must be held in a ref by the parent,
+  never in state, because the forms call it after every render.
+- **Archived athletes are not offered** in the picker.
+- **Refreshed data.** After saves and when a run is closed, `QuickStart` re-fetches
+  `/api/dashboard`, `/api/screens/overview` and `/api/delivery/overview`
+  (`REFRESH_KEYS`). A new consumer of test data must be added to that list.
+- **Draft lifecycle.** A draft is cleared after a successful save. It is kept after a
+  failed save and when the screen is closed, which is why a dot can reappear the next
+  time the same athlete is picked for that test.
+
 Known limits, all deliberate:
 
 - A saved record whose every answer was cleared has no answers, so it is saved only
-  by that athlete's own Save, and its tab shows no dot.
+  by that athlete's own Save, and its tab shows no dot. For a movement screen that
+  Save also needs a note left in place, because the server refuses a screen with no
+  findings and no notes.
 - The group screen has no delete.
 - Save all is sequential. A failure stops nothing, it is listed against that athlete.
 

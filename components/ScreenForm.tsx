@@ -23,7 +23,7 @@ import {
   type TestMark,
 } from "@/lib/screen";
 import { TRACKERS, todayISO, fmtDate } from "@/lib/velo";
-import { saveTestDraft, clearTestDraft, type TestDraft } from "@/lib/testDraft";
+import { saveTestDraft, clearTestDraft, loadTestDraft, type TestDraft } from "@/lib/testDraft";
 
 /* ------------------------------------------------------------------ *
  * Recording a movement screen
@@ -214,6 +214,22 @@ export default function ScreenForm({
     }
   }, [persist, dirty, results, notes, date, athleteId]);
 
+  /*
+   * A save on the athlete's own page (persist off) never reads or writes a
+   * draft, but a group test may have left one behind for this same screen. It
+   * is stale the moment that screen is saved, and would come back over the
+   * complete record. Only a draft for the date just saved is cleared; a draft
+   * for another date is a different screen. With persist on, the effect above
+   * clears the draft once the baseline moves, and clearing here would lose
+   * answers typed while the request is in flight.
+   */
+  function clearOwnPageDraft() {
+    if (persist) return;
+    if (loadTestDraft("screen", athleteId)?.date === date) {
+      clearTestDraft("screen", athleteId);
+    }
+  }
+
   async function save(): Promise<boolean> {
     setBusy(true);
     setErr(null);
@@ -227,6 +243,7 @@ export default function ScreenForm({
       setJustSaved(true);
       setBaseline(stable(results, notes));
       setBusy(false);
+      clearOwnPageDraft();
       onSaved(updating ? "Screen updated" : "Screen saved");
       return true;
     } catch (e) {

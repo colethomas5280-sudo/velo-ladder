@@ -103,6 +103,14 @@ export default function GroupTest({
     };
   }, []);
 
+  // A panel that is active only by fallback (the picked athlete went, or never
+  // arrived) must stay mounted once it is no longer active, so switching away
+  // from it never throws away what was typed. Adjusted during render, which
+  // React supports for a component's own state.
+  if (activeId && !mounted.has(activeId)) {
+    setMounted(new Set(mounted).add(activeId));
+  }
+
   const pick = (id: string) => {
     setActiveId(id);
     setMounted((s) => (s.has(id) ? s : new Set(s).add(id)));

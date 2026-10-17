@@ -5,7 +5,7 @@ import type { DeliveryScreen } from "@/lib/types";
 import { api, ApiError } from "@/lib/fetcher";
 import { BIG_12 } from "@/lib/big12";
 import { fmtDate, todayISO } from "@/lib/velo";
-import { saveTestDraft, clearTestDraft, type TestDraft } from "@/lib/testDraft";
+import { saveTestDraft, clearTestDraft, loadTestDraft, type TestDraft } from "@/lib/testDraft";
 
 /* ------------------------------------------------------------------ *
  * Recording a delivery assessment
@@ -138,6 +138,22 @@ export default function DeliveryForm({
     }
   }, [persist, dirty, flaws, notes, date, athleteId]);
 
+  /*
+   * A save on the athlete's own page (persist off) never reads or writes a
+   * draft, but a group test may have left one behind for this same
+   * assessment. It is stale the moment that assessment is saved, and would
+   * come back over the complete record. Only a draft for the date just saved
+   * is cleared; a draft for another date is a different assessment. With
+   * persist on, the effect above clears the draft once the baseline moves,
+   * and clearing here would lose marks made while the request is in flight.
+   */
+  function clearOwnPageDraft() {
+    if (persist) return;
+    if (loadTestDraft("delivery", athleteId)?.date === date) {
+      clearTestDraft("delivery", athleteId);
+    }
+  }
+
   async function save(): Promise<boolean> {
     setBusy(true);
     setErr(null);
@@ -151,6 +167,7 @@ export default function DeliveryForm({
       setJustSaved(true);
       setBaseline(stable(flaws, notes));
       setBusy(false);
+      clearOwnPageDraft();
       onSaved(updating ? "Assessment updated" : "Assessment saved");
       return true;
     } catch (e) {

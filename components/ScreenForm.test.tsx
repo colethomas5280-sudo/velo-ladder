@@ -347,3 +347,44 @@ test("after a save the screen no longer reports unsaved answers", async () => {
     api.restore();
   }
 });
+
+/* ---- persist off: a save on the athlete's own page clears a leftover group draft ---- */
+
+const stored = (date: string) => {
+  window.localStorage.setItem(
+    `veloladder:testdraft:screen:${ID}`,
+    JSON.stringify({ date, notes: "", data: fillNormal({}, [SCREEN_TESTS[0]]) }),
+  );
+};
+
+async function saveFromOwnPage(opts: { status?: number } = {}) {
+  const api = mockApi(opts.status ?? 200);
+  try {
+    form();
+    markRestNormal();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save screen" }));
+    });
+    return api.calls.length;
+  } finally {
+    api.restore();
+  }
+}
+
+test("persist off: a successful save clears a stored draft for the same date", async () => {
+  stored(TODAY);
+  assert.equal(await saveFromOwnPage(), 1);
+  assert.equal(loadTestDraft("screen", ID), null);
+});
+
+test("persist off: a stored draft for a different date survives a save", async () => {
+  stored("2026-09-16");
+  assert.equal(await saveFromOwnPage(), 1);
+  assert.equal(loadTestDraft("screen", ID)!.date, "2026-09-16");
+});
+
+test("persist off: a failed save leaves the stored draft alone", async () => {
+  stored(TODAY);
+  assert.equal(await saveFromOwnPage({ status: 500 }), 1);
+  assert.ok(loadTestDraft("screen", ID) !== null);
+});
