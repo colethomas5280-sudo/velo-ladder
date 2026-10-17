@@ -13,6 +13,7 @@ import CustomizeDashboard, {
   setWidgets,
   useWidgets,
 } from "./CustomizeDashboard";
+import QuickStart from "./QuickStart";
 import { useScreeningDue, screeningDueLabel } from "./RetestPrompt";
 
 export default function Dashboard() {
@@ -31,6 +32,8 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      <QuickStart />
 
       {isLoading && (
         <div className="card pad" style={{ color: "var(--ink-dim)" }}>

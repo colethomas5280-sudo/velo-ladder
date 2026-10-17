@@ -4423,3 +4423,35 @@ a.btn {
   margin: 8px 0 4px;
   padding: 0;
 }
+
+/* Homepage quick start */
+.quick-start {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.quick-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--ink);
+  cursor: pointer;
+}
+.quick-btn:hover {
+  border-color: var(--accent);
+}
+.quick-name {
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+}
+.quick-tag {
+  font-size: 13px;
+  color: var(--ink-dim);
+}

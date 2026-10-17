@@ -13,9 +13,11 @@ import { useEffect } from "react";
  * ------------------------------------------------------------------ */
 
 export default function RecordChooser({
+  title = "Record a screen",
   onPick,
   onClose,
 }: {
+  title?: string;
   onPick: (kind: "screen" | "delivery") => void;
   onClose: () => void;
 }) {
@@ -35,11 +37,11 @@ export default function RecordChooser({
         className="modal-panel narrow"
         role="dialog"
         aria-modal="true"
-        aria-label="Record an assessment"
+        aria-label={title === "Record a screen" ? "Record an assessment" : title}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-head">
-          <span className="modal-title">Record a screen</span>
+          <span className="modal-title">{title}</span>
           <button className="modal-x" onClick={onClose} aria-label="Close">
             ×
           </button>

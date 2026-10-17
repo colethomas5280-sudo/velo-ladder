@@ -150,3 +150,19 @@ test("a called re-screen shows its reason instead of a clock", () => {
   );
   assert.match(document.body.textContent!, /back from an injury flag/i);
 });
+
+/* ------------------------------------------------------------------ *
+ * The homepage shortcuts
+ *
+ * "Track a new session" and "Track a new test" are not a widget: the coach
+ * can switch every widget off and the two buttons still have to be there.
+ * ------------------------------------------------------------------ */
+
+test("both quick-start buttons show even when every widget is switched off", () => {
+  localStorage.setItem("veloladder:dashboard", "[]");
+  render(withSwr({ "/api/dashboard": EMPTY }, <Dashboard />));
+  assert.ok(screen.getByText(/nothing on your dashboard/i), "the widgets really are all off");
+  assert.ok(screen.queryByRole("button", { name: /^Track a new session/ }) !== null);
+  assert.ok(screen.queryByRole("button", { name: /^Track a new test/ }) !== null);
+  assert.ok(screen.queryByRole("dialog") === null, "and neither has opened anything");
+});
