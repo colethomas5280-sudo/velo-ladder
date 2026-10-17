@@ -413,3 +413,31 @@ test("the X asks first, and Leave reaches the caller's onClose", () => {
   press("Leave");
   assert.equal(onClose.mock.callCount(), 1);
 });
+
+test("for the athlete on screen the summary reads the draft on screen, which is also what gets posted", async () => {
+  const api = mockApi();
+  try {
+    put("a", HIT("91"), { date: "2026-10-12" });
+    open();
+    // Storage drifts behind the screen's back. Save writes the on-screen draft over it before posting.
+    put("a", HIT("50"), { date: "2026-09-01" });
+    press("Save all 3");
+    const box = confirmBox("Save 1 session?")!;
+    assert.ok(within(box).queryByText(`Jake Bell · ${fmtDate("2026-10-12")} · 91 mph`) !== null);
+    await pressInside(box, "Save all");
+    assert.equal(api.calls[0].body.date, "2026-10-12");
+    assert.deepEqual(api.calls[0].body.throws, { m5: [null, 91, null, null, null] });
+  } finally {
+    api.restore();
+  }
+});
+
+test("a single save also reads the draft on screen, not whatever storage holds", () => {
+  put("a", HIT("91"), { date: "2026-10-12" });
+  open();
+  put("a", HIT("50"), { date: "2026-09-01" });
+  press("Save Jake only");
+  assert.ok(
+    within(confirmBox("Save Jake Bell's session?")!).queryByText(`Mound · ${fmtDate("2026-10-12")} · best 100% throw 91 mph`) !== null,
+  );
+});

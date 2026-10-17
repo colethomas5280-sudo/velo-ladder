@@ -282,3 +282,13 @@ test("the X still asks before leaving, through the real page", () => {
   press("Leave");
   assert.ok(screen.queryByRole("dialog", { name: "Track a new session for Jake Bell" }) === null);
 });
+
+test("the summary reads the draft on screen, not whatever storage holds", () => {
+  put(HIT("91"), { date: "2026-10-12" });
+  openEntry();
+  put(HIT("50"), { date: "2026-09-01" });
+  press("Save session");
+  assert.ok(
+    within(confirmBox("Save Jake Bell's session?")!).queryByText(`Mound · ${fmtDate("2026-10-12")} · best 100% throw 91 mph`) !== null,
+  );
+});

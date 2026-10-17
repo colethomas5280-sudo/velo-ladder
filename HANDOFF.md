@@ -810,6 +810,47 @@ on today, and one with numbers keeps its date (as does one editing an existing
 session). Before that fix (commit 5a10c1c) pressing Save with nothing entered left an
 empty draft behind that dated every later session on an old day.
 
+## Confirmations on the velocity pop-ups
+
+Two pop-ups enter velocity numbers: `SessionModal` (one athlete, opened from
+`AthleteProfile`) and `GroupEntryModal` (several, opened by `GroupSession`). Both now ask
+before anything irreversible-feeling happens. Nothing else does: the movement screen,
+Pitching Inhibitors, recovery and lift pop-ups, and `GroupTest` are deliberately NOT
+covered, and the API, routes and schema are untouched.
+
+**Leave prompt** ("Leave this session?", Keep editing is the focused default). The X, a
+click on the dimmed area and Escape open it, every time, even with an empty form.
+`Leave` calls the modal's own `onClose`, so callers (`AthleteProfile`, `GroupSession`,
+`QuickStart`) did not change. Exception: `SessionModal` on `step === "pick"` (only
+choosing mound or pull-down, nothing entered) closes instantly; the back arrow never
+prompts. `GroupEntryModal` has no such step, so it always prompts. The prompt lives inside
+each modal (`leaving` state).
+
+**Save prompt.** `EntryForm` is unchanged and still calls `onSave` / `onSaveAll`. The
+callers split each into a request step (the old validation, then open the confirm, send
+nothing) and the old save body, which only the confirm's button runs: `requestSaveOne` /
+`requestSaveAll` / `confirmSave` in `GroupSession`, `requestSave` / `confirmSave` in
+`AthleteProfile`. The wording and the "best 100% throw" and date logic are pure and live in
+`lib/saveSummary.ts` (it asks `throwsFromDraft`, so it lists exactly who the post would
+save). The confirm's buttons are disabled while a save is in flight and a ref guard stops a
+fast double click; a failed save closes the confirm and shows the usual error in the pop-up.
+
+**Two hazards, both tested.**
+- Render `ConfirmDialog` as a SIBLING after the pop-up's `.modal-backdrop`, never inside it
+  and not in a portal. React events bubble through the React tree, so a confirm inside the
+  backdrop would hand its dimmed-area clicks to the backdrop's `onClick`, which is what opens
+  the leave prompt. The caller's save confirm goes in through the modals' optional `overlay`
+  prop for the same reason.
+- The pop-up's document-level Escape listener must do nothing while any confirm is open
+  (`confirmOpen = leaving || !!overlay`). Otherwise one Escape cancels the confirm AND opens
+  the leave prompt, and the result depends on listener registration order.
+
+Tests: `lib/saveSummary.test.ts`, `components/ConfirmDialog.test.tsx`,
+`SessionModal.test.tsx`, `GroupEntryModal.test.tsx`, `GroupSession.confirm.test.tsx`,
+`AthleteProfile.confirm.test.tsx` (stubs `ResizeObserver` and `matchMedia` for the chart).
+The one edit to an older test: `QuickStart.test.tsx` "closing a session screen refreshes the
+same three" now also clicks Leave, because the X no longer closes in one click.
+
 ## Local development
 
 Node is installed via **nvm** (`~/.nvm`, Node v24). If `node` isn't found, run:
