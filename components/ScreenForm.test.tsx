@@ -2,7 +2,7 @@ import "./testDom";
 import { test, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
-import { SCREEN_TESTS, fillNormal } from "@/lib/screen";
+import { SCREEN_TESTS, fillNormal, isApplicable, screenFields } from "@/lib/screen";
 import type { MovementScreen } from "@/lib/types";
 import { loadTestDraft } from "@/lib/testDraft";
 import { withSwr } from "./testSwr";
@@ -276,4 +276,74 @@ test("clearing a reading and re-answering it the same leaves the form clean, wha
   fireEvent.change(first(), { target: { value: original } });
   await waitFor(() => assert.equal(seen[seen.length - 1], false));
   await waitFor(() => assert.equal(loadTestDraft("screen", ID), null));
+});
+
+/*
+ * onDirty means "has unsaved ANSWERS", not "differs from the record": a group
+ * parent counts these in Save all, and a screen with no reading is not
+ * something the server will take.
+ */
+const firstSelect = () => document.querySelector<HTMLSelectElement>(".ms-select")!;
+
+test("typing only in the notes of a blank screen does not report unsaved answers", async () => {
+  const seen: boolean[] = [];
+  form({ persist: true, onDirty: (d) => seen.push(d) });
+  fireEvent.change(screen.getByPlaceholderText(/guarding on the left/i), { target: { value: "just a note" } });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 30));
+  });
+  assert.equal(seen[seen.length - 1], false);
+  assert.ok(seen.every((d) => d === false), "never reported true");
+  assert.equal(loadTestDraft("screen", ID), null);
+});
+
+test("clearing every answer of a saved screen reports no unsaved answers", async () => {
+  // One ungated reading, so clearing it leaves the record truly empty (clearing a gate leaves its branch behind).
+  const field = screenFields([SCREEN_TESTS[0]]).find((f) => isApplicable(f, {}))!;
+  const results = { [field.key]: fillNormal({}, [SCREEN_TESTS[0]])[field.key] };
+  assert.ok(results[field.key], "setup: a normal reading for the first question");
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results, notes: "" } as unknown as MovementScreen;
+  const seen: boolean[] = [];
+  form({ initial: saved, onDirty: (d) => seen.push(d) });
+  fireEvent.click(document.querySelector(".ms-test-toggle")!);
+  const sel = firstSelect();
+  assert.equal(sel.value, results[field.key]);
+  fireEvent.change(sel, { target: { value: "" } });
+  assert.ok(document.querySelector(".ms-progress b")!.textContent!.startsWith("0 of "), "setup: nothing answered");
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 30));
+  });
+  assert.equal(seen[seen.length - 1], false);
+  assert.ok(seen.every((d) => d === false), "an empty screen is never reported as having answers");
+});
+
+test("changing one answer of a saved screen reports unsaved answers", async () => {
+  const results = fillNormal({}, [SCREEN_TESTS[0]]);
+  const saved = { id: "s1", athleteId: ID, date: TODAY, results, notes: "" } as unknown as MovementScreen;
+  const seen: boolean[] = [];
+  form({ initial: saved, onDirty: (d) => seen.push(d) });
+  assert.equal(seen[seen.length - 1], false);
+  fireEvent.click(document.querySelector(".ms-test-toggle")!);
+  const sel = firstSelect();
+  const other = Array.from(sel.options).map((o) => o.value).find((v) => v !== "" && v !== sel.value)!;
+  assert.ok(other, "setup: another finding to pick");
+  fireEvent.change(sel, { target: { value: other } });
+  await waitFor(() => assert.equal(seen[seen.length - 1], true));
+});
+
+test("after a save the screen no longer reports unsaved answers", async () => {
+  const api = mockApi();
+  try {
+    const seen: boolean[] = [];
+    let save: (() => Promise<boolean>) | null = null;
+    form({ group: true, onDirty: (d) => seen.push(d), register: (fn) => (save = fn) });
+    markRestNormal();
+    await waitFor(() => assert.equal(seen[seen.length - 1], true));
+    await act(async () => {
+      await save!();
+    });
+    await waitFor(() => assert.equal(seen[seen.length - 1], false));
+  } finally {
+    api.restore();
+  }
 });

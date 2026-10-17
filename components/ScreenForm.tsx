@@ -192,9 +192,16 @@ export default function ScreenForm({
 
   const dirty = stable(results, notes) !== baseline;
 
+  /*
+   * What a parent is told is "has unsaved ANSWERS", not "differs from the
+   * record": a note typed on a blank form is not something to save, and a
+   * screen with no reading is refused by the server. (The draft effect below
+   * uses the same test, and the internal `dirty` keeps tracking notes.)
+   */
+  const hasUnsavedAnswers = dirty && Object.keys(results).length > 0;
   useEffect(() => {
-    onDirty?.(dirty);
-  }, [dirty, onDirty]);
+    onDirty?.(hasUnsavedAnswers);
+  }, [hasUnsavedAnswers, onDirty]);
 
   // A draft exists only while there are unsaved answers, so an empty or
   // back-to-saved form leaves nothing behind to date a later test wrongly.

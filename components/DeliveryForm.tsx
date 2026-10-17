@@ -116,9 +116,16 @@ export default function DeliveryForm({
 
   const dirty = stable(flaws, notes) !== baseline;
 
+  /*
+   * What a parent is told is "has unsaved marks", not "differs from the
+   * record": a note typed on a clean form is not something Save all should
+   * sweep up as an assessment. (A clean assessment is still saved, by that
+   * athlete's own Save button.)
+   */
+  const hasUnsavedAnswers = dirty && Object.keys(flaws).length > 0;
   useEffect(() => {
-    onDirty?.(dirty);
-  }, [dirty, onDirty]);
+    onDirty?.(hasUnsavedAnswers);
+  }, [hasUnsavedAnswers, onDirty]);
 
   // A draft exists only while there are unsaved marks, so an empty or
   // back-to-saved form leaves nothing behind to date a later test wrongly.

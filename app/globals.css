@@ -4418,3 +4418,8 @@ a.btn {
   padding: 12px 16px 16px;
   border-top: 1px solid var(--line-soft);
 }
+.group-test-name {
+  font-weight: 600;
+  margin: 8px 0 4px;
+  padding: 0;
+}

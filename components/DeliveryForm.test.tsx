@@ -101,9 +101,9 @@ test("onDirty is false until something is ticked, then true", async () => {
 
 test("a saved assessment opened untouched is not dirty, and unticking back to it is not dirty", async () => {
   const seen: boolean[] = [];
-  form({ initial: saved(), onDirty: (d) => seen.push(d) });
+  form({ initial: saved({ flaws: { [FLAW]: true, [OTHER]: true } }), onDirty: (d) => seen.push(d) });
   assert.equal(seen[seen.length - 1], false);
-  tick(); // unticks the saved flaw
+  tick(); // unticks one of two saved flaws
   await waitFor(() => assert.equal(seen[seen.length - 1], true));
   tick(); // ticks it again
   await waitFor(() => assert.equal(seen[seen.length - 1], false));
@@ -331,14 +331,34 @@ test("a draft on the saved assessment's own date is an edit that starts dirty", 
   assert.equal(seen[seen.length - 1], true, "the draft differs from the saved notes");
 });
 
-test("clearing every mark of a saved assessment is a change but leaves no draft", async () => {
+test("clearing every mark of a saved assessment reports no unsaved answers and leaves no draft", async () => {
   const seen: boolean[] = [];
   form({ initial: saved(), persist: true, onDirty: (d) => seen.push(d) });
-  tick(); // unticks the only saved flaw, so nothing is marked but the form differs from the record
-  await waitFor(() => assert.equal(seen[seen.length - 1], true));
+  tick(); // unticks the only saved flaw, so nothing is marked although the form differs from the record
   assert.equal(box().checked, false);
   await act(async () => {
     await new Promise((r) => setTimeout(r, 30));
   });
+  assert.equal(seen[seen.length - 1], false, "no marks means no unsaved answers");
+  assert.ok(seen.every((d) => d === false), "never reported true");
   assert.equal(loadTestDraft("delivery", ID), null, "an empty mark set is never kept as a draft");
+});
+
+test("typing only in the notes of a clean assessment does not report unsaved answers", async () => {
+  const seen: boolean[] = [];
+  form({ persist: true, onDirty: (d) => seen.push(d) });
+  fireEvent.change(screen.getByPlaceholderText(/filmed from the side/i), { target: { value: "just a note" } });
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 30));
+  });
+  assert.ok(seen.every((d) => d === false), "never reported true");
+  assert.equal(loadTestDraft("delivery", ID), null);
+});
+
+test("marking one more flaw on a saved assessment reports unsaved answers", async () => {
+  const seen: boolean[] = [];
+  form({ initial: saved(), onDirty: (d) => seen.push(d) });
+  assert.equal(seen[seen.length - 1], false);
+  tick(OTHER);
+  await waitFor(() => assert.equal(seen[seen.length - 1], true));
 });
