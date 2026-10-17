@@ -1,7 +1,7 @@
 # Homepage shortcuts and group tests — design
 
 **Date:** 2026-10-16
-**Status:** awaiting Cole's review
+**Status:** implemented
 **Builds on:** the velocity group screen (`components/GroupSession.tsx`), the movement
 screen and Pitching Inhibitors modals (`ScreenModal.tsx`, `DeliveryModal.tsx`), the
 draft helper (`lib/draft.ts`, and its stale-date fix in commit `5a10c1c`)

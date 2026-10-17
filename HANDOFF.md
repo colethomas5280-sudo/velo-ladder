@@ -123,6 +123,9 @@ separate narrow read that still never widens `canSeeAthlete`. See **## Leaderboa
 - `GroupSession` → `GroupEntryModal` wrapping `EntryForm` — athlete tabs, per-athlete
   draft, "Save all N" / "Save one". Type is chosen with the seg control in its header
   (not the two-step picker).
+- `QuickStart` → `AthletePicker` → `GroupSession` or `GroupTest`: the two homepage
+  buttons and the multi-athlete test screen. See **## Homepage quick start and group
+  tests**.
 - `EntryForm` — the weight lanes. Each shows five boxes (80% primer + four 100%
   throws) and, stacked beneath, **Last** over **PR** with the session date on hover;
   plus a live `max·avg·new PR` while typing. Average and floor live on the chart, not
@@ -724,6 +727,61 @@ and doubling the cost of every send.
 
 `defaultRecipient()` preselects the guardian for a **Youth** athlete who has one
 on file, and the athlete otherwise. The coach can always override.
+
+## Homepage quick start and group tests
+
+Two buttons on the coach Dashboard, **Track a new session** and **Track a new test**
+(`components/QuickStart.tsx`). They are plain buttons on the page, always shown. They
+are not a widget, so `CustomizeDashboard` cannot hide them. Cole asked for them so he
+can run two athletes through the same test at once on one device (the OnBaseU app his
+tests come from is one athlete per device).
+
+- **One picker for both flows.** `AthletePicker` is a single presentational component.
+  `QuickStart` feeds it from `/api/athletes/overview`, fetched only once a picker is
+  wanted (the homepage costs nothing extra until a button is pressed). Picks are held
+  by athlete id, and the ids come back in roster order, not click order.
+- **A session** opens the existing `GroupSession` (see Key components). Nothing new
+  there.
+- **A test** opens `GroupTest`, for movement screens and Pitching Inhibitors only.
+  Strength is excluded by Cole's choice. `GroupTest` mounts one `ScreenForm` or
+  `DeliveryForm` per athlete, one tab each. A form that has been visited stays mounted
+  and is hidden rather than unmounted, so flipping tabs loses nothing. It also mounts
+  any athlete whose saved draft exists, so that athlete's tab shows its dot after a
+  reload.
+- **Tab labels** are first names, plus a last initial when two first names clash. The
+  full name is the heading above the form and the tab's `aria-label`. A record that
+  fails to load shows a Retry.
+- **Drafts** (`lib/testDraft.ts`) live in localStorage under
+  `veloladder:testdraft:<type>:<athleteId>` and survive a reload by Cole's choice. A
+  draft exists only while there are answers. Only a non-empty string (a screen reading)
+  or `true` (a delivery flaw) counts, and anything else in storage is dropped on load.
+  Saving a draft with no answers removes it instead of writing an empty one. An entry
+  with no answers always opens on today. One with answers keeps its date.
+- **"Has answers" is the dirty signal.** The forms' `onDirty` means "has unsaved
+  ANSWERS". A notes-only change does not count, so it never lights a tab dot and Save
+  all never includes it.
+- **Save all (N)** covers exactly the athletes with unsaved answers. It runs one
+  athlete at a time and reports failures per athlete. A **clean** Pitching Inhibitors
+  assessment (nothing flagged) is saved only by that athlete's own Save button, never
+  by Save all.
+- **No delete in group mode.** Delete stays on the athlete's own page.
+  "Record a different date instead" is not offered in group mode either.
+- **No API or schema change.** No `/api/setup` run is needed for this feature.
+- **`ScreenModal` and `DeliveryModal` are thin frames** around `ScreenForm` and
+  `DeliveryForm`. The form logic lives in the forms, and the single-athlete modal and
+  `GroupTest` share it.
+
+Known limits, all deliberate:
+
+- A saved record whose every answer was cleared has no answers, so it is saved only
+  by that athlete's own Save, and its tab shows no dot.
+- The group screen has no delete.
+- Save all is sequential. A failure stops nothing, it is listed against that athlete.
+
+The velocity side has the same rule in `lib/draft.ts`: an entry with no numbers opens
+on today, and one with numbers keeps its date (as does one editing an existing
+session). Before that fix (commit 5a10c1c) pressing Save with nothing entered left an
+empty draft behind that dated every later session on an old day.
 
 ## Local development
 
