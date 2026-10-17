@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import type { TrainingSession } from "@/lib/types";
 import {
@@ -18,10 +18,26 @@ import {
   saveDraft,
   clearDraft,
 } from "@/lib/draft";
+import {
+  summarizeDraft,
+  sessionTitle,
+  sessionLine,
+  groupTitle,
+  groupLine,
+} from "@/lib/saveSummary";
 import { useTracker } from "./useTracker";
 import EntryForm from "./EntryForm";
 import GroupEntryModal from "./GroupEntryModal";
+import ConfirmDialog from "./ConfirmDialog";
 
+/** What the save confirm is showing. Built when Save is pressed, so it cannot drift while it is open. */
+type Pending = {
+  kind: "one" | "all";
+  title: string;
+  /** One line for a single athlete, one per athlete for Save all. */
+  lines: string[];
+  confirmLabel: string;
+};
 
 export default function GroupSession({
   people,
@@ -80,6 +96,7 @@ export default function GroupSession({
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (m: string) => {
     setToast(m);
@@ -112,6 +129,63 @@ export default function GroupSession({
     else await api(`/api/athletes/${id}/sessions`, "POST", payload);
     clearDraft(id, tracker);
     return true;
+  }
+
+  /*
+   * The Save buttons only ASK. Each request step runs the same "is there
+   * anything to save" check the save itself does, then opens the confirm; the
+   * real save (saveOne / saveAll below) runs from the confirm's own button.
+   * The summary is built from the same drafts the post will use: the active
+   * athlete's in-memory draft, everyone else's stored one.
+   */
+  function requestSaveOne() {
+    if (!activeId) return;
+    const summary = summarizeDraft(draft, tracker);
+    if (!summary) {
+      setSaveError("Enter at least one 100% throw (boxes 1-4) before saving.");
+      return;
+    }
+    const name = members.find((m) => m.id === activeId)?.name ?? "";
+    setPending({
+      kind: "one",
+      title: sessionTitle(name, summary.editing),
+      lines: [sessionLine(summary)],
+      confirmLabel: summary.editing ? "Update" : "Save",
+    });
+  }
+
+  function requestSaveAll() {
+    const rows = members.flatMap((m) => {
+      const d = m.id === activeId ? draft : loadDraft(m.id, tracker);
+      const summary = summarizeDraft(d, tracker);
+      return summary ? [groupLine(m.name, summary)] : [];
+    });
+    if (rows.length === 0) {
+      setSaveError(
+        "Nothing to save. Enter at least one 100% throw for someone first.",
+      );
+      return;
+    }
+    setPending({
+      kind: "all",
+      title: groupTitle(rows.length),
+      lines: rows,
+      confirmLabel: "Save all",
+    });
+  }
+
+  /** Set the instant a confirm is accepted. `saving` alone is a render behind a fast double click. */
+  const confirming = useRef(false);
+  async function confirmSave() {
+    if (!pending || confirming.current) return;
+    confirming.current = true;
+    try {
+      if (pending.kind === "one") await saveOne();
+      else await saveAll();
+    } finally {
+      confirming.current = false;
+      setPending(null);
+    }
   }
 
   async function saveOne() {
@@ -193,6 +267,28 @@ export default function GroupSession({
         setActiveId(id);
       }}
       onClose={onClose}
+      overlay={
+        pending && (
+          <ConfirmDialog
+            title={pending.title}
+            confirmLabel={pending.confirmLabel}
+            cancelLabel="Keep editing"
+            onConfirm={confirmSave}
+            onCancel={() => setPending(null)}
+            busy={saving}
+          >
+            {pending.kind === "one" ? (
+              <p>{pending.lines[0]}</p>
+            ) : (
+              <ul className="confirm-lines">
+                {pending.lines.map((l, i) => (
+                  <li key={i}>{l}</li>
+                ))}
+              </ul>
+            )}
+          </ConfirmDialog>
+        )
+      }
       tabs={members.map((m) => ({
         id: m.id,
         name: m.name.split(" ")[0],
@@ -205,12 +301,12 @@ export default function GroupSession({
         sessions={activeSessions ?? []}
         draft={draft}
         setDraft={setDraft}
-        onSave={saveOne}
+        onSave={requestSaveOne}
         onClear={clearActive}
         saving={saving}
         readOnly={false}
         groupSize={members.length}
-        onSaveAll={saveAll}
+        onSaveAll={requestSaveAll}
         activeName={activeName}
         error={saveError}
       />

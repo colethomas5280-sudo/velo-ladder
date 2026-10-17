@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import type {
@@ -26,7 +26,13 @@ import {
   saveDraft,
   clearDraft,
 } from "@/lib/draft";
+import {
+  summarizeDraft,
+  sessionTitle,
+  sessionLine,
+} from "@/lib/saveSummary";
 import { useTracker } from "./useTracker";
+import ConfirmDialog from "./ConfirmDialog";
 import Masthead from "./Masthead";
 import EntryForm from "./EntryForm";
 import ProgressChart from "./ProgressChart";
@@ -115,6 +121,14 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const [saveError, setSaveError] = useState<string | null>(null);
   /** null = closed, "pick" = choosing session type, "entry" = the weight grid */
   const [modal, setModal] = useState<null | "pick" | "entry">(null);
+  /** The save confirm, built when Save is pressed. null = not asking. */
+  const [pending, setPending] = useState<{
+    title: string;
+    line: string;
+    confirmLabel: string;
+  } | null>(null);
+  /** Set the instant a confirm is accepted; `saving` alone is a render behind a fast double click. */
+  const confirming = useRef(false);
   const [toast, setToast] = useState<string | null>(null);
   const showToast = (m: string) => {
     setToast(m);
@@ -123,15 +137,41 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
   const err = (e: unknown, fallback: string) =>
     showToast(e instanceof ApiError ? e.message : fallback);
 
+  const NO_HUNDRED =
+    "Enter at least one 100% throw (boxes 1-4) before saving. The 80% primer isn't scored.";
+
+  /** The Save button only ASKS: same check as the save, then the summary. */
+  function requestSave() {
+    const summary = summarizeDraft(draft, tracker);
+    if (!summary) {
+      setSaveError(NO_HUNDRED);
+      return;
+    }
+    setPending({
+      title: sessionTitle(athlete?.name ?? "", summary.editing),
+      line: sessionLine(summary),
+      confirmLabel: summary.editing ? "Update" : "Save",
+    });
+  }
+
+  async function confirmSave() {
+    if (confirming.current) return;
+    confirming.current = true;
+    try {
+      await saveSession();
+    } finally {
+      confirming.current = false;
+      setPending(null);
+    }
+  }
+
   async function saveSession() {
     const { throws, hasHundred } = throwsFromDraft(
       draft.throws,
       cfg.slots.map((s) => s.key),
     );
     if (!hasHundred) {
-      setSaveError(
-        "Enter at least one 100% throw (boxes 1-4) before saving. The 80% primer isn't scored.",
-      );
+      setSaveError(NO_HUNDRED);
       return;
     }
     setSaving(true);
@@ -396,6 +436,20 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
           onPick={pickType}
           onBack={() => setModal("pick")}
           onClose={() => setModal(null)}
+          overlay={
+            pending && (
+              <ConfirmDialog
+                title={pending.title}
+                confirmLabel={pending.confirmLabel}
+                cancelLabel="Keep editing"
+                onConfirm={confirmSave}
+                onCancel={() => setPending(null)}
+                busy={saving}
+              >
+                <p>{pending.line}</p>
+              </ConfirmDialog>
+            )
+          }
         >
           <EntryForm
             cfg={cfg}
@@ -403,7 +457,7 @@ export default function AthleteProfile({ athleteId }: { athleteId: string }) {
             sessions={allSessions}
             draft={draft}
             setDraft={setDraft}
-            onSave={saveSession}
+            onSave={requestSave}
             onClear={clearOrCancel}
             saving={saving}
             readOnly={false}
