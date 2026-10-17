@@ -4413,3 +4413,8 @@ a.btn {
   color: var(--ink-dim);
   font-size: 13.5px;
 }
+
+.group-test-foot {
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--line-soft);
+}

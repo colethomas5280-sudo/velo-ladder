@@ -60,24 +60,27 @@ function group({
 
 /**
  * Stubs fetch for POSTs and records { url, body }. A POST whose URL contains
- * `failFor` answers 500. Restore in finally.
+ * `failFor` answers 500. With a `gate`, every POST waits for it. Restore in finally.
  */
-function mockApi(failFor?: string) {
+function mockApi(failFor?: string, gate?: Promise<void>) {
   const calls: { url: string; body: Record<string, unknown> }[] = [];
+  const gets: string[] = [];
   const real = globalThis.fetch;
   globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
     if (init?.method === "POST" && typeof init.body === "string") {
       const url = String(input);
       calls.push({ url, body: JSON.parse(init.body) });
+      if (gate) await gate;
       const fail = !!failFor && url.includes(failFor);
       return new Response(JSON.stringify(fail ? { error: "nope" } : {}), {
         status: fail ? 500 : 200,
         headers: { "Content-Type": "application/json" },
       });
     }
+    gets.push(String(input));
     return real(input as string, init);
   }) as typeof fetch;
-  return { calls, restore: () => (globalThis.fetch = real) };
+  return { calls, gets, restore: () => (globalThis.fetch = real) };
 }
 
 /** One athlete's wrapper. It carries `hidden` while inactive, so queries inside need { hidden: true }. */
@@ -87,7 +90,7 @@ const tabs = () => Array.from(document.querySelectorAll<HTMLElement>(".atab"));
 const tab = (first: string) => tabs().find((t) => t.textContent!.startsWith(first))!;
 const tabText = (first: string) => tab(first).textContent!;
 const progress = (id: string) => panel(id).querySelector(".ms-progress b")!.textContent!;
-const saveAllButton = () => screen.getByRole("button", { name: /^(save all|saving)/i }) as HTMLButtonElement;
+const saveAllButton = () => document.querySelector<HTMLButtonElement>(".group-test-foot button")!;
 
 /** Lets pending promises and effects land, inside act so React stays quiet. */
 const settle = () =>
@@ -195,7 +198,7 @@ test("an athlete's own Save posts only their body to their own screens route", a
     assert.equal(api.calls.length, 1);
     assert.equal(api.calls[0].url, "/api/athletes/a/screens");
     assert.equal(api.calls[0].body.date, TODAY);
-    assert.deepEqual(api.calls[0].body.results, fillNormal({}, SCREEN_TESTS));
+    assert.deepEqual(api.calls[0].body.results, fillNormal({}));
     assert.ok(api.calls.every((c) => !c.url.includes("/b/")), "B was not posted");
   } finally {
     api.restore();
@@ -229,6 +232,30 @@ test("Save all posts for each athlete with answers, none for one without, and co
     assert.equal(tabText("Alex"), "Alex ✓");
     assert.equal(tabText("Blake"), "Blake ✓");
     assert.equal(tabText("Casey"), "Casey");
+  } finally {
+    api.restore();
+  }
+});
+
+test("Save all is disabled and reads Saving while it runs, so it cannot be pressed twice", async () => {
+  let release!: () => void;
+  const api = mockApi(undefined, new Promise<void>((r) => (release = r)));
+  try {
+    group();
+    markRestNormal("a");
+    await waitFor(() => assert.equal(saveAllButton().textContent, "Save all (1)"));
+    await click(saveAllButton());
+    await waitFor(() => assert.equal(saveAllButton().textContent, "Saving…"));
+    assert.equal(saveAllButton().disabled, true);
+    await click(saveAllButton());
+    assert.equal(api.calls.length, 1, "a second press did not post again");
+
+    await act(async () => {
+      release();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    await waitFor(() => assert.equal(saveAllButton().textContent, "Save all (0)"));
+    assert.equal(api.calls.length, 1);
   } finally {
     api.restore();
   }
@@ -394,6 +421,19 @@ test("onSaved fires once per successful save and not for a failed one", async ()
     await waitFor(() => assert.equal(saved, 1));
     await settle();
     assert.equal(saved, 1, "A failed, B succeeded");
+  } finally {
+    api.restore();
+  }
+});
+
+test("a successful save refreshes that athlete's own records and no one else's", async () => {
+  const api = mockApi();
+  try {
+    group();
+    markRestNormal("a");
+    await click(ownSave("a"));
+    await waitFor(() => assert.ok(api.gets.includes("/api/athletes/a/screens"), `gets: ${api.gets}`));
+    assert.ok(!api.gets.includes("/api/athletes/b/screens"));
   } finally {
     api.restore();
   }
