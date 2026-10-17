@@ -362,6 +362,10 @@ test("closing a session screen refreshes the same three", async () => {
   await act(async () => {
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Close" }));
   });
+  // Closing the velocity pop-up now asks first; leaving is what really closes it.
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+  });
   await waitFor(() => assert.deepEqual([...log].sort(), [...REFRESHED].sort()));
 });
 

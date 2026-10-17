@@ -4455,3 +4455,29 @@ a.btn {
   font-size: 13px;
   color: var(--ink-dim);
 }
+
+/* ---------- confirm box over a pop-up ---------- */
+/* Same z-index as .modal-backdrop would stack it above by DOM order, but the
+   explicit value keeps that from depending on where it is rendered. */
+.confirm-backdrop {
+  z-index: 70;
+  align-items: center;
+}
+.confirm-body {
+  font-size: 13.5px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+}
+.confirm-body p {
+  margin: 0;
+}
+.confirm-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
