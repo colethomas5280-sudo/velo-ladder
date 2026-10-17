@@ -851,6 +851,16 @@ Tests: `lib/saveSummary.test.ts`, `components/ConfirmDialog.test.tsx`,
 The one edit to an older test: `QuickStart.test.tsx` "closing a session screen refreshes the
 same three" now also clicks Leave, because the X no longer closes in one click.
 
+**Save all and partial failure (GroupSession).** Save all posts the athletes one after
+another. Each success is recorded the moment it happens: the athlete's tab is ticked and,
+for the active athlete, the on-screen draft is cleared. If a later athlete fails, the
+message says how many saved ("Saved 1, but not everyone. ..."), the roster is told, and
+a retry lists only the athletes still unsaved. Without this, a retry re-wrote the active
+athlete's on-screen numbers into storage and posted the same session a second time.
+Known remaining limit: if a request reaches the server but its reply is lost, the app
+cannot tell it was saved and a retry would post it again (the sessions API has no
+idempotency key).
+
 ## Local development
 
 Node is installed via **nvm** (`~/.nvm`, Node v24). If `node` isn't found, run:

@@ -441,3 +441,94 @@ test("a single save also reads the draft on screen, not whatever storage holds",
     within(confirmBox("Save Jake Bell's session?")!).queryByText(`Mound · ${fmtDate("2026-10-12")} · best 100% throw 91 mph`) !== null,
   );
 });
+
+/* ---- A failure partway through Save all must not make a retry post anyone twice ---- */
+
+const tabLabel = (first: string) =>
+  screen.getByRole("button", { name: new RegExp(`^${first}`) }).textContent ?? "";
+
+test("a retry after a partial Save all failure posts only the athlete who failed", async () => {
+  // Jake (a) is the active tab and saves; Cooper (b) fails.
+  const first = mockApi({ failFor: "/b/" });
+  try {
+    put("a", HIT("91"));
+    put("b", HIT("88"));
+    open(["a", "b"]);
+    press("Save all 2");
+    await pressInside(confirmBox("Save 2 sessions?")!, "Save all");
+    assert.equal(first.calls.filter((c) => c.url.includes("/a/")).length, 1, "Jake posted once");
+    assert.ok(screen.queryByRole("alert") !== null, "the failure is shown");
+  } finally {
+    first.restore();
+  }
+
+  // The server recovers; the coach presses Save all again.
+  const second = mockApi();
+  try {
+    press("Save all 2");
+    const box = confirmBox("Save 1 session?");
+    assert.ok(box !== null, "only Cooper is left to save");
+    assert.ok(within(box!).queryByText(/Jake/) === null, "Jake is not offered again");
+    await pressInside(box!, "Save all");
+    assert.equal(second.calls.filter((c) => c.url.includes("/a/")).length, 0, "Jake is never posted a second time");
+    assert.equal(second.calls.filter((c) => c.url.includes("/b/")).length, 1, "Cooper posts on the retry");
+  } finally {
+    second.restore();
+  }
+});
+
+test("a partial failure still ticks the athletes who saved and says how many did", async () => {
+  const api = mockApi({ failFor: "/b/" });
+  try {
+    put("a", HIT("91"));
+    put("b", HIT("88"));
+    open(["a", "b"]);
+    press("Save all 2");
+    await pressInside(confirmBox("Save 2 sessions?")!, "Save all");
+    assert.ok(tabLabel("Jake").includes("✓"), "Jake's tab shows he is saved");
+    assert.ok(!tabLabel("Cooper").includes("✓"), "Cooper's tab does not");
+    const alert = screen.getByRole("alert").textContent ?? "";
+    assert.match(alert, /Saved 1/);
+    assert.match(alert, /Couldn't save \(500\): nope/);
+  } finally {
+    api.restore();
+  }
+});
+
+test("a partial failure still tells the page that something was saved", async () => {
+  const api = mockApi({ failFor: "/b/" });
+  try {
+    put("a", HIT("91"));
+    put("b", HIT("88"));
+    let saved = 0;
+    const fixtures: Record<string, unknown> = {};
+    for (const p of PEOPLE) fixtures[`/api/athletes/${p.id}/sessions`] = [];
+    render(
+      withSwr(
+        fixtures,
+        <GroupSession people={PEOPLE} ids={["a", "b"]} onClose={() => {}} onSaved={() => (saved += 1)} />,
+      ),
+    );
+    press("Save all 2");
+    await pressInside(confirmBox("Save 2 sessions?")!, "Save all");
+    assert.ok(saved >= 1, "the roster is told Jake's session exists");
+  } finally {
+    api.restore();
+  }
+});
+
+test("when the first athlete fails nothing is marked saved and the message is the plain one", async () => {
+  const api = mockApi({ failFor: "/a/" });
+  try {
+    put("a", HIT("91"));
+    put("b", HIT("88"));
+    open(["a", "b"]);
+    press("Save all 2");
+    await pressInside(confirmBox("Save 2 sessions?")!, "Save all");
+    assert.equal(screen.getByRole("alert").textContent, "Couldn't save (500): nope");
+    assert.ok(!tabLabel("Jake").includes("✓"));
+    assert.equal(loadDraft("a", "mound").throws.m5?.[1], "91", "his numbers are still there");
+  } finally {
+    api.restore();
+  }
+});

@@ -228,6 +228,15 @@ export default function GroupSession({
         if (await postFor(m.id, loadDraft(m.id, tracker))) {
           now.add(m.id);
           count++;
+          /*
+           * Record every success the moment it happens, not after the loop.
+           * postFor has just cleared this athlete's STORED draft; if a later
+           * athlete then fails, an unrecorded success leaves the active
+           * athlete's on-screen numbers behind, and the retry writes them back
+           * to storage and posts the same session a second time.
+           */
+          setSaved(new Set(now));
+          if (m.id === activeId) setDraftState(emptyDraft());
         }
       }
       setSaved(now);
@@ -240,11 +249,14 @@ export default function GroupSession({
         );
     } catch (e) {
       console.error("[velo] group save failed", e);
-      setSaveError(
+      const why =
         e instanceof ApiError
           ? `Couldn't save (${e.status}): ${e.message}`
-          : "Couldn't save the group. Check your connection. Your numbers are still here.",
-      );
+          : "Couldn't save the group. Check your connection. Your numbers are still here.";
+      // Some sessions may already exist: say so, and tell the page, so the
+      // roster is not left showing the old picture.
+      setSaveError(count > 0 ? `Saved ${count}, but not everyone. ${why}` : why);
+      if (count > 0) onSaved?.();
     } finally {
       setSaving(false);
     }
